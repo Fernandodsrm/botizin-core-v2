@@ -14,6 +14,7 @@
 #include <time.h>
 #include "internet_config.h"
 #include "version.h"
+#include "telemetry_config.h"
 
 WebServer server(80);
 Preferences journal;
@@ -33,6 +34,11 @@ String internetStatus = "WAITING_FOR_FIRST_CHECK";
 bool internetStopped = false;
 uint32_t nextInternetCheck = 0;
 int responseCode = 400;
+String telemetryStatus = "WAITING";
+uint32_t nextTelemetry = 0, telemetrySequence = 0;
+uint8_t telemetryFailures = 0;
+bool telemetryStopped = false;
+String telemetryBootId;
 
 String partitionInfo(const esp_partition_t *p) {
   if (!p) return "NONE";
@@ -107,6 +113,7 @@ String snapshot() {
   s += "INTERNET_OTA: " + internetStatus + "\n";
   s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
+  s += "TELEMETRY: " + telemetryStatus + "\n";
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
   return s;
@@ -395,6 +402,69 @@ void checkInternetOTA() {
   rebootScheduled = true;
 }
 
+// Separate diagnostic sender: no Update, NVS write, boot change or Wi-Fi reconfiguration.
+// Called sequentially AFTER the existing OTA check has returned and freed its TLS clients.
+void __attribute__((noinline)) sendTelemetry() {
+  if (telemetryStopped || rebootScheduled || uploadActive || uploadOK ||
+      WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000) return;
+  if (ESP.getFreeHeap() < 80000) { telemetryStatus = "SKIPPED_LOW_HEAP"; return; }
+  cJSON *root = cJSON_CreateObject();
+  if (!root) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
+  const esp_partition_t *run = esp_ota_get_running_partition();
+  String runText = partitionInfo(run);
+  String bootText = partitionInfo(esp_ota_get_boot_partition());
+  String nextText = partitionInfo(esp_ota_get_next_update_partition(nullptr));
+  String resetText = resetInfo(), stateText = stateInfo(run);
+  // Preserve the persisted source version and SHA evidence without rewriting the OTA journal.
+  String evidence = priorAttempt.substring(0, 4096);
+  bool ok = cJSON_AddStringToObject(root, "origin", "ESP32_REAL") &&
+    cJSON_AddBoolToObject(root, "simulated", false) &&
+    cJSON_AddStringToObject(root, "firmware_version", BOTIZIN_VERSION) &&
+    cJSON_AddStringToObject(root, "boot_id", telemetryBootId.c_str()) &&
+    cJSON_AddNumberToObject(root, "sequence", ++telemetrySequence) &&
+    cJSON_AddNumberToObject(root, "uptime_seconds", millis() / 1000) &&
+    cJSON_AddStringToObject(root, "running_partition", runText.c_str()) &&
+    cJSON_AddStringToObject(root, "boot_partition", bootText.c_str()) &&
+    cJSON_AddStringToObject(root, "next_update_partition", nextText.c_str()) &&
+    cJSON_AddStringToObject(root, "reset_reason", resetText.c_str()) &&
+    cJSON_AddStringToObject(root, "ota_state", stateText.c_str()) &&
+    cJSON_AddStringToObject(root, "ota_journal", evidence.c_str());
+  char *payload = ok ? cJSON_PrintUnformatted(root) : nullptr;
+  cJSON_Delete(root);
+  if (!payload) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
+  size_t length = strlen(payload);
+  int code = -1000;
+  if (length <= 8192) {
+    NetworkClientSecure tls;
+    tls.useBuiltinCACertBundle();
+    tls.setHandshakeTimeout(5);
+    HTTPClient http;
+    http.setConnectTimeout(5000);
+    http.setTimeout(5000);
+    http.useHTTP10(true);
+    http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+    // Device token only. The account API key is NEVER used by the ESP32.
+    String url = "https://thingsboard.cloud/api/v1/";
+    url += BOTIZIN_TB_DEVICE_TOKEN;
+    url += "/telemetry";
+    if (http.begin(tls, url)) {
+      http.addHeader("Content-Type", "application/json");
+      code = http.POST((uint8_t *)payload, length);
+    }
+    http.end();
+    tls.stop();
+  }
+  cJSON_free(payload);
+  telemetryStatus = "HTTP_" + String(code);
+  Serial.println("TELEMETRY: " + telemetryStatus);
+  if (code >= 200 && code < 300) telemetryFailures = 0;
+  else if (++telemetryFailures >= 3) {
+    telemetryStopped = true;
+    telemetryStatus = "PAUSED_AFTER_3_FAILURES_UNTIL_REBOOT";
+    Serial.println("TELEMETRY: " + telemetryStatus);
+  }
+}
+
 void printPartitionTable() {
   Serial.println("PARTITION_TABLE:");
   esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, nullptr);
@@ -444,6 +514,8 @@ void setup() {
     rebootAt = millis() + 2000; rebootScheduled = true;
   });
   if (WiFi.status() == WL_CONNECTED) configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
+  telemetryBootId = String((unsigned long)esp_random(), HEX) + String((unsigned long)esp_random(), HEX);
+  nextTelemetry = millis() + 20000;
   nextInternetCheck = millis() + 10000;
   server.begin();
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
@@ -456,6 +528,11 @@ void loop() {
       (int32_t)(millis() - nextInternetCheck) >= 0) {
     nextInternetCheck = millis() + 60000;
     checkInternetOTA();
+  }
+  if (!rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
+      (int32_t)(millis() - nextTelemetry) >= 0) {
+    nextTelemetry = millis() + 60000;
+    sendTelemetry();
   }
   delay(2);
 }

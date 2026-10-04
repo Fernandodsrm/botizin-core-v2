@@ -1,0 +1,24 @@
+{
+  "protected_functions_unchanged": [
+    "partitionInfo",
+    "stateInfo",
+    "resetInfo",
+    "logLine",
+    "checkpoint",
+    "hexDigest",
+    "hashPartition",
+    "failUpload",
+    "beginUpload",
+    "writeUpload",
+    "finishUpload",
+    "handleUpload",
+    "newerVersion",
+    "stopInternet",
+    "checkInternetOTA",
+    "printPartitionTable"
+  ],
+  "wifi_config_unchanged": true,
+  "flash_write_calls_in_sender": false,
+  "account_api_key_in_sender": false,
+  "physical_test": "PENDING"
+}

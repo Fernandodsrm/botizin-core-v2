@@ -31,6 +31,8 @@ jobs:
           arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
       - name: Compile and validate firmware package
+        env:
+          BOTIZIN_TB_DEVICE_TOKEN: ${{ secrets.BOTIZIN_TB_DEVICE_TOKEN }}
         run: python3 ci/build.py
       - name: Save firmware, manifest, ELF and logs
         if: always()
