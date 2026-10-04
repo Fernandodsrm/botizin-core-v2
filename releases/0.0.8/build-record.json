@@ -1,0 +1,11 @@
+{
+  "version": "0.0.8",
+  "core": "3.3.12",
+  "fqbn": "esp32:esp32:esp32s3:FlashSize=16M,FlashMode=qio,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,CPUFreq=240,USBMode=hwcdc,CDCOnBoot=cdc,EraseFlash=none",
+  "source_commit": "2458e477630191d6a2073915780997d880948300",
+  "run_id": "37225221568",
+  "bytes": 1145648,
+  "sha256": "8c050e655aef076f07cd871836053162c9a4eda12803c66bb56bedb0376cb817",
+  "credentials_compiled": false,
+  "published": false
+}
