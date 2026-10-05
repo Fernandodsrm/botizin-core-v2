@@ -35,6 +35,10 @@ uint32_t nextInternetCheck = 0;
 int responseCode = 400;
 String telemetryStatus = "WAITING";
 String oledStatus = "WAITING";
+String peerStatus = "WAITING", peerVersion;
+uint32_t peerSeenAt = 0;
+uint8_t oledPage = 0;
+bool oledDetail = false;
 uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
 bool telemetryStopped = false;
@@ -114,6 +118,10 @@ String snapshot() {
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
   s += "OLED: " + oledStatus + "\n";
+  s += "OLED_PAGE: " + String(oledPage == 0 ? "WROOM" : "S3") + "\n";
+  s += "S3_LINK: " + peerStatus + "\n";
+  s += "S3_EXPECTED_URL: http://192.168.0.36/status\n";
+  s += "S3_LAST_VERSION: " + peerVersion + "\n";
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
   return s;
@@ -430,7 +438,10 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "next_update_partition", nextText.c_str()) &&
     cJSON_AddStringToObject(root, "reset_reason", resetText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_state", stateText.c_str()) &&
-    cJSON_AddStringToObject(root, "ota_journal", evidence.c_str());
+    cJSON_AddStringToObject(root, "ota_journal", evidence.c_str()) &&
+    cJSON_AddStringToObject(root, "s3_link", peerStatus.c_str()) &&
+    cJSON_AddStringToObject(root, "s3_last_version", peerVersion.c_str()) &&
+    cJSON_AddNumberToObject(root, "s3_last_seen_age_seconds", peerVersion.length() ? double((millis() - peerSeenAt) / 1000) : -1.0);
   char *payload = ok ? cJSON_PrintUnformatted(root) : nullptr;
   cJSON_Delete(root);
   if (!payload) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
@@ -468,7 +479,9 @@ void __attribute__((noinline)) sendTelemetry() {
 }
 
 #include "ping_rpc.h"
+#include "peer_status.h"
 #include "oled_status.h"
+#include "navigation.h"
 
 void printPartitionTable() {
   Serial.println("PARTITION_TABLE:");
@@ -526,9 +539,12 @@ void setup() {
   server.begin();
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
   beginOled();
+  beginNavigation();
+  nextPeerPoll = millis() + 12000;
 }
 
 void loop() {
+  pollNavigation();
   pollProvisioning(uploadActive || uploadOK || rebootScheduled);
   server.handleClient();
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
@@ -547,6 +563,10 @@ void loop() {
     nextPingPoll = millis() + 15000;
     pollPing();
   }
+  pollNavigation();
+  refreshOled();
+  pollPeerStatus();
+  pollNavigation();
   refreshOled();
   delay(2);
 }

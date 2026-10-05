@@ -36,6 +36,10 @@ jobs:
           arduino-cli lib install "Adafruit BusIO@1.17.4" --no-deps
           arduino-cli lib install "Adafruit GFX Library@1.12.6" --no-deps
           arduino-cli lib install "Adafruit SSD1306@2.5.17" --no-deps
+      - name: Validate S3 status parser
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/peer_status_test.cpp -o /tmp/peer-status-test
+          /tmp/peer-status-test
       - name: Compile and validate firmware package
         run: python3 ci/build_wroom.py
       - name: Save firmware, manifest, ELF and logs

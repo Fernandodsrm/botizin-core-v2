@@ -30,14 +30,46 @@ static void refreshOled() {
     return;
   }
   oled.clearDisplay();
-  oledLine(0, String("BOTIZIN WROOM ") + BOTIZIN_VERSION);
-  oledLine(1, WiFi.status() == WL_CONNECTED ? "WiFi: OK" : "WiFi: AGUARDANDO");
-  oledLine(2, String("IP ") + WiFi.localIP().toString());
-  const esp_partition_t *run = esp_ota_get_running_partition();
-  oledLine(3, String(run ? run->label : "NONE") + (otaReady ? " / OTA PRONTO" : " / OTA BLOQUEADO"));
-  oledLine(4, internetStatus.startsWith("UP_TO_DATE") ? "Internet OTA: ATUAL" : "OTA " + internetStatus);
-  oledLine(5, String("TB ") + telemetryStatus);
-  oledLine(6, String("PING ") + pingStatus);
+  if (oledPage == 0 && !oledDetail) {
+    oledLine(0, String("WROOM ") + BOTIZIN_VERSION + " [1/2]");
+    oledLine(1, WiFi.status() == WL_CONNECTED ? "WiFi: OK" : "WiFi: AGUARDANDO");
+    oledLine(2, String("IP ") + WiFi.localIP().toString());
+    const esp_partition_t *run = esp_ota_get_running_partition();
+    oledLine(3, String(run ? run->label : "NONE") + (otaReady ? " / OTA PRONTO" : " / OTA BLOQUEADO"));
+    oledLine(4, internetStatus.startsWith("UP_TO_DATE") ? "Internet OTA: ATUAL" : "OTA " + internetStatus);
+    oledLine(5, String("TB ") + telemetryStatus);
+    oledLine(6, "BAIXO:S3 OK:DETALHE");
+  } else if (oledPage == 0) {
+    oledLine(0, String("WROOM ") + BOTIZIN_VERSION + " DET");
+    oledLine(1, String("PING ") + pingStatus);
+    oledLine(2, String("Reset ") + resetInfo());
+    oledLine(3, String("OTA ") + stateInfo(esp_ota_get_running_partition()));
+    oledLine(4, String("Ligada ") + String(millis() / 1000) + "s");
+    oledLine(5, "S3 " + peerStatus);
+    oledLine(6, "OK:STATUS BAIXO:S3");
+  } else if (!peerHaveReport) {
+    oledLine(0, "S3 [2/2]");
+    oledLine(1, "SEM RELATO DA S3");
+    oledLine(2, peerStatus);
+    oledLine(3, "Alvo 192.168.0.36");
+    oledLine(4, "Consulta pela rede");
+    oledLine(5, "WROOM segue ativa");
+    oledLine(6, "VOLTAR:WROOM");
+  } else {
+    oledLine(0, String("S3 ") + peerFrame.version + " [2/2]");
+    oledLine(1, peerRecent() ? "CONTATO RECENTE" : "SEM CONTATO RECENTE");
+    oledLine(2, String("Relato ha ") + String((millis() - peerSeenAt) / 1000) + "s");
+    if (!oledDetail) {
+      oledLine(3, String("IP ") + peerFrame.ip);
+      oledLine(4, String("OTA ") + peerFrame.state);
+      oledLine(5, String("Ligada ") + String(peerFrame.uptime) + "s no relato");
+    } else {
+      oledLine(3, String(peerFrame.running).substring(0, 12));
+      oledLine(4, String("Reset ") + peerFrame.reset);
+      oledLine(5, String("OTA ") + peerFrame.internet);
+    }
+    oledLine(6, "OK:DET VOLTAR:WROOM");
+  }
   oled.display();
   if (!oledPresent()) {
     oledReady = false;
