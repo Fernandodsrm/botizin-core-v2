@@ -1,0 +1,13 @@
+{
+  "version": "0.0.10",
+  "core": "3.3.12",
+  "fqbn": "esp32:esp32:esp32s3:FlashSize=16M,FlashMode=qio,PSRAM=opi,PartitionScheme=app3M_fat9M_16MB,CPUFreq=240,USBMode=hwcdc,CDCOnBoot=cdc,EraseFlash=none",
+  "source_commit": "4f822cee8dd25a60ca21a773af3e65729ceedaf3",
+  "run_id": "37264705509",
+  "bytes": 1154272,
+  "sha256": "b0ad415a8dee35ac647b26b24260983040ea2a969cb577a9162587464c72abf9",
+  "wifi_credentials_compiled": false,
+  "published": true,
+  "publishable": true,
+  "device_token_compiled": true
+}
