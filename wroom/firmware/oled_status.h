@@ -14,7 +14,8 @@ static bool oledPresent() {
 }
 
 static void oledLine(uint8_t row, const String &value) {
-  oled.setCursor(0, row * 9);
+  // Yellow band: y=0..15. Blue content starts at y=18.
+  oled.setCursor(0, row < 2 ? row * 8 : 18 + (row - 2) * 9);
   // Fixed screen width; no wrapping or oversized temporary framebuffer.
   oled.print(value.substring(0, 21));
 }
@@ -32,58 +33,59 @@ static void refreshOled() {
   oled.clearDisplay();
   if (oledMenu) {
     oledLine(0, "BOTIZIN - MENU");
+    oledLine(1, "Cima/Baixo OK:abrir");
     const char *areas[] = {"Conexao", "Placa WROOM", "Placa S3", "Atualizacao WROOM", "Ajuda dos botoes"};
-    for (uint8_t i = 0; i < 5; ++i) oledLine(i + 1, String(i == oledMenuChoice ? "> " : "  ") + areas[i]);
-    oledLine(6, "Cima/Baixo OK:abrir");
+    for (uint8_t i = 0; i < 5; ++i) oledLine(i + 2, String(i == oledMenuChoice ? "> " : "  ") + areas[i]);
   } else if (oledPage == 3) {
-    oledLine(0, "CONEXAO");
-    oledLine(1, WiFi.status() == WL_CONNECTED ? "Wi-Fi: conectado" : "Wi-Fi: sem conexao");
-    oledLine(2, String("IP ") + WiFi.localIP().toString());
-    oledLine(3, telemetryStatus == "HTTP_200" ? "Site: envio aceito" : "Site: aguardando/envio");
-    oledLine(4, oledDetail ? "Site = ThingsBoard" : peerRecent() ? "S3: contato recente" : "S3: sem relato atual");
-    oledLine(5, "Cima/Baixo: area");
-    oledLine(6, "OK:info Voltar:menu");
+    oledLine(0, "CONEXAO       ^v:area");
+    oledLine(1, "OK:info Voltar:menu");
+    oledLine(2, WiFi.status() == WL_CONNECTED ? "Wi-Fi: conectado" : "Wi-Fi: sem conexao");
+    oledLine(3, String("IP ") + WiFi.localIP().toString());
+    oledLine(4, telemetryStatus == "HTTP_200" ? "Site: envio aceito" : "Site: aguardando");
+    oledLine(5, peerRecent() ? "S3: contato recente" : "S3: sem relato atual");
+    oledLine(6, oledDetail ? "Site = ThingsBoard" : "Dados desta WROOM");
   } else if (oledPage == 0) {
-    oledLine(0, String("PLACA WROOM ") + BOTIZIN_VERSION);
-    oledLine(1, String("Ligada ") + String(millis() / 60000) + " min");
-    oledLine(2, stateInfo(esp_ota_get_running_partition()) == "VALID" ? "Programa: validado" : "Programa: " + stateInfo(esp_ota_get_running_partition()));
-    oledLine(3, oledDetail ? "Reset = ultimo inicio" : resetInfo().startsWith("POWERON") ? "Inicio: ligou energia" : resetInfo().startsWith("BROWNOUT") ? "Inicio: queda energia" : resetInfo().startsWith("SOFTWARE") ? "Inicio: pelo programa" : "Inicio: " + resetInfo());
-    oledLine(4, oledDetail ? "PING = resposta real" : pingStatus == "READY" ? "Comandos: prontos" : "Comandos: ver painel");
-    oledLine(5, "Cima/Baixo: area");
-    oledLine(6, "OK:info Voltar:menu");
+    oledLine(0, String("WROOM ") + BOTIZIN_VERSION + " ^v:area");
+    oledLine(1, "OK:info Voltar:menu");
+    oledLine(2, String("Ligada ") + String(millis() / 60000) + " min");
+    oledLine(3, stateInfo(esp_ota_get_running_partition()) == "VALID" ? "Programa: validado" : "Programa: " + stateInfo(esp_ota_get_running_partition()));
+    oledLine(4, oledDetail ? "Reset = ultimo inicio" : resetInfo().startsWith("POWERON") ? "Inicio: ligou energia" : resetInfo().startsWith("BROWNOUT") ? "Inicio: queda energia" : resetInfo().startsWith("SOFTWARE") ? "Inicio: pelo programa" : "Inicio: " + resetInfo());
+    oledLine(5, oledDetail ? "PING = resposta real" : pingStatus == "READY" ? "Comandos: prontos" : "Comandos: ver painel");
+    oledLine(6, peerRecent() ? "S3: contato recente" : "S3: sem relato atual");
   } else if (oledPage == 1) {
-    oledLine(0, String("PLACA S3 ") + (peerHaveReport ? String(peerFrame.version) : ""));
-    oledLine(1, peerRecent() ? "Contato: recente" : "Contato: aguardando");
-    oledLine(2, peerHaveReport ? String("Relato ha ") + String((millis() - peerSeenAt) / 1000) + "s" : "Buscando na rede...");
-    oledLine(3, peerHaveReport ? (oledDetail ? "Programa: " + String(peerFrame.state) : "IP " + String(peerFrame.ip)) : "Alvo: 192.168.0.36");
-    oledLine(4, peerHaveReport ? String("Ligada ") + String(peerFrame.uptime / 60) + " min no relato" : "WROOM segue ativa");
-    oledLine(5, "Cima/Baixo: area");
-    oledLine(6, "OK:info Voltar:menu");
+    oledLine(0, String("S3 ") + (peerHaveReport ? String(peerFrame.version) : "--") + " ^v:area");
+    oledLine(1, "OK:info Voltar:menu");
+    oledLine(2, peerRecent() ? "Contato: recente" : "Contato: aguardando");
+    oledLine(3, peerHaveReport ? String("Relato ha ") + String((millis() - peerSeenAt) / 1000) + "s" : "Buscando na rede...");
+    oledLine(4, peerHaveReport ? (oledDetail ? "Programa: " + String(peerFrame.state) : "IP " + String(peerFrame.ip)) : "Alvo: 192.168.0.36");
+    oledLine(5, peerHaveReport ? String("Ligada ") + String(peerFrame.uptime / 60) + " min" : "WROOM segue ativa");
+    oledLine(6, "Valores do relato S3");
   } else if (oledPage == 2 && oledDetail && candidateReady()) {
-    oledLine(0, "CONFIRMAR INSTALACAO?");
-    oledLine(1, "Atual " + String(BOTIZIN_VERSION));
-    oledLine(2, "Nova  " + otaTargetVersion);
-    oledLine(3, "Vai reiniciar WROOM");
-    oledLine(4, String("Prazo ") + String((otaManualUntil - millis()) / 1000) + "s");
-    oledLine(5, "Cima/Baixo: opcoes");
-    oledLine(6, "OK:SIM Voltar:NAO");
+    oledLine(0, "INSTALAR NA WROOM?");
+    oledLine(1, "OK:SIM Voltar:NAO");
+    oledLine(2, "Atual " + String(BOTIZIN_VERSION));
+    oledLine(3, "Nova  " + otaTargetVersion);
+    oledLine(4, "Vai reiniciar WROOM");
+    oledLine(5, String("Prazo ") + String((otaManualUntil - millis()) / 1000) + "s");
+    oledLine(6, "Automatico: LIGADO");
   } else if (oledPage == 2) {
-    oledLine(0, "ATUALIZACAO WROOM");
-    oledLine(1, String("Atual ") + BOTIZIN_VERSION + " Auto:ON");
-    oledLine(2, candidateReady() ? "Nova " + otaTargetVersion : internetStatus.startsWith("UP_TO_DATE") ? "Sem versao nova" : otaCheckQueued ? "Consulta aguardando" : "Git: consultar versao");
-    oledLine(3, String("> ") + (oledOtaChoice == 0 ? "Consultar GitHub" : oledOtaChoice == 1 ? "Instalar nova versao" : "Cancelar pedido"));
-    bool active = oledOtaChoice == 0 ? otaReady && !internetStopped : oledOtaChoice == 1 ? candidateReady() : manualWindowActive();
-    oledLine(4, active ? (oledOtaChoice == 1 ? "OK: ver confirmacao" : "Disponivel com OK") : oledOtaChoice == 1 ? "Bloqueado: sem nova" : "Bloqueado: sem pedido");
-    oledLine(5, "Cima/Baixo: opcao");
-    oledLine(6, "OK:acao Voltar:menu");
+    oledLine(0, String("OTA WROOM ") + BOTIZIN_VERSION + " ^v");
+    oledLine(1, "OK:acao Voltar:menu");
+    const char *actions[] = {"Consultar GitHub", "Instalar nova", "Cancelar pedido"};
+    bool active[] = {otaReady && !internetStopped, candidateReady(), manualWindowActive()};
+    for (uint8_t i = 0; i < 3; ++i) {
+      oledLine(i + 2, String(i == oledOtaChoice ? "> " : "  ") + actions[i] + (active[i] ? "" : " [X]"));
+    }
+    oledLine(5, candidateReady() ? "Nova " + otaTargetVersion + " Auto:ON" : internetStatus.startsWith("UP_TO_DATE") ? "Auto:ON | sem nova" : "Automatico: LIGADO");
+    oledLine(6, active[oledOtaChoice] ? (oledOtaChoice == 0 ? "Busca; nao instala" : oledOtaChoice == 1 ? "OK: abre confirmacao" : "Auto retoma em 5 min") : oledOtaChoice == 1 ? "Sem candidata valida" : oledOtaChoice == 2 ? "Sem pedido manual" : "Consulta bloqueada");
   } else {
     oledLine(0, "AJUDA DOS BOTOES");
-    oledLine(1, "Cima: item anterior");
-    oledLine(2, "Baixo: proximo item");
-    oledLine(3, "OK: acao na tela");
-    oledLine(4, "Voltar: sair da area");
-    oledLine(5, "Instala: pede SIM/NAO");
-    oledLine(6, "Voltar: menu inicial");
+    oledLine(1, "Voltar:menu ^v:area");
+    oledLine(2, "Cima: item anterior");
+    oledLine(3, "Baixo: proximo item");
+    oledLine(4, "OK: acao na tela");
+    oledLine(5, "^v = Cima/Baixo");
+    oledLine(6, "[X] = indisponivel");
   }
   oled.display();
   if (!oledPresent()) {
@@ -116,13 +118,14 @@ void showOtaProgress(const String &phase, size_t done, size_t total) {
   if (!oledReady) return;
   if (!oledPresent()) { oledReady = false; oledStatus = "PAUSED_I2C_ERROR"; return; }
   oled.clearDisplay();
-  oledLine(0, "OTA WROOM"); oledLine(1, phase);
+  oledLine(0, "ATUALIZANDO WROOM");
+  oledLine(1, "Botoes: bloqueados");
+  oledLine(2, phase);
   if (total) {
-    oledLine(2, String((unsigned long)(done * 100 / total)) + "%");
-    oledLine(3, String((unsigned long)done) + " bytes");
-    oledLine(4, "de " + String((unsigned long)total));
+    oledLine(3, String((unsigned long)(done * 100 / total)) + "%");
+    oledLine(4, String((unsigned long)done) + " bytes");
+    oledLine(5, "de " + String((unsigned long)total));
   }
-  oledLine(5, "Botoes: bloqueados");
   oledLine(6, "Nao desligue a placa");
   oled.display();
 }

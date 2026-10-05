@@ -1,2 +1,2 @@
 #pragma once
-#define BOTIZIN_VERSION "0.0.8"
+#define BOTIZIN_VERSION "0.0.9"
