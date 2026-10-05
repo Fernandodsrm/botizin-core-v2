@@ -38,7 +38,8 @@ String oledStatus = "WAITING";
 String peerStatus = "WAITING", peerVersion;
 uint32_t peerSeenAt = 0;
 uint8_t oledPage = 0;
-bool oledDetail = false;
+bool oledDetail = false, oledMenu = true;
+uint8_t oledMenuChoice = 0, oledOtaChoice = 0;
 uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
 bool telemetryStopped = false;
@@ -146,7 +147,7 @@ String snapshot() {
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
   s += "OLED: " + oledStatus + "\n";
-  s += "OLED_PAGE: " + String(oledPage == 0 ? "WROOM" : oledPage == 1 ? "S3" : "OTA") + "\n";
+  s += "OLED_PAGE: " + String(oledMenu ? "MENU" : oledPage == 0 ? "WROOM" : oledPage == 1 ? "S3" : oledPage == 2 ? "OTA" : oledPage == 3 ? "CONNECTION" : "HELP") + "\n";
   s += "S3_LINK: " + peerStatus + "\n";
   s += "S3_EXPECTED_URL: http://192.168.0.36/status\n";
   s += "S3_LAST_VERSION: " + peerVersion + "\n";

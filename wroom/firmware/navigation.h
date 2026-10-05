@@ -34,15 +34,33 @@ static void pollNavigation() {
   portEXIT_CRITICAL(&navMux);
   // Discard presses during firmware writes and pending actions.
   if (!pending || uploadActive || uploadOK || rebootScheduled || otaCheckQueued || otaInstallQueued) return;
-  if (pending & 4) { if (oledPage == 2) cancelOtaCheck(); oledPage = 0; oledDetail = false; }
-  else if (pending & (2 | 8)) { oledPage = (oledPage + ((pending & 8) ? 1 : 2)) % 3; oledDetail = false; }
-  else if (pending & 1) {
-    if (oledPage == 2) {
-      if (candidateReady()) confirmOta(otaCandidateId, otaTargetVersion, otaTargetSHA, telemetryBootId);
-      else queueOtaCheck();
-    } else oledDetail = !oledDetail;
-  }
-  if (oledPage == 1) nextPeerPoll = millis();
+  if (pending & 4) {
+    if (oledPage == 2 && oledDetail && !oledMenu) oledDetail = false;
+    else { oledMenu = true; oledDetail = false; }
+  } else if (oledMenu) {
+    if (pending & (2 | 8)) oledMenuChoice = (oledMenuChoice + ((pending & 8) ? 1 : 4)) % 5;
+    else if (pending & 1) {
+      const uint8_t pages[] = {3, 0, 1, 2, 4};
+      oledPage = pages[oledMenuChoice]; oledMenu = false; oledDetail = false;
+    }
+  } else if (oledPage == 2) {
+    if (pending & (2 | 8)) {
+      oledDetail = false;
+      oledOtaChoice = (oledOtaChoice + ((pending & 8) ? 1 : 2)) % 3;
+    } else if (pending & 1) {
+      if (oledOtaChoice == 0) { oledDetail = false; queueOtaCheck(); }
+      else if (oledOtaChoice == 1 && candidateReady()) {
+        if (!oledDetail) oledDetail = true;
+        else { confirmOta(otaCandidateId, otaTargetVersion, otaTargetSHA, telemetryBootId); oledDetail = false; }
+      } else if (oledOtaChoice == 2 && manualWindowActive()) { cancelOtaCheck(); oledDetail = false; }
+    }
+  } else if (pending & (2 | 8)) {
+    const uint8_t pages[] = {3, 0, 1, 2, 4};
+    uint8_t index = 0; while (index < 4 && pages[index] != oledPage) ++index;
+    index = (index + ((pending & 8) ? 1 : 4)) % 5;
+    oledPage = pages[index]; oledMenuChoice = index; oledDetail = false;
+  } else if ((pending & 1) && oledPage != 4) oledDetail = !oledDetail;
+  if (oledPage == 1 && !oledMenu) nextPeerPoll = millis();
   nextOledRefresh = 0;
-  Serial.printf("NAV: %s / %s\n", oledPage == 0 ? "WROOM" : oledPage == 1 ? "S3" : "OTA", oledDetail ? "DETAIL" : "STATUS");
+  Serial.printf("NAV: page=%u menu=%u choice=%u detail=%u\n", oledPage, oledMenu, oledOtaChoice, oledDetail);
 }
