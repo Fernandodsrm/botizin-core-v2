@@ -1,0 +1,11 @@
+# Interface WROOM 0.0.8
+
+Menu inicial: Conexão, Placa WROOM, Placa S3, Atualização WROOM e Ajuda dos botões. Cima/Baixo escolhem e OK abre; Voltar retorna ao menu. Dentro das áreas de consulta, Cima/Baixo trocam de área e OK mostra informações explicativas. Ajuda não executa comandos.
+
+Na área Atualização, Cima/Baixo escolhem Consultar GitHub, Instalar nova versão ou Cancelar pedido. A tela informa quando a ação está bloqueada. Consultar abre a reserva manual existente de até 5 minutos. Instalar só abre uma tela de confirmação se houver candidata válida; outro OK confirma e Voltar retorna sem instalar. Cancelar é uma opção separada, limpa a candidata e concede os cinco minutos existentes antes de retomar o automático. Voltar ao menu não cancela nem instala. Durante escrita/reinício os botões permanecem bloqueados.
+
+Painel: conexão/dados primeiro, teste PING depois e atualização por último. Dados técnicos e comprovantes ficam em detalhes recolhidos. Botões bloqueados têm aparência cinza e motivo textual; firmware 0.0.8 é aceito junto com as versões anteriores. Horário do servidor, correlação RPC, expiração, validação SHA e confirmação de novo boot são preservados.
+
+Pinos inalterados: OK25, Cima27, Voltar32, Baixo33; OLED SDA21/SCL22. LED26 permanece fora desta mudança. S3 permanece 0.0.10. NVS, SPIFFS, tabela de partições e OTA automático preservados. Não há alterações no transporte de comandos ou na política de recuperação. Chamadas HTTPS continuam sequenciais e podem atrasar a navegação enquanto estão em andamento; esta versão organiza a interface, sem prometer resposta física em tempo real.
+
+Testes: navegação, instalação bloqueada sem candidata, confirmação explícita, candidata expirada, cancelamento separado e bloqueio durante escrita. Pipeline 37299492857 / fonte 8c53d4d02f6af4a21ce01efc6301500271a0d635 concluiu com sucesso. Binário 1227392 bytes; SHA-256 deeba61f4c9c8fab6840f55a39a0eb71b62c0d42cfff98a222e4571b9b1bfd21; RAM global 65440 bytes; partições idênticas à 0.0.7. Widgets e layout conferidos por leitura após salvar. Testes de PING, OTA e relógio do servidor passaram. Renderização em navegador local ficou indisponível porque o download do Chromium falhou; usabilidade física ainda exige teste na placa.

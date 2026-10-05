@@ -43,10 +43,12 @@ self.onDataUpdated = function () {
   put('version', value('firmware_version'));
   put('origin', real ? 'Relato real da ESP32' : 'Origem ainda não confirmada');
   put('uptime', v.uptime_seconds ? duration(Number(v.uptime_seconds.value)) : 'Aguardando dados');
-  put('reset', value('reset_reason'));
+  var reset=value('reset_reason');
+  put('reset', reset.indexOf('POWERON')===0?'Recebeu energia':reset.indexOf('SOFTWARE')===0?'Reinício pelo programa':reset.indexOf('BROWNOUT')===0?'Queda de alimentação':reset);
+  put('reset-help',reset);
   put('running', value('running_partition'));
   put('boot', value('boot_partition'));
-  put('ota', value('ota_state'));
+  put('ota', value('ota_state') === 'VALID' ? 'Validado' : value('ota_state'));
   put('boot-id', value('boot_id'));
   put('sequence', value('sequence'));
   var journal = value('ota_journal');
