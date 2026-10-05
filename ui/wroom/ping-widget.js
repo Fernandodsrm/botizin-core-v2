@@ -12,9 +12,9 @@ self.onDataUpdated=function(){
 function updateReady(){
  if(!self.root)return;
  var v=self.v||{},version=v.firmware_version;
- self.ready=version&&String(version.value)==='0.0.3'&&v.origin&&String(v.origin.value)==='ESP32_REAL'&&v.simulated&&String(v.simulated.value)==='false'&&Date.now()-version.ts<180000;
+ self.ready=version&&['0.0.3','0.0.4'].indexOf(String(version.value))>=0&&v.origin&&String(v.origin.value)==='ESP32_REAL'&&v.simulated&&String(v.simulated.value)==='false'&&Date.now()-version.ts<180000;
  self.button.disabled=self.busy||!self.ready;
- text('readiness',self.busy?'Aguardando resposta da placa…':self.ready?'Pronto. A placa consulta comandos a cada 15 segundos.':'Disponível quando a placa informar 0.0.3 com contato recente.');
+ text('readiness',self.busy?'Aguardando resposta da placa…':self.ready?'Pronto. A placa consulta comandos a cada 15 segundos.':'Disponível quando a placa informar 0.0.3 ou 0.0.4 com contato recente.');
 }
 function sendPing(){
  if(!self.ready||self.busy)return;
