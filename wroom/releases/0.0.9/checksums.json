@@ -1,0 +1,6 @@
+{
+  "firmware.ino.bootloader.bin": "7c5e6c42dcd3b658a81374d51e42aa839559b936df3ec181e94e864880b29fc2",
+  "firmware.ino.bin": "98db9a6d520e303963d90b823613f2fbfcb367397adf0707c2a9077fa118ce1d",
+  "boot_app0.bin": "f94c5d786a7a8fab06ac5d10e33bf37711a6697636dc037559ea19cc410a17f0",
+  "firmware.ino.partitions.bin": "148b959cbff1c38aa8e1d5c0ba9d612c54997b945e56a63f41223eef650653a1"
+}
