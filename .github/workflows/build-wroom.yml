@@ -30,6 +30,12 @@ jobs:
           arduino-cli version
           arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - name: Install pinned OLED libraries
+        run: |
+          arduino-cli lib update-index
+          arduino-cli lib install "Adafruit BusIO@1.17.4" --no-deps
+          arduino-cli lib install "Adafruit GFX Library@1.12.6" --no-deps
+          arduino-cli lib install "Adafruit SSD1306@2.5.17" --no-deps
       - name: Compile and validate firmware package
         run: python3 ci/build_wroom.py
       - name: Save firmware, manifest, ELF and logs

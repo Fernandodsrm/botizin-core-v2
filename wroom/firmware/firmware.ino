@@ -34,6 +34,7 @@ bool internetStopped = false;
 uint32_t nextInternetCheck = 0;
 int responseCode = 400;
 String telemetryStatus = "WAITING";
+String oledStatus = "WAITING";
 uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
 bool telemetryStopped = false;
@@ -112,6 +113,7 @@ String snapshot() {
   s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
+  s += "OLED: " + oledStatus + "\n";
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
   return s;
@@ -466,6 +468,7 @@ void __attribute__((noinline)) sendTelemetry() {
 }
 
 #include "ping_rpc.h"
+#include "oled_status.h"
 
 void printPartitionTable() {
   Serial.println("PARTITION_TABLE:");
@@ -522,6 +525,7 @@ void setup() {
   nextInternetCheck = millis() + 10000;
   server.begin();
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
+  beginOled();
 }
 
 void loop() {
@@ -543,5 +547,6 @@ void loop() {
     nextPingPoll = millis() + 15000;
     pollPing();
   }
+  refreshOled();
   delay(2);
 }
