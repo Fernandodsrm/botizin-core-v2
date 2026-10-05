@@ -465,6 +465,8 @@ void __attribute__((noinline)) sendTelemetry() {
   }
 }
 
+#include "ping_rpc.h"
+
 void printPartitionTable() {
   Serial.println("PARTITION_TABLE:");
   esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, nullptr);
@@ -515,6 +517,7 @@ void setup() {
   });
   if (WiFi.status() == WL_CONNECTED) configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
   telemetryBootId = String((unsigned long)esp_random(), HEX) + String((unsigned long)esp_random(), HEX);
+  nextPingPoll = millis() + 30000;
   nextTelemetry = millis() + 20000;
   nextInternetCheck = millis() + 10000;
   server.begin();
@@ -533,6 +536,11 @@ void loop() {
       (int32_t)(millis() - nextTelemetry) >= 0) {
     nextTelemetry = millis() + 60000;
     sendTelemetry();
+  }
+  if (!rebootScheduled && !uploadActive && !uploadOK && !pingStopped &&
+      (int32_t)(millis() - nextPingPoll) >= 0) {
+    nextPingPoll = millis() + 15000;
+    pollPing();
   }
   delay(2);
 }
