@@ -31,7 +31,7 @@ static void refreshOled() {
   }
   oled.clearDisplay();
   if (oledPage == 0 && !oledDetail) {
-    oledLine(0, String("WROOM ") + BOTIZIN_VERSION + " [1/2]");
+    oledLine(0, String("WROOM ") + BOTIZIN_VERSION + " [1/3]");
     oledLine(1, WiFi.status() == WL_CONNECTED ? "WiFi: OK" : "WiFi: AGUARDANDO");
     oledLine(2, String("IP ") + WiFi.localIP().toString());
     const esp_partition_t *run = esp_ota_get_running_partition();
@@ -47,8 +47,18 @@ static void refreshOled() {
     oledLine(4, String("Ligada ") + String(millis() / 1000) + "s");
     oledLine(5, "S3 " + peerStatus);
     oledLine(6, "OK:STATUS BAIXO:S3");
+  } else if (oledPage == 2) {
+    oledLine(0, "OTA WROOM [3/3]");
+    oledLine(1, "Automatico: LIGADO");
+    oledLine(2, "Atual: " + String(BOTIZIN_VERSION));
+    oledLine(3, manualOtaStatus);
+    if (candidateReady()) {
+      oledLine(4, "Nova: " + otaTargetVersion);
+      oledLine(5, "OK:INSTALAR (5 min)");
+    } else { oledLine(4, "OK:CONSULTAR"); oledLine(5, "Sem instalacao manual"); }
+    oledLine(6, "VOLTAR:CANCELAR");
   } else if (!peerHaveReport) {
-    oledLine(0, "S3 [2/2]");
+    oledLine(0, "S3 [2/3]");
     oledLine(1, "SEM RELATO DA S3");
     oledLine(2, peerStatus);
     oledLine(3, "Alvo 192.168.0.36");
@@ -56,7 +66,7 @@ static void refreshOled() {
     oledLine(5, "WROOM segue ativa");
     oledLine(6, "VOLTAR:WROOM");
   } else {
-    oledLine(0, String("S3 ") + peerFrame.version + " [2/2]");
+    oledLine(0, String("S3 ") + peerFrame.version + " [2/3]");
     oledLine(1, peerRecent() ? "CONTATO RECENTE" : "SEM CONTATO RECENTE");
     oledLine(2, String("Relato ha ") + String((millis() - peerSeenAt) / 1000) + "s");
     if (!oledDetail) {
@@ -94,4 +104,20 @@ static void beginOled() {
     oled.setTextSize(1); oled.setTextColor(SSD1306_WHITE); oled.setTextWrap(false);
     refreshOled();
   }
+}
+
+// OTA runs sequentially on loopTask. Bounded OLED writes only at progress checkpoints.
+void showOtaProgress(const String &phase, size_t done, size_t total) {
+  if (!oledReady) return;
+  if (!oledPresent()) { oledReady = false; oledStatus = "PAUSED_I2C_ERROR"; return; }
+  oled.clearDisplay();
+  oledLine(0, "OTA WROOM"); oledLine(1, phase);
+  if (total) {
+    oledLine(2, String((unsigned long)(done * 100 / total)) + "%");
+    oledLine(3, String((unsigned long)done) + " bytes");
+    oledLine(4, "de " + String((unsigned long)total));
+  }
+  oledLine(5, "Automatico: LIGADO");
+  oledLine(6, "Mantenha alimentacao");
+  oled.display();
 }

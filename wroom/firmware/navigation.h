@@ -21,19 +21,28 @@ static void beginNavigation() {
     pinMode(button.pin, INPUT_PULLUP);
     attachInterruptArg(button.pin, navPress, &button, FALLING);
   }
-  Serial.println("BUTTONS: OK25 UP27 BACK32 DOWN33; navigation only");
+  Serial.println("BUTTONS: OK25 UP27 BACK32 DOWN33; navigation + explicit OTA query/confirmation");
+}
+
+static void discardNavigation() {
+  portENTER_CRITICAL(&navMux); navPending = 0; portEXIT_CRITICAL(&navMux);
 }
 
 static void pollNavigation() {
   portENTER_CRITICAL(&navMux);
   uint8_t pending = navPending; navPending = 0;
   portEXIT_CRITICAL(&navMux);
-  // Discard presses during firmware writes; buttons cannot start any OTA in 0.0.5.
-  if (!pending || uploadActive || uploadOK || rebootScheduled) return;
-  if (pending & 4) { oledPage = 0; oledDetail = false; }
-  else if (pending & (2 | 8)) { oledPage = oledPage == 0 ? 1 : 0; oledDetail = false; }
-  else if (pending & 1) oledDetail = !oledDetail;
+  // Discard presses during firmware writes and pending actions.
+  if (!pending || uploadActive || uploadOK || rebootScheduled || otaCheckQueued || otaInstallQueued) return;
+  if (pending & 4) { if (oledPage == 2) cancelOtaCheck(); oledPage = 0; oledDetail = false; }
+  else if (pending & (2 | 8)) { oledPage = (oledPage + ((pending & 8) ? 1 : 2)) % 3; oledDetail = false; }
+  else if (pending & 1) {
+    if (oledPage == 2) {
+      if (candidateReady()) confirmOta(otaCandidateId, otaTargetVersion, otaTargetSHA, telemetryBootId);
+      else queueOtaCheck();
+    } else oledDetail = !oledDetail;
+  }
   if (oledPage == 1) nextPeerPoll = millis();
   nextOledRefresh = 0;
-  Serial.printf("NAV: %s / %s\n", oledPage == 0 ? "WROOM" : "S3", oledDetail ? "DETAIL" : "STATUS");
+  Serial.printf("NAV: %s / %s\n", oledPage == 0 ? "WROOM" : oledPage == 1 ? "S3" : "OTA", oledDetail ? "DETAIL" : "STATUS");
 }

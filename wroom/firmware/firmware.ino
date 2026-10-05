@@ -43,6 +43,33 @@ uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
 bool telemetryStopped = false;
 String telemetryBootId;
+// Automatic OTA remains enabled. A manual query reserves a bounded confirmation window.
+String manualOtaStatus = "READY", otaCandidateId, otaTargetVersion, otaTargetURL, otaTargetSHA;
+size_t otaTargetBytes = 0;
+uint32_t otaManualUntil = 0;
+bool otaCheckQueued = false, otaInstallQueued = false;
+void showOtaProgress(const String &phase, size_t done = 0, size_t total = 0);
+#include "ota_confirmation.h"
+
+bool manualWindowActive() { return otaManualUntil && (int32_t)(otaManualUntil - millis()) > 0; }
+bool candidateReady() { return !otaCandidateId.isEmpty() && manualWindowActive() && !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled; }
+void clearOtaCandidate() { otaCandidateId = ""; otaTargetVersion = ""; otaTargetURL = ""; otaTargetSHA = ""; otaTargetBytes = 0; }
+bool queueOtaCheck() {
+  if (!otaReady || internetStopped || otaCheckQueued || otaInstallQueued || uploadActive || uploadOK || rebootScheduled) return false;
+  clearOtaCandidate(); otaManualUntil = millis() + 300000;
+  otaCheckQueued = true; manualOtaStatus = "CHECK_QUEUED"; return true;
+}
+bool confirmOta(const String &id, const String &version, const String &sha, const String &boot) {
+  if (!candidateReady() || !otaConfirmationMatches(millis(), otaManualUntil, id.c_str(), otaCandidateId.c_str(), version.c_str(), otaTargetVersion.c_str(), sha.c_str(), otaTargetSHA.c_str(), boot.c_str(), telemetryBootId.c_str())) return false;
+  otaInstallQueued = true; manualOtaStatus = "INSTALL_QUEUED"; return true;
+}
+void cancelOtaCheck() {
+  if (otaInstallQueued || uploadActive || uploadOK || rebootScheduled) return;
+  otaCheckQueued = false; clearOtaCandidate();
+  // Cancellation grants five minutes to the user before automatic installation resumes.
+  manualOtaStatus = "CANCELLED_AUTO_IN_5MIN"; otaManualUntil = millis() + 300000;
+}
+
 
 String partitionInfo(const esp_partition_t *p) {
   if (!p) return "NONE";
@@ -114,11 +141,12 @@ String snapshot() {
   s += "WIFI: " + String(WiFi.status() == WL_CONNECTED ? "OK" : "DISCONNECTED") + "\n";
   s += "OTA: " + String(otaReady ? "READY" : "BLOCKED: hardware/partition mismatch") + "\n";
   s += "INTERNET_OTA: " + internetStatus + "\n";
+  s += "OTA_AUTOMATIC_ENABLED: YES\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
   s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
   s += "OLED: " + oledStatus + "\n";
-  s += "OLED_PAGE: " + String(oledPage == 0 ? "WROOM" : "S3") + "\n";
+  s += "OLED_PAGE: " + String(oledPage == 0 ? "WROOM" : oledPage == 1 ? "S3" : "OTA") + "\n";
   s += "S3_LINK: " + peerStatus + "\n";
   s += "S3_EXPECTED_URL: http://192.168.0.36/status\n";
   s += "S3_LAST_VERSION: " + peerVersion + "\n";
@@ -280,7 +308,8 @@ void stopInternet(const String &reason) {
   Serial.println("INTERNET_OTA: " + internetStatus);
 }
 
-void checkInternetOTA() {
+void checkInternetOTA(bool manual) {
+  if (manual) { manualOtaStatus = "CHECKING"; showOtaProgress("CONSULTANDO GITHUB"); }
   if (!otaReady) { stopInternet("hardware/partition mismatch"); return; }
   if (WiFi.status() != WL_CONNECTED) {
     internetStatus = "WAITING_FOR_WIFI"; return;
@@ -350,6 +379,20 @@ void checkInternetOTA() {
   if (!newerVersion(targetVersion)) {
     stopInternet("manifest version is invalid or older"); return;
   }
+  if (manual) {
+    otaTargetVersion = targetVersion; otaTargetURL = targetURL; otaTargetSHA = targetSHA; otaTargetBytes = targetBytes;
+    otaCandidateId = telemetryBootId + "-" + String((unsigned long)esp_random(), HEX);
+    otaManualUntil = millis() + 300000; manualOtaStatus = "AVAILABLE";
+    nextTelemetry = millis(); showOtaProgress("VERSAO DISPONIVEL"); return;
+  }
+  installInternetOTA(targetVersion, targetURL, targetSHA, targetBytes);
+}
+
+void installInternetOTA(const String &targetVersion, const String &targetURL, const String &targetSHA, size_t targetBytes) {
+  if (!otaReady || internetStopped || uploadActive || uploadOK || rebootScheduled || WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000 || !newerVersion(targetVersion)) {
+    manualOtaStatus = "INSTALL_REJECTED"; return;
+  }
+  showOtaProgress("ABRINDO DOWNLOAD");
   Serial.println("TARGET_VERSION: " + targetVersion);
   Serial.println("DOWNLOAD_URL: " + targetURL);
   NetworkClientSecure firmwareTLS;
@@ -390,6 +433,7 @@ void checkInternetOTA() {
         if (writtenBytes >= nextProgress) {
           Serial.printf("DOWNLOAD_PROGRESS: %lu/%lu\n", (unsigned long)writtenBytes, (unsigned long)expectedBytes);
           nextProgress += 65536;
+          showOtaProgress("BAIXANDO", writtenBytes, expectedBytes);
         }
       }
     } else if (!download.connected()) {
@@ -401,9 +445,12 @@ void checkInternetOTA() {
     delay(1);
   }
   download.end();
+  showOtaProgress("VERIFICANDO SHA256", writtenBytes, expectedBytes);
   if (uploadActive) finishUpload();
   if (!uploadOK) { stopInternet("download/write verification failed; no retry or reboot"); return; }
   internetStatus = "VERIFIED " + targetVersion + "; REBOOT_PENDING";
+  manualOtaStatus = "VERIFIED_REBOOT_PENDING";
+  showOtaProgress("SHA OK REINICIANDO", writtenBytes, expectedBytes);
   logLine("REBOOT_REQUESTED: SOFTWARE / INTERNET_OTA");
   checkpoint();
   rebootAt = millis() + 2000;
@@ -439,6 +486,8 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "reset_reason", resetText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_state", stateText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_journal", evidence.c_str()) &&
+    cJSON_AddBoolToObject(root, "ota_automatic_enabled", true) &&
+    cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str()) &&
     cJSON_AddStringToObject(root, "s3_link", peerStatus.c_str()) &&
     cJSON_AddStringToObject(root, "s3_last_version", peerVersion.c_str()) &&
     cJSON_AddNumberToObject(root, "s3_last_seen_age_seconds", peerVersion.length() ? double((millis() - peerSeenAt) / 1000) : -1.0);
@@ -548,10 +597,24 @@ void loop() {
   pollProvisioning(uploadActive || uploadOK || rebootScheduled);
   server.handleClient();
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
+  if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued) {
+    String version = otaTargetVersion, url = otaTargetURL, sha = otaTargetSHA;
+    size_t bytes = otaTargetBytes;
+    otaInstallQueued = false; clearOtaCandidate(); otaManualUntil = 0;
+    installInternetOTA(version, url, sha, bytes);
+  }
+  if (!rebootScheduled && !uploadActive && !uploadOK && otaCheckQueued) {
+    otaCheckQueued = false;
+    checkInternetOTA(true);
+    if (manualOtaStatus == "CHECKING") manualOtaStatus = internetStatus;
+    // Presses made while the synchronous query was running cannot confirm its result.
+    discardNavigation(); nextOledRefresh = 0; nextTelemetry = millis();
+  }
   if (!rebootScheduled && !uploadActive && !uploadOK && !internetStopped &&
       (int32_t)(millis() - nextInternetCheck) >= 0) {
     nextInternetCheck = millis() + 60000;
-    checkInternetOTA();
+    if (!manualWindowActive()) { clearOtaCandidate(); checkInternetOTA(false); }
+
   }
   if (!rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
       (int32_t)(millis() - nextTelemetry) >= 0) {
