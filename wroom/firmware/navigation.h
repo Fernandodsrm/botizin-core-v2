@@ -46,7 +46,7 @@ static void pollNavigation() {
       if(navBoard)nextPeerPoll=millis();
     }
   }else if(navLevel==2){
-    if(pending&(2|8))navDiagnostic=(navDiagnostic+((pending&8)?1:2))%3;
+    if(pending&(2|8))navDiagnostic=(navDiagnostic+((pending&8)?1:3))%4;
     else if(pending&1){navLevel=3;oledPage=7;if(navBoard)nextPeerPoll=millis();}
   }else if(oledPage==2||oledPage==5){
     uint8_t &choice=oledPage==2?oledOtaChoice:oledS3Choice;

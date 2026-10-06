@@ -29,7 +29,7 @@ static void oledList(const char *const *items,uint8_t count,uint8_t selected){
 static void diagnosticPage(){
   bool remote=navBoard;bool ready=remote?peerHaveReport&&peerFrame.diagnostics:diagnosticMemory.ready;
   uint32_t age=remote?(millis()-peerSeenAt)/1000+peerFrame.sampleAge:(millis()-diagnosticMemory.at)/1000;
-  oledLine(0,String(navDiagnostic==0?"MEMORIA ":navDiagnostic==1?"TEMPOS ":"REINICIO ")+(remote?"S3":"WROOM"));
+  oledLine(0,String(navDiagnostic==0?"MEMORIA ":navDiagnostic==1?"REDE ":navDiagnostic==2?"TELA/COLETA ":"REINICIO ")+(remote?"S3":"WROOM"));
   oledLine(1,ready?(remote&&!peerRecent()?"Dados antigos ":"Medido ha ")+String(age)+"s":"Aguardando medidas");
   if(!ready){oledLine(2,remote?"S3 precisa 0.0.12":"Coleta a cada 5s");return;}
   if(navDiagnostic==0){
@@ -43,7 +43,12 @@ static void diagnosticPage(){
     oledLine(3,"Git max "+diagnosticMs(remote?peerFrame.gitMax:diagnosticOps[DIAG_GIT].maxUs));
     oledLine(4,"Site max "+diagnosticMs(remote?peerFrame.tbMax:diagnosticOps[DIAG_TB].maxUs));
     oledLine(5,"Comandos "+diagnosticMs(remote?peerFrame.rpcMax:diagnosticOps[DIAG_RPC].maxUs));
-    oledLine(6,"Coleta max "+diagnosticMs(remote?peerFrame.sampleMax:diagnosticOps[DIAG_SAMPLE].maxUs));
+    oledLine(6,"Link max "+diagnosticMs(remote?peerFrame.peerMax:diagnosticOps[DIAG_PEER].maxUs));
+  }else if(navDiagnostic==2){
+    oledLine(2,"Tela max "+diagnosticMs(remote?peerFrame.oledMax:diagnosticOps[DIAG_OLED].maxUs));
+    oledLine(3,"Coleta max "+diagnosticMs(remote?peerFrame.sampleMax:diagnosticOps[DIAG_SAMPLE].maxUs));
+    oledLine(4,remote?"S3 sem OLED local":"Tela: ate 1 vez/s");
+    oledLine(5,"Coleta: a cada 5s");oledLine(6,"Max desde reinicio");
   }else{
     uint32_t uptime=remote?peerFrame.uptime:diagnosticUptime();
     oledLine(2,"Desde reinicio:");oledLine(3,String(uptime/60)+" min "+String(uptime%60)+"s");
@@ -64,7 +69,7 @@ static void refreshOled() {
     const char *boards[]={"WROOM - robo","S3 - central"};oledList(boards,2,navBoard);
   }else if(navLevel==2){
     oledLine(0,String("DIAGNOSTICO ")+(navBoard?"S3":"WROOM"));oledLine(1,"Recursos e esperas");
-    const char *items[]={"Memoria","Tempos das operacoes","Ultimo reinicio"};oledList(items,3,navDiagnostic);
+    const char *items[]={"Memoria","Tempos da rede","Tela e coleta","Ultimo reinicio"};oledList(items,4,navDiagnostic);
   }else if(oledPage==7){diagnosticPage();
   }else if(oledPage==8){
     bool remote=navBoard;oledLine(0,String("CONEXAO ")+(remote?"S3":"WROOM"));

@@ -8,7 +8,7 @@ struct PeerStatusFrame {
   uint32_t uptime;
   char bootId[24];bool diagnostics=false;
   uint32_t free=0,minimum=0,largest=0,psram=0,otaFree=0,sampleAge=0,loopMax=0;
-  uint32_t gitMax=0,tbMax=0,rpcMax=0,oledMax=0,sampleMax=0;
+  uint32_t gitMax=0,tbMax=0,rpcMax=0,peerMax=0,oledMax=0,sampleMax=0;
 
 };
 
@@ -46,7 +46,7 @@ static void parsePeerDiagnostics(const char *body,PeerStatusFrame &out){uint32_t
     peerNumber(body,"DIAG_OTA_FREE",out.otaFree)&&peerNumber(body,"DIAG_SAMPLE_AGE",out.sampleAge)&&
     peerNumber(body,"DIAG_LOOP_MAX_US",out.loopMax)&&peerNumber(body,"DIAG_GIT_MAX_US",out.gitMax)&&
     peerNumber(body,"DIAG_TB_MAX_US",out.tbMax)&&peerNumber(body,"DIAG_RPC_MAX_US",out.rpcMax)&&
-    peerNumber(body,"DIAG_OLED_MAX_US",out.oledMax)&&peerNumber(body,"DIAG_SAMPLE_MAX_US",out.sampleMax);
+    peerNumber(body,"DIAG_PEER_MAX_US",out.peerMax)&&peerNumber(body,"DIAG_OLED_MAX_US",out.oledMax)&&peerNumber(body,"DIAG_SAMPLE_MAX_US",out.sampleMax);
 }
 
 static bool parsePeerStatus(const char *body, PeerStatusFrame &out) {

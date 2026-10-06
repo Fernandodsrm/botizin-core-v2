@@ -152,7 +152,7 @@ String snapshot() {
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
   s += "OLED: " + oledStatus + "\n";
-  s += "OLED_PAGE: " + String(oledMenu ? "MENU" : oledPage == 0 ? "WROOM" : oledPage == 1 ? "S3" : oledPage == 2 ? "OTA" : oledPage == 3 ? "CONNECTION" : oledPage == 5 ? "OTA_S3" : "HELP") + "\n";
+  s += "OLED_PAGE: " + String(oledMenu ? "MENU" : navLevel == 1 ? "BOARD_LIST" : navLevel == 2 ? "DIAGNOSTIC_LIST" : oledPage == 7 ? "DIAGNOSTICS" : oledPage == 8 ? "CONNECTION" : oledPage == 9 ? "CONTROLS" : oledPage == 2 ? "OTA_WROOM" : oledPage == 5 ? "OTA_S3" : "HELP") + "\n";
   s += "S3_LINK: " + peerStatus + "\n";
   s += "S3_EXPECTED_URL: http://192.168.0.36/status\n";
   s += "S3_LAST_VERSION: " + peerVersion + "\n";
