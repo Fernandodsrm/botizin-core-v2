@@ -40,6 +40,10 @@ jobs:
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/peer_status_test.cpp -o /tmp/peer-status-test
           /tmp/peer-status-test
+      - name: Validate diagnostic parser
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/diagnostic_parser_test.cpp -o /tmp/diagnostic-parser-test
+          /tmp/diagnostic-parser-test
       - name: Validate OTA confirmation binding and expiry
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/ota_confirmation_test.cpp -o /tmp/ota-confirmation-test
