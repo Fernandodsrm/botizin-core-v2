@@ -20,47 +20,70 @@ static void oledLine(uint8_t row, const String &value) {
   oled.print(value.substring(0, 21));
 }
 
-static void refreshOled() {
-  if (!oledReady || uploadActive || uploadOK || rebootScheduled ||
-      (int32_t)(millis() - nextOledRefresh) < 0) return;
-  nextOledRefresh = millis() + 1000;
-  if (!oledPresent()) {
-    oledReady = false;
-    oledStatus = "PAUSED_I2C_ERROR";
-    Serial.println("OLED: " + oledStatus);
-    return;
+static String diagnosticBytes(uint32_t n){return String(n/1024)+" KiB";}
+static String diagnosticMs(uint32_t n){return String(n/1000)+" ms";}
+static void oledList(const char *const *items,uint8_t count,uint8_t selected){
+  uint8_t first=selected>=5?selected-4:0;
+  for(uint8_t i=first;i<count&&i<first+5;++i)oledLine(2+i-first,String(i==selected?"> ":"  ")+items[i]);
+}
+static void diagnosticPage(){
+  bool remote=navBoard;bool ready=remote?peerHaveReport&&peerFrame.diagnostics:diagnosticMemory.ready;
+  uint32_t age=remote?(millis()-peerSeenAt)/1000+peerFrame.sampleAge:(millis()-diagnosticMemory.at)/1000;
+  oledLine(0,String(navDiagnostic==0?"MEMORIA ":navDiagnostic==1?"TEMPOS ":"REINICIO ")+(remote?"S3":"WROOM"));
+  oledLine(1,ready?(remote&&!peerRecent()?"Dados antigos ":"Medido ha ")+String(age)+"s":"Aguardando medidas");
+  if(!ready){oledLine(2,remote?"S3 precisa 0.0.12":"Coleta a cada 5s");return;}
+  if(navDiagnostic==0){
+    oledLine(2,"RAM livre "+diagnosticBytes(remote?peerFrame.free:diagnosticMemory.free));
+    oledLine(3,"RAM minima "+diagnosticBytes(remote?peerFrame.minimum:diagnosticMemory.minimum));
+    oledLine(4,"Maior bloco "+diagnosticBytes(remote?peerFrame.largest:diagnosticMemory.largest));
+    oledLine(5,"PSRAM livre "+diagnosticBytes(remote?peerFrame.psram:diagnosticMemory.psram));
+    oledLine(6,"Firmware cabe +"+diagnosticBytes(remote?peerFrame.otaFree:diagnosticMemory.otaFree));
+  }else if(navDiagnostic==1){
+    oledLine(2,"Pausa max "+diagnosticMs(remote?peerFrame.loopMax:diagnosticLoopMaxUs));
+    oledLine(3,"Git max "+diagnosticMs(remote?peerFrame.gitMax:diagnosticOps[DIAG_GIT].maxUs));
+    oledLine(4,"Site max "+diagnosticMs(remote?peerFrame.tbMax:diagnosticOps[DIAG_TB].maxUs));
+    oledLine(5,"Comandos "+diagnosticMs(remote?peerFrame.rpcMax:diagnosticOps[DIAG_RPC].maxUs));
+    oledLine(6,"Coleta max "+diagnosticMs(remote?peerFrame.sampleMax:diagnosticOps[DIAG_SAMPLE].maxUs));
+  }else{
+    uint32_t uptime=remote?peerFrame.uptime:diagnosticUptime();
+    oledLine(2,"Desde reinicio:");oledLine(3,String(uptime/60)+" min "+String(uptime%60)+"s");
+    oledLine(4,"Motivo: "+(remote?String(peerFrame.reset):resetInfo()));
+    oledLine(5,"ID ultimo inicio:");oledLine(6,remote?String(peerFrame.bootId):telemetryBootId);
   }
+}
+static void refreshOled() {
+  if(!oledReady||uploadActive||uploadOK||rebootScheduled||(int32_t)(millis()-nextOledRefresh)<0)return;
+  nextOledRefresh=millis()+1000;DiagnosticScope diagnosticScope(DIAG_OLED);
+  if(!oledPresent()){oledReady=false;oledStatus="PAUSED_I2C_ERROR";diagnosticScope.failed=true;return;}
   oled.clearDisplay();
-  if (oledMenu) {
-    oledLine(0, "BOTIZIN - MENU");
-    oledLine(1, "Cima/Baixo OK:abrir");
-    const char *areas[] = {"Conexao", "Placa WROOM", "Placa S3", "Atualizacao WROOM", "Atualizacao S3", "Ajuda dos botoes"};
-    uint8_t first=oledMenuChoice>=5?1:0;
-    for (uint8_t i = first; i < first+5; ++i) oledLine(i-first+2, String(i == oledMenuChoice ? "> " : "  ") + areas[i]);
-  } else if (oledPage == 3) {
-    oledLine(0, "CONEXAO       ^v:area");
-    oledLine(1, "OK:info Voltar:menu");
-    oledLine(2, WiFi.status() == WL_CONNECTED ? "Wi-Fi: conectado" : "Wi-Fi: sem conexao");
-    oledLine(3, String("IP ") + WiFi.localIP().toString());
-    oledLine(4, telemetryStatus == "HTTP_200" ? "Site: envio aceito" : "Site: aguardando");
-    oledLine(5, peerRecent() ? "S3: contato recente" : "S3: sem relato atual");
-    oledLine(6, oledDetail ? "Site = ThingsBoard" : "Dados desta WROOM");
-  } else if (oledPage == 0) {
-    oledLine(0, String("WROOM ") + BOTIZIN_VERSION + " ^v:area");
-    oledLine(1, "OK:info Voltar:menu");
-    oledLine(2, String("Ligada ") + String(millis() / 60000) + " min");
-    oledLine(3, stateInfo(esp_ota_get_running_partition()) == "VALID" ? "Programa: validado" : "Programa: " + stateInfo(esp_ota_get_running_partition()));
-    oledLine(4, oledDetail ? "Reset = ultimo inicio" : resetInfo().startsWith("POWERON") ? "Inicio: ligou energia" : resetInfo().startsWith("BROWNOUT") ? "Inicio: queda energia" : resetInfo().startsWith("SOFTWARE") ? "Inicio: pelo programa" : "Inicio: " + resetInfo());
-    oledLine(5, oledDetail ? "PING = resposta real" : pingStatus == "READY" ? "Comandos: prontos" : "Comandos: ver painel");
-    oledLine(6, peerRecent() ? "S3: contato recente" : "S3: sem relato atual");
-  } else if (oledPage == 1) {
-    oledLine(0, String("S3 ") + (peerHaveReport ? String(peerFrame.version) : "--") + " ^v:area");
-    oledLine(1, "OK:info Voltar:menu");
-    oledLine(2, peerRecent() ? "Contato: recente" : "Contato: aguardando");
-    oledLine(3, peerHaveReport ? String("Relato ha ") + String((millis() - peerSeenAt) / 1000) + "s" : "Buscando na rede...");
-    oledLine(4, peerHaveReport ? (oledDetail ? "Programa: " + String(peerFrame.state) : "IP " + String(peerFrame.ip)) : "Alvo: 192.168.0.36");
-    oledLine(5, peerHaveReport ? String("Ligada ") + String(peerFrame.uptime / 60) + " min" : "WROOM segue ativa");
-    oledLine(6, "Valores do relato S3");
+  const char *areas[]={"Conexoes","Diagnostico","Atualizacoes","Controles","Ajuda"};
+  if(navLevel==0){
+    oledLine(0,"BOTIZIN - CONJUNTO");oledLine(1,"WROOM + S3");oledList(areas,5,oledMenuChoice);
+  }else if(navLevel==1){
+    oledLine(0,areas[navGroup]);oledLine(1,"Selecionar placa");
+    const char *boards[]={"WROOM - robo","S3 - central"};oledList(boards,2,navBoard);
+  }else if(navLevel==2){
+    oledLine(0,String("DIAGNOSTICO ")+(navBoard?"S3":"WROOM"));oledLine(1,"Recursos e esperas");
+    const char *items[]={"Memoria","Tempos das operacoes","Ultimo reinicio"};oledList(items,3,navDiagnostic);
+  }else if(oledPage==7){diagnosticPage();
+  }else if(oledPage==8){
+    bool remote=navBoard;oledLine(0,String("CONEXAO ")+(remote?"S3":"WROOM"));
+    oledLine(1,remote?"Recebido da S3":"Medido na WROOM");
+    if(remote){
+      oledLine(2,peerRecent()?"Wi-Fi: conectado":"Wi-Fi: sem dado atual");
+      oledLine(3,peerHaveReport?"IP "+String(peerFrame.ip):"IP: aguardando");
+      oledLine(4,peerHaveReport?"Versao "+String(peerFrame.version):"Versao: aguardando");
+      oledLine(5,peerHaveReport?"Resposta ha "+String((millis()-peerSeenAt)/1000)+"s":"Sem resposta recebida");
+      oledLine(6,peerRecent()?"Link entre placas: OK":"Link: sem dado atual");
+    }else{
+      oledLine(2,WiFi.status()==WL_CONNECTED?"Wi-Fi: conectado":"Wi-Fi: desconectado");
+      oledLine(3,"IP "+WiFi.localIP().toString());oledLine(4,"Versao "+String(BOTIZIN_VERSION));
+      oledLine(5,telemetryStatus=="HTTP_200"?"Site: ultimo envio OK":"Site: "+telemetryStatus);
+      oledLine(6,"Origem: WROOM local");
+    }
+  }else if(oledPage==9){
+    oledLine(0,String("CONTROLES ")+(navBoard?"S3":"WROOM"));oledLine(1,"Funcoes disponiveis");
+    oledLine(2,"  LED [X]");oledLine(4,"Ainda nao implantado");
   } else if (oledPage == 2 && oledDetail && candidateReady()) {
     oledLine(0, "INSTALAR NA WROOM?");
     oledLine(1, "OK:SIM Voltar:NAO");
@@ -70,8 +93,8 @@ static void refreshOled() {
     oledLine(5, String("Prazo ") + String((otaManualUntil - millis()) / 1000) + "s");
     oledLine(6, "Automatico: LIGADO");
   } else if (oledPage == 2) {
-    oledLine(0, String("OTA WROOM ") + BOTIZIN_VERSION + " ^v");
-    oledLine(1, "OK:acao Voltar:menu");
+    oledLine(0, String("OTA WROOM ") + BOTIZIN_VERSION + "");
+    oledLine(1, "Automatico: LIGADO");
     const char *actions[] = {"Consultar GitHub", "Instalar nova", "Cancelar pedido"};
     bool active[] = {otaReady && !internetStopped, candidateReady(), manualWindowActive()};
     for (uint8_t i = 0; i < 3; ++i) {
@@ -86,8 +109,8 @@ static void refreshOled() {
     oledLine(5,String("Prazo ")+String((s3CandidateUntil-millis())/1000)+"s");
     oledLine(6,"WROOM segue ligada");
   } else if (oledPage == 5) {
-    oledLine(0,"OTA S3 "+(s3OtaVersion.isEmpty()?peerVersion:s3OtaVersion)+" ^v");
-    oledLine(1,"OK:acao Voltar:menu");
+    oledLine(0,"OTA S3 "+(s3OtaVersion.isEmpty()?peerVersion:s3OtaVersion)+"");
+    oledLine(1,"Automatico: LIGADO");
     if(s3Busy||!s3WatchVersion.isEmpty()){
       oledLine(2,"Acompanhando a S3");oledLine(3,s3OtaRecent()?s3OtaStatus:"Aguardando relato S3");
       oledLine(4,s3Expected?(s3OtaRecent()?String(""):String("Ultimo "))+String((unsigned long)(s3Written*100/s3Expected))+"% da S3":"Sem progresso atual");
@@ -100,23 +123,14 @@ static void refreshOled() {
       oledLine(5,s3CandidateReady()?"Nova "+s3Target+" Auto:ON":s3OtaStatus);
       oledLine(6,peerKey.length()!=64?"Pareamento pendente":!s3OtaRecent()?"Aguardando relato S3":oledS3Choice==0?"Busca; nao instala":oledS3Choice==1?"OK: abre confirmacao":"Auto retoma em 5 min");
     }
-  } else {
-    oledLine(0, "AJUDA DOS BOTOES");
-    oledLine(1, "Voltar:menu ^v:area");
-    oledLine(2, "Cima: item anterior");
-    oledLine(3, "Baixo: proximo item");
-    oledLine(4, "OK: acao na tela");
-    oledLine(5, "^v = Cima/Baixo");
-    oledLine(6, "[X] = indisponivel");
+  }else{
+    oledLine(0,"AJUDA - NAVEGACAO");oledLine(1,"Mesmo modelo em tudo");
+    oledLine(2,"Cima: item anterior");oledLine(3,"Baixo: proximo item");
+    oledLine(4,"Direita: entra / OK");oledLine(5,"Esquerda: volta nivel");oledLine(6,"[X]: indisponivel");
   }
   oled.display();
-  if (!oledPresent()) {
-    oledReady = false;
-    oledStatus = "PAUSED_I2C_ERROR";
-    Serial.println("OLED: " + oledStatus);
-  }
+  if(!oledPresent()){oledReady=false;oledStatus="PAUSED_I2C_ERROR";diagnosticScope.failed=true;}
 }
-
 static void beginOled() {
   // I2C timeout bounds each transaction; no reset or flash writes on failure.
   if (!Wire.begin(21, 22, 400000)) {

@@ -29,47 +29,43 @@ static void discardNavigation() {
 }
 
 static void pollNavigation() {
-  portENTER_CRITICAL(&navMux);
-  uint8_t pending = navPending; navPending = 0;
-  portEXIT_CRITICAL(&navMux);
-  // Discard presses during firmware writes and pending actions.
-  if (!pending || uploadActive || uploadOK || rebootScheduled || otaCheckQueued || otaInstallQueued || !s3QueuedAction.isEmpty()) return;
-  if (pending & 4) {
-    if ((oledPage == 2 || oledPage == 5) && oledDetail && !oledMenu) oledDetail = false;
-    else { oledMenu = true; oledDetail = false; }
-  } else if (oledMenu) {
-    if (pending & (2 | 8)) oledMenuChoice = (oledMenuChoice + ((pending & 8) ? 1 : 5)) % 6;
-    else if (pending & 1) {
-      const uint8_t pages[] = {3, 0, 1, 2, 5, 4};
-      oledPage = pages[oledMenuChoice]; oledMenu = false; oledDetail = false;
+  portENTER_CRITICAL(&navMux);uint8_t pending=navPending;navPending=0;portEXIT_CRITICAL(&navMux);
+  if(!pending||uploadActive||uploadOK||rebootScheduled||otaCheckQueued||otaInstallQueued||!s3QueuedAction.isEmpty())return;
+  if(pending&4){
+    if(oledDetail){oledDetail=false;}
+    else if(navLevel==3){navLevel=navGroup==4?0:navGroup==1?2:1;}
+    else if(navLevel){--navLevel;}
+  }else if(navLevel==0){
+    if(pending&(2|8))oledMenuChoice=(oledMenuChoice+((pending&8)?1:4))%5;
+    else if(pending&1){navGroup=oledMenuChoice;navLevel=navGroup==4?3:1;oledPage=4;}
+  }else if(navLevel==1){
+    if(pending&(2|8))navBoard=1-navBoard;
+    else if(pending&1){
+      if(navGroup==1)navLevel=2;
+      else{navLevel=3;oledPage=navGroup==0?8:navGroup==2?(navBoard?5:2):9;}
+      if(navBoard)nextPeerPoll=millis();
     }
-  } else if (oledPage == 2) {
-    if (pending & (2 | 8)) {
-      oledDetail = false;
-      oledOtaChoice = (oledOtaChoice + ((pending & 8) ? 1 : 2)) % 3;
-    } else if (pending & 1) {
-      if (oledOtaChoice == 0) { oledDetail = false; queueOtaCheck(); }
-      else if (oledOtaChoice == 1 && candidateReady()) {
-        if (!oledDetail) oledDetail = true;
-        else { confirmOta(otaCandidateId, otaTargetVersion, otaTargetSHA, telemetryBootId); oledDetail = false; }
-      } else if (oledOtaChoice == 2 && manualWindowActive()) { cancelOtaCheck(); oledDetail = false; }
+  }else if(navLevel==2){
+    if(pending&(2|8))navDiagnostic=(navDiagnostic+((pending&8)?1:2))%3;
+    else if(pending&1){navLevel=3;oledPage=7;if(navBoard)nextPeerPoll=millis();}
+  }else if(oledPage==2||oledPage==5){
+    uint8_t &choice=oledPage==2?oledOtaChoice:oledS3Choice;
+    if(pending&(2|8)){oledDetail=false;choice=(choice+((pending&8)?1:2))%3;}
+    else if(pending&1){
+      if(oledPage==2){
+        if(choice==0){oledDetail=false;queueOtaCheck();}
+        else if(choice==1&&candidateReady()){
+          if(!oledDetail)oledDetail=true;
+          else{confirmOta(otaCandidateId,otaTargetVersion,otaTargetSHA,telemetryBootId);oledDetail=false;}
+        }else if(choice==2&&manualWindowActive()){cancelOtaCheck();oledDetail=false;}
+      }else{
+        if(choice==0){oledDetail=false;queueS3Action("check");}
+        else if(choice==1&&s3CandidateReady()){
+          if(!oledDetail){oledDetail=true;stageS3Confirmation();}
+          else{queueS3Action("confirm");oledDetail=false;}
+        }else if(choice==2&&s3OtaRecent()&&s3WindowUntil&&(int32_t)(s3WindowUntil-millis())>0){queueS3Action("cancel");oledDetail=false;}
+      }
     }
-  } else if (oledPage == 5) {
-    if (pending & (2 | 8)) { oledDetail = false; oledS3Choice = (oledS3Choice + ((pending & 8) ? 1 : 2)) % 3; }
-    else if (pending & 1) {
-      if (oledS3Choice == 0) { oledDetail=false; queueS3Action("check"); }
-      else if (oledS3Choice == 1 && s3CandidateReady()) {
-        if (!oledDetail) { oledDetail=true; stageS3Confirmation(); }
-        else { queueS3Action("confirm"); oledDetail=false; }
-      } else if (oledS3Choice == 2 && s3OtaRecent() && s3WindowUntil && (int32_t)(s3WindowUntil-millis())>0) { queueS3Action("cancel"); oledDetail=false; }
-    }
-  } else if (pending & (2 | 8)) {
-    const uint8_t pages[] = {3, 0, 1, 2, 5, 4};
-    uint8_t index = 0; while (index < 5 && pages[index] != oledPage) ++index;
-    index = (index + ((pending & 8) ? 1 : 5)) % 6;
-    oledPage = pages[index]; oledMenuChoice = index; oledDetail = false;
-  } else if ((pending & 1) && oledPage != 4) oledDetail = !oledDetail;
-  if (oledPage == 1 && !oledMenu) nextPeerPoll = millis();
-  nextOledRefresh = 0;
-  Serial.printf("NAV: page=%u menu=%u choice=%u detail=%u\n", oledPage, oledMenu, oledOtaChoice, oledDetail);
+  }
+  oledMenu=navLevel==0;nextOledRefresh=0;
 }

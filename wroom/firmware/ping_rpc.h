@@ -6,6 +6,7 @@ bool pingStopped = false;
 String pingStatus = "WAITING";
 
 void __attribute__((noinline)) pollPing() {
+  DiagnosticScope diagnosticScope(DIAG_RPC);
   if (!provisioned || pingStopped || rebootScheduled || uploadActive || uploadOK || !otaReady ||
       WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000) return;
   if (ESP.getFreeHeap() < 80000) { pingStatus = "SKIPPED_LOW_HEAP"; return; }

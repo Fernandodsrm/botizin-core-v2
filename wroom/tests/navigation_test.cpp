@@ -36,29 +36,32 @@ bool manualWindowActive(){return window;}
 bool queueOtaCheck(){++checks;return true;}
 bool confirmOta(const char*,const char*,const char*,const char*){++installs;return true;}
 void cancelOtaCheck(){++cancels;candidate=false;}
+#include "../firmware/navigation_model.h"
 #include "../firmware/navigation.h"
 void press(uint8_t p){navPending=p;pollNavigation();}
 int main(){
  beginNavigation();discardNavigation();
- press(8);assert(oledMenuChoice==1&&oledMenu);press(1);assert(oledPage==0&&!oledMenu);
- press(4);assert(oledMenu);press(8);press(1);assert(oledPage==1&&!oledMenu&&nextPeerPoll==1000);
- press(8);assert(oledPage==2);press(1);assert(checks==1&&installs==0);
- press(8);press(1);assert(!oledDetail&&installs==0); // disabled without a candidate
- candidate=true;window=true;press(1);assert(oledDetail&&installs==0); // opens confirmation only
- press(4);assert(!oledDetail&&!oledMenu&&installs==0&&cancels==0); // NO returns, no install
- press(1);candidate=false;press(1);assert(installs==0); // expired candidate cannot install
- candidate=true;oledDetail=false;press(1);press(1);assert(installs==1); // explicit second OK
- oledDetail=false;press(8);press(1);assert(cancels==1); // separate cancel action
- uploadActive=true;auto page=oledPage;press(4);assert(oledPage==page&&!oledMenu);uploadActive=false;
- press(4);assert(oledMenu);press(4);assert(oledMenu); // no side effect at home
- oledMenuChoice=2;press(8);assert(oledMenuChoice==3);press(8);assert(oledMenuChoice==4);press(1);assert(oledPage==5&&!oledMenu);
- press(1);assert(s3checks==1);press(8);press(1);assert(s3installs==0&&!oledDetail);
- s3Candidate=true;press(1);assert(s3stages==1&&s3installs==0&&oledDetail);
- press(4);assert(!oledDetail&&!oledMenu&&s3installs==0);
- press(1);s3Candidate=false;press(1);assert(s3installs==0);
- s3Candidate=true;oledDetail=false;press(1);press(1);assert(s3installs==1);
+ // Root -> Connection -> WROOM; down cannot jump to another area.
+ press(1);assert(navLevel==1);press(1);assert(navLevel==3&&oledPage==8&&navBoard==0);
+ press(8);assert(navLevel==3&&oledPage==8&&navBoard==0);
+ press(4);assert(navLevel==1);press(8);press(1);assert(navBoard==1&&nextPeerPoll==1000);
+ press(4);press(4);assert(navLevel==0&&oledMenu);
+ // Diagnostics requires board then category, and back preserves each selection.
+ press(8);press(1);press(1);assert(navLevel==2);press(8);press(1);assert(navLevel==3&&oledPage==7&&navDiagnostic==1);
+ press(8);assert(navDiagnostic==1&&oledPage==7);press(4);assert(navLevel==2);press(4);assert(navLevel==1);press(4);
+ // WROOM query and explicit second confirmation.
+ oledMenuChoice=2;press(1);navBoard=0;press(1);assert(oledPage==2);
+ press(1);assert(checks==1);press(8);press(1);assert(installs==0&&!oledDetail);
+ candidate=true;window=true;press(1);assert(oledDetail&&installs==0);press(4);assert(!oledDetail&&navLevel==3);
+ press(1);candidate=false;press(1);assert(installs==0);candidate=true;oledDetail=false;press(1);press(1);assert(installs==1);
+ press(8);press(1);assert(cancels==1);
+ // S3 uses same hierarchy and install gate.
+ press(4);navBoard=1;press(1);assert(oledPage==5);press(1);assert(s3checks==1);press(8);press(1);assert(s3installs==0);
+ s3Candidate=true;press(1);assert(oledDetail&&s3stages==1);press(4);assert(!oledDetail&&navLevel==3);
+ press(1);s3Candidate=false;press(1);assert(s3installs==0);s3Candidate=true;oledDetail=false;press(1);press(1);assert(s3installs==1);
  press(8);press(1);assert(s3cancels==1);
- press(4);press(8);assert(oledMenuChoice==5);press(8);assert(oledMenuChoice==0);
- press(2);assert(oledMenuChoice==5);s3QueuedAction.empty=false;press(1);assert(oledMenu);s3QueuedAction.empty=true;
- puts("NAVIGATION_TESTS_OK: menu, disabled install, explicit confirmation, cancel, expired candidate, busy guard");
+ uploadActive=true;press(4);assert(navLevel==3);uploadActive=false;press(4);press(4);
+ oledMenuChoice=4;press(1);assert(oledPage==4&&navLevel==3);press(4);assert(navLevel==0);
+ oledMenuChoice=0;press(2);assert(oledMenuChoice==4);press(8);assert(oledMenuChoice==0);
+ puts("NAVIGATION_TREE_OK: hierarchy, fixed button roles, expiry and explicit install confirmation");
 }

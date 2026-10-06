@@ -44,6 +44,7 @@ uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
 bool telemetryStopped = false;
 String telemetryBootId;
+#include "diagnostics.h"
 // Automatic OTA remains enabled. A manual query reserves a bounded confirmation window.
 String manualOtaStatus = "READY", otaCandidateId, otaTargetVersion, otaTargetURL, otaTargetSHA;
 size_t otaTargetBytes = 0;
@@ -53,6 +54,7 @@ void showOtaProgress(const String &phase, size_t done = 0, size_t total = 0);
 #include "ota_confirmation.h"
 #include "peer_auth.h"
 static void discardNavigation();
+#include "navigation_model.h"
 #include "peer_ota_client.h"
 
 bool manualWindowActive() { return otaManualUntil && (int32_t)(otaManualUntil - millis()) > 0; }
@@ -126,7 +128,7 @@ String snapshot() {
   const esp_partition_t *run = esp_ota_get_running_partition();
   String s = "BOTIZIN WROOM V" + String(BOTIZIN_VERSION) + "\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
-  s += "UPTIME_SECONDS: " + String(millis() / 1000) + "\n";
+  s += "UPTIME_SECONDS: " + String(diagnosticUptime()) + "\n";
   s += "RESET_REASON: " + resetInfo() + "\n";
   s += "FLASH_BYTES: " + String(ESP.getFlashChipSize()) + "\n";
   s += "PSRAM_BYTES: " + String(ESP.getPsramSize()) + "\n";
@@ -157,6 +159,7 @@ String snapshot() {
   s += "PEER_PAIRED: " + String(peerKey.length()==64?"YES":"NO") + "\n";
   s += "S3_OTA_STATUS: " + s3OtaStatus + "\n";
   s += "S3_OTA_VERSION: " + s3OtaVersion + "\n";
+  s += diagnosticText();
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
   return s;
@@ -316,6 +319,7 @@ void stopInternet(const String &reason) {
 }
 
 void checkInternetOTA(bool manual) {
+  DiagnosticScope diagnosticScope(DIAG_GIT);
   if (manual) { manualOtaStatus = "CHECKING"; showOtaProgress("CONSULTANDO GITHUB"); }
   if (!otaReady) { stopInternet("hardware/partition mismatch"); return; }
   if (WiFi.status() != WL_CONNECTED) {
@@ -470,6 +474,7 @@ void __attribute__((noinline)) sendTelemetry() {
   if (!provisioned || telemetryStopped || rebootScheduled || uploadActive || uploadOK ||
       WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000) return;
   if (ESP.getFreeHeap() < 80000) { telemetryStatus = "SKIPPED_LOW_HEAP"; return; }
+  DiagnosticScope diagnosticScope(DIAG_TB);
   cJSON *root = cJSON_CreateObject();
   if (!root) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
   const esp_partition_t *run = esp_ota_get_running_partition();
@@ -486,7 +491,7 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "device_id", WiFi.macAddress().c_str()) &&
     cJSON_AddStringToObject(root, "boot_id", telemetryBootId.c_str()) &&
     cJSON_AddNumberToObject(root, "sequence", ++telemetrySequence) &&
-    cJSON_AddNumberToObject(root, "uptime_seconds", millis() / 1000) &&
+    cJSON_AddNumberToObject(root, "uptime_seconds", diagnosticUptime()) &&
     cJSON_AddStringToObject(root, "running_partition", runText.c_str()) &&
     cJSON_AddStringToObject(root, "boot_partition", bootText.c_str()) &&
     cJSON_AddStringToObject(root, "next_update_partition", nextText.c_str()) &&
@@ -502,6 +507,7 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "s3_link", peerStatus.c_str()) &&
     cJSON_AddStringToObject(root, "s3_last_version", peerVersion.c_str()) &&
     cJSON_AddNumberToObject(root, "s3_last_seen_age_seconds", peerVersion.length() ? double((millis() - peerSeenAt) / 1000) : -1.0);
+  ok = ok && diagnosticJSON(root);
   char *payload = ok ? cJSON_PrintUnformatted(root) : nullptr;
   cJSON_Delete(root);
   if (!payload) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
@@ -527,6 +533,7 @@ void __attribute__((noinline)) sendTelemetry() {
     http.end();
     tls.stop();
   }
+  diagnosticScope.failed = code != 200;
   cJSON_free(payload);
   telemetryStatus = "HTTP_" + String(code);
   Serial.println("TELEMETRY: " + telemetryStatus);
@@ -571,6 +578,7 @@ void setup() {
              a->size == 0x140000 && b->size == 0x140000 &&
              data->address == 0xe000 && data->size == 0x2000 && run &&
              (run->address == a->address || run->address == b->address);
+  sampleDiagnostics();
   Serial.println(snapshot());
   loadProvisioning();
   WiFi.persistent(false);
@@ -605,6 +613,8 @@ void setup() {
 }
 
 void loop() {
+  diagnosticLoopTick();
+  if (!uploadActive && !uploadOK && !rebootScheduled) sampleDiagnostics();
   pollNavigation();
   pollProvisioning(uploadActive || uploadOK || rebootScheduled);
   server.handleClient();

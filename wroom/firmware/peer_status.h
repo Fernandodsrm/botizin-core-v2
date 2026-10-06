@@ -16,7 +16,8 @@ static void pollPeerStatus() {
   if (uploadActive || uploadOK || rebootScheduled || ESP.getFreeHeap() < 85000) return;
   if (WiFi.status() != WL_CONNECTED) { peerStatus = "WIFI_DISCONNECTED"; return; }
   if ((int32_t)(millis() - nextPeerPoll) < 0) return;
-  nextPeerPoll = millis() + (oledPage == 1 ? 10000 : 30000);
+  nextPeerPoll = millis() + (!oledMenu && navBoard && (oledPage == 7 || oledPage == 8) ? 10000 : 30000);
+  DiagnosticScope diagnosticScope(DIAG_PEER);diagnosticScope.failed=true;
   NetworkClient client;
   HTTPClient http;
   http.setConnectTimeout(350); http.setTimeout(400);
@@ -42,7 +43,7 @@ static void pollPeerStatus() {
       PeerStatusFrame candidate = {};
       if (received == (size_t)length && parsePeerStatus(peerBody, candidate)) {
         peerFrame = candidate; peerHaveReport = true; peerSeenAt = millis();
-        peerVersion = candidate.version; peerStatus = "OK";
+        peerVersion = candidate.version; peerStatus = "OK";diagnosticScope.failed=false;
       } else peerStatus = "INVALID_OR_INCOMPLETE_STATUS";
     } else if (code == 200) peerStatus = "INVALID_LENGTH";
   }
