@@ -52,7 +52,7 @@ bool otaCheckQueued = false, otaInstallQueued = false;
 void showOtaProgress(const String &phase, size_t done = 0, size_t total = 0);
 #include "ota_confirmation.h"
 #include "peer_auth.h"
-void discardNavigation();
+static void discardNavigation();
 #include "peer_ota_client.h"
 
 bool manualWindowActive() { return otaManualUntil && (int32_t)(otaManualUntil - millis()) > 0; }
