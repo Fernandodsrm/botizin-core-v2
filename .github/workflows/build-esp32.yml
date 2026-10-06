@@ -1,0 +1,48 @@
+name: Build BOTIZIN ESP32-S3 in cloud
+
+on:
+  push:
+    branches: [cloud-build]
+    paths:
+      - 'firmware/**'
+      - 'ci/**'
+      - '.github/workflows/build-esp32.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install Arduino CLI 1.5.1
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Install exact ESP32 core 3.3.12
+        run: |
+          arduino-cli version
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - name: Validate manual confirmation binding
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror tests/ota_confirmation_test.cpp -o /tmp/ota-confirmation-test
+          /tmp/ota-confirmation-test
+      - name: Compile and validate firmware package
+        env:
+          BOTIZIN_TB_DEVICE_TOKEN: ${{ secrets.BOTIZIN_TB_DEVICE_TOKEN }}
+        run: python3 ci/build.py
+      - name: Save firmware, manifest, ELF and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: botizin-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
