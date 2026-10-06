@@ -35,13 +35,13 @@ self.onDataUpdated=function(){
 function updateReady(){
  if(!self.root)return;
  var v=self.v||{},version=v.firmware_version;
- self.ready=version&&['0.0.3','0.0.4','0.0.5','0.0.6','0.0.7','0.0.8','0.0.9','0.0.10','0.0.11'].indexOf(String(version.value))>=0&&v.origin&&String(v.origin.value)==='ESP32_REAL'&&v.simulated&&String(v.simulated.value)==='false'&&labRecent(version.ts);
+ self.ready=version&&['0.0.3','0.0.4','0.0.5','0.0.6','0.0.7','0.0.8','0.0.9','0.0.10','0.0.11','0.0.12'].indexOf(String(version.value))>=0&&v.origin&&String(v.origin.value)==='ESP32_REAL'&&v.simulated&&String(v.simulated.value)==='false'&&labRecent(version.ts);
  self.button.disabled=self.busy||!self.ready;self.button.textContent=self.busy?'Aguardando PONG…':'Testar resposta (PING)';
  var reason='Aguardando telemetria da WROOM. Recarregue o painel e aguarde até 1 minuto.';
  if(version){
   var age=Math.max(0,Math.floor((labNow()-version.ts)/1000));
   if(age>=180)reason='Contato exibido há '+age+' segundos. Recarregue o painel; os dados precisam ser recentes.';
-  else if(['0.0.3','0.0.4','0.0.5','0.0.6','0.0.7','0.0.8','0.0.9','0.0.10','0.0.11'].indexOf(String(version.value))<0)reason='Versão exibida: '+version.value+'. Aguardando firmware compatível.';
+  else if(['0.0.3','0.0.4','0.0.5','0.0.6','0.0.7','0.0.8','0.0.9','0.0.10','0.0.11','0.0.12'].indexOf(String(version.value))<0)reason='Versão exibida: '+version.value+'. Aguardando firmware compatível.';
   else if(!v.origin||!v.simulated)reason='Aguardando identificação do relato real da placa. Recarregue o painel.';
  }
  if(!isFinite(labNow()))reason='Sincronizando horário com o servidor. Aguarde ou recarregue o painel.';

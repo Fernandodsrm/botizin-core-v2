@@ -31,7 +31,7 @@ static void diagnosticPage(){
   uint32_t age=remote?(millis()-peerSeenAt)/1000+peerFrame.sampleAge:(millis()-diagnosticMemory.at)/1000;
   oledLine(0,String(navDiagnostic==0?"MEMORIA ":navDiagnostic==1?"REDE ":navDiagnostic==2?"TELA/COLETA ":"REINICIO ")+(remote?"S3":"WROOM"));
   oledLine(1,ready?(remote&&!peerRecent()?"Dados antigos ":"Medido ha ")+String(age)+"s":"Aguardando medidas");
-  if(!ready){oledLine(2,remote?"S3 precisa 0.0.12":"Coleta a cada 5s");return;}
+  if(!ready){oledLine(2,remote?"S3 precisa 0.0.12+":"Coleta a cada 5s");return;}
   if(navDiagnostic==0){
     oledLine(2,"RAM livre "+diagnosticBytes(remote?peerFrame.free:diagnosticMemory.free));
     oledLine(3,"RAM minima "+diagnosticBytes(remote?peerFrame.minimum:diagnosticMemory.minimum));
