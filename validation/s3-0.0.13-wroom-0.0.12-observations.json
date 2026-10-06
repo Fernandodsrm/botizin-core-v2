@@ -1,0 +1,282 @@
+{
+  "WROOM": {
+    "firmware_version": [
+      {
+        "ts": 1791261507755,
+        "value": "0.0.12"
+      }
+    ],
+    "boot_id": [
+      {
+        "ts": 1791261507755,
+        "value": "63f2931b64accf03"
+      }
+    ],
+    "uptime_seconds": [
+      {
+        "ts": 1791261507755,
+        "value": "87"
+      }
+    ],
+    "ota_state": [
+      {
+        "ts": 1791261507755,
+        "value": "VALID"
+      }
+    ],
+    "ota_automatic_enabled": [
+      {
+        "ts": 1791261507755,
+        "value": "true"
+      }
+    ],
+    "peer_paired": [
+      {
+        "ts": 1791261507755,
+        "value": "true"
+      }
+    ],
+    "diag_schema": [
+      {
+        "ts": 1791261507755,
+        "value": "1"
+      }
+    ],
+    "ram_internal_free_bytes": [
+      {
+        "ts": 1791261507755,
+        "value": "159976"
+      }
+    ],
+    "ram_internal_min_bytes": [
+      {
+        "ts": 1791261507755,
+        "value": "96576"
+      }
+    ],
+    "ram_largest_block_bytes": [
+      {
+        "ts": 1791261507755,
+        "value": "110580"
+      }
+    ],
+    "psram_free_bytes": [
+      {
+        "ts": 1791261507755,
+        "value": "0"
+      }
+    ],
+    "ota_free_bytes": [
+      {
+        "ts": 1791261507755,
+        "value": "62560"
+      }
+    ],
+    "diag_sample_max_us": [
+      {
+        "ts": 1791261507755,
+        "value": "196"
+      }
+    ],
+    "diag_sample_last_us": [
+      {
+        "ts": 1791261507755,
+        "value": "168"
+      }
+    ],
+    "diag_sample_calls": [
+      {
+        "ts": 1791261507755,
+        "value": "17"
+      }
+    ],
+    "diag_flash_init_us": [
+      {
+        "ts": 1791261507755,
+        "value": "242585"
+      }
+    ],
+    "loop_max_gap_us": [
+      {
+        "ts": 1791261507755,
+        "value": "2863018"
+      }
+    ],
+    "diag_git_max_us": [
+      {
+        "ts": 1791261507755,
+        "value": "584663"
+      }
+    ],
+    "diag_tb_max_us": [
+      {
+        "ts": 1791261507755,
+        "value": "1360133"
+      }
+    ],
+    "diag_rpc_max_us": [
+      {
+        "ts": 1791261507755,
+        "value": "2830958"
+      }
+    ],
+    "diag_peer_max_us": [
+      {
+        "ts": 1791261507755,
+        "value": "353809"
+      }
+    ],
+    "diag_oled_max_us": [
+      {
+        "ts": 1791261507755,
+        "value": "29338"
+      }
+    ],
+    "s3_link": [
+      {
+        "ts": 1791261507755,
+        "value": "HTTP_-1"
+      }
+    ]
+  },
+  "S3": {
+    "firmware_version": [
+      {
+        "ts": 1791261495357,
+        "value": "0.0.13"
+      }
+    ],
+    "boot_id": [
+      {
+        "ts": 1791261495357,
+        "value": "11a09c76e589d795"
+      }
+    ],
+    "uptime_seconds": [
+      {
+        "ts": 1791261495357,
+        "value": "26"
+      }
+    ],
+    "ota_state": [
+      {
+        "ts": 1791261495357,
+        "value": "VALID"
+      }
+    ],
+    "ota_automatic_enabled": [
+      {
+        "ts": 1791261495357,
+        "value": "true"
+      }
+    ],
+    "peer_paired": [
+      {
+        "ts": 1791261495357,
+        "value": "true"
+      }
+    ],
+    "diag_schema": [
+      {
+        "ts": 1791261495357,
+        "value": "1"
+      }
+    ],
+    "ram_internal_free_bytes": [
+      {
+        "ts": 1791261495357,
+        "value": "259544"
+      }
+    ],
+    "ram_internal_min_bytes": [
+      {
+        "ts": 1791261495357,
+        "value": "204476"
+      }
+    ],
+    "ram_largest_block_bytes": [
+      {
+        "ts": 1791261495357,
+        "value": "167924"
+      }
+    ],
+    "psram_free_bytes": [
+      {
+        "ts": 1791261495357,
+        "value": "8374692"
+      }
+    ],
+    "ota_free_bytes": [
+      {
+        "ts": 1791261495357,
+        "value": "1978944"
+      }
+    ],
+    "diag_sample_max_us": [
+      {
+        "ts": 1791261495357,
+        "value": "101"
+      }
+    ],
+    "diag_sample_last_us": [
+      {
+        "ts": 1791261495357,
+        "value": "101"
+      }
+    ],
+    "diag_sample_calls": [
+      {
+        "ts": 1791261495357,
+        "value": "5"
+      }
+    ],
+    "diag_flash_init_us": [
+      {
+        "ts": 1791261495357,
+        "value": "91776"
+      }
+    ],
+    "loop_max_gap_us": [
+      {
+        "ts": 1791261495357,
+        "value": "441013"
+      }
+    ],
+    "diag_git_max_us": [
+      {
+        "ts": 1791261495357,
+        "value": "437481"
+      }
+    ],
+    "diag_tb_max_us": [
+      {
+        "ts": 1791261495357,
+        "value": "0"
+      }
+    ],
+    "diag_rpc_max_us": [
+      {
+        "ts": 1791261495357,
+        "value": "0"
+      }
+    ],
+    "diag_peer_max_us": [
+      {
+        "ts": 1791261495357,
+        "value": "0"
+      }
+    ],
+    "diag_oled_max_us": [
+      {
+        "ts": 1791261495357,
+        "value": "0"
+      }
+    ],
+    "s3_link": [
+      {
+        "ts": 1791261524541,
+        "value": null
+      }
+    ]
+  }
+}
