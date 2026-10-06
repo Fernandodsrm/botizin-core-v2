@@ -331,13 +331,14 @@ void checkInternetOTA(bool manual) {
   http.setTimeout(15000);
   http.useHTTP10(true);
   if (!http.begin(tls, BOTIZIN_MANIFEST_URL)) {
-    internetStatus = "MANIFEST_BEGIN_FAILED"; return;
+    diagnosticScope.failed=true;internetStatus = "MANIFEST_BEGIN_FAILED"; return;
   }
   http.addHeader("Cache-Control", "no-cache");
   int code = http.GET();
   Serial.printf("MANIFEST_HTTP: %d\n", code);
   int manifestSize = http.getSize();
   if (code != 200) {
+    diagnosticScope.failed=true;
     internetStatus = "MANIFEST_HTTP_" + String(code);
     http.end(); return;
   }

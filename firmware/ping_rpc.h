@@ -6,10 +6,10 @@ bool pingStopped = false;
 String pingStatus = "WAITING";
 
 void __attribute__((noinline)) pollPing() {
-  DiagnosticScope diagnosticScope(DIAG_RPC);
   if (pingStopped || rebootScheduled || uploadActive || uploadOK || !otaReady ||
       WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000) return;
   if (ESP.getFreeHeap() < 80000) { pingStatus = "SKIPPED_LOW_HEAP"; return; }
+  DiagnosticScope diagnosticScope(DIAG_RPC);
   String body;
   int code = -1000;
   String base = "https://thingsboard.cloud/api/v1/";
@@ -33,12 +33,13 @@ void __attribute__((noinline)) pollPing() {
   // No command is a normal outcome; it must not pause the receiver.
   if (code == 408 || code == 204) { pingFailures = 0; pingStatus = "READY"; return; }
   if (code != 200 || body.isEmpty()) {
+    diagnosticScope.failed=true;
     pingStatus = "POLL_HTTP_" + String(code);
     if (++pingFailures >= 3) { pingStopped = true; pingStatus = "PAUSED_UNTIL_REBOOT"; }
     Serial.println("PING_RPC: " + pingStatus); return;
   }
   cJSON *root = cJSON_Parse(body.c_str());
-  if (!root) { pingStatus = "INVALID_JSON"; return; }
+  if (!root) { diagnosticScope.failed=true;pingStatus = "INVALID_JSON"; return; }
   cJSON *id = cJSON_GetObjectItemCaseSensitive(root, "id");
   cJSON *method = cJSON_GetObjectItemCaseSensitive(root, "method");
   cJSON *params = cJSON_GetObjectItemCaseSensitive(root, "params");
