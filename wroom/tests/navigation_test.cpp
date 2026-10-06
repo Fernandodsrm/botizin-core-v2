@@ -20,6 +20,7 @@ uint8_t oledMenuChoice=0,oledOtaChoice=0,oledPage=0;
 uint32_t nextPeerPoll=0,nextOledRefresh=0;
 const char *otaCandidateId="id",*otaTargetVersion="0.0.9",*otaTargetSHA="sha",*telemetryBootId="boot";
 struct QueueMock{bool empty=true;bool isEmpty()const{return empty;}}s3QueuedAction;
+bool s3OtaRecent(){return true;}uint32_t s3WindowUntil=2000;
 uint8_t oledS3Choice=0;bool s3Candidate=false;int s3checks=0,s3installs=0,s3cancels=0,s3stages=0;
 bool s3CandidateReady(){return s3Candidate;}
 void stageS3Confirmation(){++s3stages;}

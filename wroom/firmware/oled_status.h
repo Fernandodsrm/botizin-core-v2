@@ -90,12 +90,12 @@ static void refreshOled() {
     oledLine(1,"OK:acao Voltar:menu");
     if(s3Busy||!s3WatchVersion.isEmpty()){
       oledLine(2,"Acompanhando a S3");oledLine(3,s3OtaRecent()?s3OtaStatus:"Aguardando relato S3");
-      oledLine(4,s3Expected?String((unsigned long)(s3Written*100/s3Expected))+"% recebido da S3":"Sem progresso atual");
+      oledLine(4,s3Expected?(s3OtaRecent()?String(""):String("Ultimo "))+String((unsigned long)(s3Written*100/s3Expected))+"% da S3":"Sem progresso atual");
       oledLine(5,s3WatchVersion.isEmpty()?"Automatico: LIGADO":"Destino "+s3WatchVersion);
       oledLine(6,"Nao desligue a S3");
     }else{
       const char *actions[]={"Consultar GitHub","Instalar nova","Cancelar pedido"};
-      bool active[]={peerKey.length()==64&&WiFi.status()==WL_CONNECTED,s3CandidateReady(),s3OtaRecent()};
+      bool active[]={peerKey.length()==64&&WiFi.status()==WL_CONNECTED,s3CandidateReady(),s3OtaRecent()&&s3WindowUntil&&(int32_t)(s3WindowUntil-millis())>0};
       for(uint8_t i=0;i<3;++i)oledLine(i+2,String(i==oledS3Choice?"> ":"  ")+actions[i]+(active[i]?"":" [X]"));
       oledLine(5,s3CandidateReady()?"Nova "+s3Target+" Auto:ON":s3OtaStatus);
       oledLine(6,peerKey.length()!=64?"Pareamento pendente":!s3OtaRecent()?"Aguardando relato S3":oledS3Choice==0?"Busca; nao instala":oledS3Choice==1?"OK: abre confirmacao":"Auto retoma em 5 min");

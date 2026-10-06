@@ -2,7 +2,7 @@
 static const char *peerBaseURL="http://192.168.0.36";
 static String s3OtaStatus="Aguardando S3",s3OtaVersion,s3OtaBoot,s3Candidate,s3Target,s3SHA,s3QueuedAction;
 static String s3WatchVersion,s3WatchBoot,s3ConfirmId,s3ConfirmVersion,s3ConfirmSHA,s3ConfirmBoot;
-static uint32_t s3CandidateUntil=0,s3ReplyAt=0,nextS3OtaPoll=0;
+static uint32_t s3CandidateUntil=0,s3WindowUntil=0,s3ReplyAt=0,nextS3OtaPoll=0,s3WatchStarted=0;
 static bool s3HaveOtaReply=false,s3Busy=false;
 static size_t s3Written=0,s3Expected=0;
 static uint8_t oledS3Choice=0;
@@ -67,15 +67,16 @@ static bool fetchS3OTA(const String &action){
   s3Written=(size_t)written->valuedouble;s3Expected=(size_t)expected->valuedouble;
   s3OtaStatus=s3JsonText(o,"manual_status");String internet=s3JsonText(o,"internet_status");
   s3Candidate="";uint32_t budget=(uint32_t)expires->valuedouble*1000,elapsed=millis()-started+1000;
+  s3WindowUntil=budget>elapsed?millis()+budget-elapsed:0;
   if(cJSON_IsTrue(ready)&&budget>elapsed){
     s3Candidate=s3JsonText(o,"candidate_id");s3Target=s3JsonText(o,"target_version");s3SHA=s3JsonText(o,"sha256");
     if(s3Candidate.isEmpty()||s3Target.isEmpty()||!peerHex(s3SHA,64))s3Candidate="";
     else s3CandidateUntil=millis()+budget-elapsed;
   }
-  if(result=="CHECK_ACCEPTED")s3OtaStatus="Consulta solicitada";
+  if(result=="CHECK_ACCEPTED"){s3Candidate="";s3Busy=true;s3OtaStatus="Consulta solicitada";}
   else if(result=="CANCEL_ACCEPTED"){s3Candidate="";s3OtaStatus="Pedido cancelado";}
   else if(result=="INSTALL_ACCEPTED"){
-    s3WatchVersion=s3ConfirmVersion;s3WatchBoot=s3ConfirmBoot;s3Candidate="";s3Busy=true;s3OtaStatus="Instalacao aceita";
+    s3WatchVersion=s3ConfirmVersion;s3WatchBoot=s3ConfirmBoot;s3WatchStarted=millis();s3Candidate="";s3Busy=true;s3OtaStatus="Instalacao aceita";
   }else if(result=="CONFIRMATION_REJECTED"||result=="BUSY_OR_BLOCKED")s3OtaStatus="S3 rejeitou pedido";
   else if(internet.startsWith("UP_TO_DATE"))s3OtaStatus="Sem versao nova";
   else if(s3Busy)s3OtaStatus=s3JsonText(o,"phase");
@@ -84,11 +85,15 @@ static bool fetchS3OTA(const String &action){
      s3JsonText(o,"ota_state")=="VALID"&&s3JsonText(o,"running_partition")==s3JsonText(o,"boot_partition")){
     s3OtaStatus="Atualizacao concluida";s3WatchVersion="";s3Busy=false;
   }
+  if(!s3WatchVersion.isEmpty()&&boot==s3WatchBoot&&(internet.startsWith("STOPPED:")||s3JsonText(o,"manual_status")=="INSTALL_REJECTED")){
+    s3WatchVersion="";s3Busy=false;s3OtaStatus="Falha informada S3";
+  }
   cJSON_Delete(o);return true;
 }
 static void pollS3OTA(){
   if(uploadActive||uploadOK||rebootScheduled||ESP.getFreeHeap()<85000)return;
   if(peerKey.length()!=64){s3OtaStatus="Pareamento pendente";return;}
+  if(!s3WatchVersion.isEmpty()&&millis()-s3WatchStarted>300000){s3WatchVersion="";s3Busy=false;s3OtaStatus="Resultado nao provado";}
   bool page=!oledMenu&&oledPage==5;
   if(!page&&s3QueuedAction.isEmpty()&&s3WatchVersion.isEmpty())return;
   if((int32_t)(millis()-nextS3OtaPoll)<0)return;
@@ -96,7 +101,7 @@ static void pollS3OTA(){
   if(WiFi.status()!=WL_CONNECTED){s3OtaStatus="Wi-Fi desconectado";return;}
   String action=s3QueuedAction.isEmpty()?String("status"):s3QueuedAction;s3QueuedAction="";
   if(!fetchS3OTA(action)&&action=="confirm"){
-    s3WatchVersion=s3ConfirmVersion;s3WatchBoot=s3ConfirmBoot;s3OtaStatus="Confirmacao incerta";
+    s3WatchVersion=s3ConfirmVersion;s3WatchBoot=s3ConfirmBoot;s3WatchStarted=millis();s3OtaStatus="Confirmacao incerta";
   }
-  discardNavigation();
+  if(action!="status")discardNavigation();
 }

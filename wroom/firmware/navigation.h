@@ -61,7 +61,7 @@ static void pollNavigation() {
       else if (oledS3Choice == 1 && s3CandidateReady()) {
         if (!oledDetail) { oledDetail=true; stageS3Confirmation(); }
         else { queueS3Action("confirm"); oledDetail=false; }
-      } else if (oledS3Choice == 2) { queueS3Action("cancel"); oledDetail=false; }
+      } else if (oledS3Choice == 2 && s3OtaRecent() && s3WindowUntil && (int32_t)(s3WindowUntil-millis())>0) { queueS3Action("cancel"); oledDetail=false; }
     }
   } else if (pending & (2 | 8)) {
     const uint8_t pages[] = {3, 0, 1, 2, 5, 4};
