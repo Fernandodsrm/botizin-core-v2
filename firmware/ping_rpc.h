@@ -1,5 +1,5 @@
 #pragma once
-// One diagnostic command only. No GPIO, restart, Wi-Fi or flash operations.
+// Explicit OTA commands acknowledge first; queued work runs after TLS is released.
 uint32_t nextPingPoll = 0;
 uint8_t pingFailures = 0;
 bool pingStopped = false;
@@ -46,7 +46,9 @@ void __attribute__((noinline)) pollPing() {
   double now = (double)time(nullptr) * 1000.0;
   bool valid = cJSON_IsNumber(id) && id->valuedouble >= 0 &&
     id->valuedouble <= 2147483647.0 && id->valuedouble == (double)id->valueint &&
-    cJSON_IsString(method) && strcmp(method->valuestring, "ping") == 0 &&
+    cJSON_IsString(method) && (strcmp(method->valuestring, "ping") == 0 ||
+      strcmp(method->valuestring, "ota_check") == 0 || strcmp(method->valuestring, "ota_status") == 0 ||
+      strcmp(method->valuestring, "ota_confirm") == 0 || strcmp(method->valuestring, "ota_cancel") == 0 || strcmp(method->valuestring, "peer_pair") == 0) &&
     cJSON_IsObject(params) && cJSON_IsString(command) &&
     strlen(command->valuestring) > 0 && strlen(command->valuestring) <= 64 &&
     cJSON_IsNumber(issued) && issued->valuedouble <= now + 30000.0 &&
@@ -54,13 +56,34 @@ void __attribute__((noinline)) pollPing() {
   if (!valid) { cJSON_Delete(root); pingStatus = "REJECTED_COMMAND"; Serial.println("PING_RPC: " + pingStatus); return; }
   int requestId = id->valueint;
   String commandId(command->valuestring);
+  String action(method->valuestring), result = action == "ping" ? "PONG" : "OTA_STATUS";
+  bool accepted = false;
+  if (action == "peer_pair") {
+    cJSON *k = cJSON_GetObjectItemCaseSensitive(params, "key");
+    accepted = cJSON_IsString(k) && savePeerKey(String(k->valuestring));
+    result = accepted ? "PAIR_READY" : "PAIR_REJECTED";
+  } else if (action == "ota_check") {
+    accepted = otaReady && !internetStopped && !otaCheckQueued && !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled;
+    result = accepted ? "CHECK_ACCEPTED" : "BUSY_OR_BLOCKED";
+  } else if (action == "ota_confirm") {
+    cJSON *cid = cJSON_GetObjectItemCaseSensitive(params, "candidate_id");
+    cJSON *v = cJSON_GetObjectItemCaseSensitive(params, "target_version");
+    cJSON *sha = cJSON_GetObjectItemCaseSensitive(params, "sha256");
+    cJSON *bid = cJSON_GetObjectItemCaseSensitive(params, "boot_id");
+    accepted = candidateReady() && cJSON_IsString(cid) && cJSON_IsString(v) && cJSON_IsString(sha) && cJSON_IsString(bid) &&
+      otaConfirmationMatches(millis(), otaManualUntil, cid->valuestring, otaCandidateId.c_str(), v->valuestring, otaTargetVersion.c_str(), sha->valuestring, otaTargetSHA.c_str(), bid->valuestring, telemetryBootId.c_str());
+    result = accepted ? "INSTALL_ACCEPTED" : "CONFIRMATION_REJECTED";
+  } else if (action == "ota_cancel") {
+    accepted = !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled;
+    result = accepted ? "CANCEL_ACCEPTED" : "BUSY_OR_BLOCKED";
+  }
   cJSON_Delete(root);
   cJSON *reply = cJSON_CreateObject();
   if (!reply) { pingStatus = "NO_REPLY_MEMORY"; return; }
   const esp_partition_t *run = esp_ota_get_running_partition();
   String running = partitionInfo(run), boot = partitionInfo(esp_ota_get_boot_partition());
   String state = stateInfo(run), reset = resetInfo();
-  bool ok = cJSON_AddStringToObject(reply, "result", "PONG") &&
+  bool ok = cJSON_AddStringToObject(reply, "result", result.c_str()) &&
     cJSON_AddStringToObject(reply, "origin", "ESP32_REAL") &&
     cJSON_AddStringToObject(reply, "command_id", commandId.c_str()) &&
     cJSON_AddNumberToObject(reply, "request_id", requestId) &&
@@ -71,6 +94,17 @@ void __attribute__((noinline)) pollPing() {
     cJSON_AddStringToObject(reply, "boot_partition", boot.c_str()) &&
     cJSON_AddStringToObject(reply, "ota_state", state.c_str()) &&
     cJSON_AddStringToObject(reply, "reset_reason", reset.c_str());
+  if (action != "ping") {
+    ok = ok && cJSON_AddBoolToObject(reply, "automatic_enabled", true) &&
+      cJSON_AddStringToObject(reply, "manual_status", manualOtaStatus.c_str()) &&
+      cJSON_AddStringToObject(reply, "internet_status", internetStatus.c_str()) &&
+      cJSON_AddBoolToObject(reply, "candidate_ready", candidateReady()) &&
+      cJSON_AddStringToObject(reply, "candidate_id", otaCandidateId.c_str()) &&
+      cJSON_AddStringToObject(reply, "target_version", otaTargetVersion.c_str()) &&
+      cJSON_AddStringToObject(reply, "sha256", otaTargetSHA.c_str()) &&
+      cJSON_AddNumberToObject(reply, "size", otaTargetBytes) &&
+      cJSON_AddNumberToObject(reply, "expires_in_seconds", manualWindowActive() ? (otaManualUntil - millis()) / 1000 : 0);
+  }
   char *payload = ok ? cJSON_PrintUnformatted(reply) : nullptr;
   cJSON_Delete(reply);
   if (!payload) { pingStatus = "NO_REPLY_MEMORY"; return; }
@@ -90,6 +124,13 @@ void __attribute__((noinline)) pollPing() {
   cJSON_free(payload);
   pingStatus = "REPLY_HTTP_" + String(posted);
   Serial.println("PING_RPC: " + commandId + " " + pingStatus);
-  if (posted >= 200 && posted < 300) pingFailures = 0;
+  if (posted >= 200 && posted < 300) {
+    pingFailures = 0;
+    // A failed acknowledgement never starts an installation.
+    if (accepted && action == "ota_check") queueOtaCheck();
+    else if (accepted && action == "ota_confirm" && candidateReady()) {
+      otaInstallQueued = true; manualOtaStatus = "INSTALL_QUEUED";
+    } else if (accepted && action == "ota_cancel") cancelOtaCheck();
+  }
   else if (++pingFailures >= 3) { pingStopped = true; pingStatus = "PAUSED_UNTIL_REBOOT"; }
 }
