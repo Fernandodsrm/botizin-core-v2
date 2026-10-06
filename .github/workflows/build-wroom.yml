@@ -40,6 +40,10 @@ jobs:
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/peer_status_test.cpp -o /tmp/peer-status-test
           /tmp/peer-status-test
+      - name: Validate bounded diagnostic sampler
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -I wroom/tests/mock wroom/tests/diagnostic_sampler_test.cpp -o /tmp/diagnostic-sampler-test
+          /tmp/diagnostic-sampler-test
       - name: Validate diagnostic parser
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/diagnostic_parser_test.cpp -o /tmp/diagnostic-parser-test

@@ -7,6 +7,8 @@ enum DiagnosticIndex { DIAG_GIT, DIAG_TB, DIAG_RPC, DIAG_PEER, DIAG_OLED, DIAG_S
 static DiagnosticOp diagnosticOps[DIAG_COUNT];
 struct DiagnosticMemory { uint32_t free=0, minimum=0, largest=0, psram=0, otaFree=0, at=0; bool ready=false; };
 static DiagnosticMemory diagnosticMemory;
+static uint32_t diagnosticFlashInitUs=0;
+static bool diagnosticFlashReady=false;
 static uint32_t diagnosticLoopAt=0, diagnosticLoopMaxUs=0, diagnosticNextSample=0;
 static bool diagnosticLoopSeen=false;
 struct DiagnosticScope {
@@ -19,6 +21,13 @@ static void diagnosticLoopTick(){uint32_t now=(uint32_t)esp_timer_get_time();
   if(diagnosticLoopSeen){uint32_t gap=now-diagnosticLoopAt;if(gap>diagnosticLoopMaxUs)diagnosticLoopMaxUs=gap;}
   diagnosticLoopAt=now;diagnosticLoopSeen=true;
 }
+static void initializeDiagnosticFlash(){
+  if(diagnosticFlashReady)return;
+  uint32_t started=(uint32_t)esp_timer_get_time();
+  const auto *p=esp_ota_get_next_update_partition(nullptr);size_t size=ESP.getSketchSize();
+  diagnosticMemory.otaFree=p&&size<p->size?p->size-size:0;
+  diagnosticFlashInitUs=(uint32_t)esp_timer_get_time()-started;diagnosticFlashReady=true;
+}
 static void sampleDiagnostics(){
   if(diagnosticMemory.ready&&(int32_t)(millis()-diagnosticNextSample)<0)return;
   diagnosticNextSample=millis()+5000;DiagnosticScope scope(DIAG_SAMPLE);
@@ -26,8 +35,6 @@ static void sampleDiagnostics(){
   diagnosticMemory.minimum=heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
   diagnosticMemory.largest=heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT);
   diagnosticMemory.psram=heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-  const auto *p=esp_ota_get_next_update_partition(nullptr);size_t size=ESP.getSketchSize();
-  diagnosticMemory.otaFree=p&&size<p->size?p->size-size:0;
   diagnosticMemory.at=millis();diagnosticMemory.ready=true;
 }
 static uint32_t diagnosticUptime(){return (uint32_t)(esp_timer_get_time()/1000000LL);}
@@ -36,13 +43,14 @@ static String diagnosticText(){String s="DIAG_SCHEMA: 1\n";
   s+="DIAG_FREE: "+String(diagnosticMemory.free)+"\nDIAG_MIN: "+String(diagnosticMemory.minimum)+"\n";
   s+="DIAG_LARGEST: "+String(diagnosticMemory.largest)+"\nDIAG_PSRAM: "+String(diagnosticMemory.psram)+"\n";
   s+="DIAG_OTA_FREE: "+String(diagnosticMemory.otaFree)+"\nDIAG_SAMPLE_AGE: "+String((millis()-diagnosticMemory.at)/1000)+"\n";
+  s+="DIAG_FLASH_INIT_US: "+String(diagnosticFlashInitUs)+"\n";
   s+="DIAG_LOOP_MAX_US: "+String(diagnosticLoopMaxUs)+"\n";
   const char *names[]={"GIT","TB","RPC","PEER","OLED","SAMPLE"};
   for(uint8_t i=0;i<DIAG_COUNT;++i){s+="DIAG_"+String(names[i])+"_MAX_US: "+String(diagnosticOps[i].maxUs)+"\n";}
   return s;
 }
 static bool diagnosticJSON(cJSON *o){
-  bool ok=cJSON_AddNumberToObject(o,"diag_schema",1)&&
+  bool ok=cJSON_AddNumberToObject(o,"diag_flash_init_us",diagnosticFlashInitUs)&&cJSON_AddNumberToObject(o,"diag_schema",1)&&
     cJSON_AddNumberToObject(o,"ram_internal_free_bytes",diagnosticMemory.free)&&
     cJSON_AddNumberToObject(o,"ram_internal_min_bytes",diagnosticMemory.minimum)&&
     cJSON_AddNumberToObject(o,"ram_largest_block_bytes",diagnosticMemory.largest)&&
