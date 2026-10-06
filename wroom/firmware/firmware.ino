@@ -52,6 +52,8 @@ bool otaCheckQueued = false, otaInstallQueued = false;
 void showOtaProgress(const String &phase, size_t done = 0, size_t total = 0);
 #include "ota_confirmation.h"
 #include "peer_auth.h"
+void discardNavigation();
+#include "peer_ota_client.h"
 
 bool manualWindowActive() { return otaManualUntil && (int32_t)(otaManualUntil - millis()) > 0; }
 bool candidateReady() { return !otaCandidateId.isEmpty() && manualWindowActive() && !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled; }
@@ -153,6 +155,8 @@ String snapshot() {
   s += "S3_EXPECTED_URL: http://192.168.0.36/status\n";
   s += "S3_LAST_VERSION: " + peerVersion + "\n";
   s += "PEER_PAIRED: " + String(peerKey.length()==64?"YES":"NO") + "\n";
+  s += "S3_OTA_STATUS: " + s3OtaStatus + "\n";
+  s += "S3_OTA_VERSION: " + s3OtaVersion + "\n";
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
   return s;
@@ -490,6 +494,10 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "ota_state", stateText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_journal", evidence.c_str()) &&
     cJSON_AddBoolToObject(root, "ota_automatic_enabled", true) &&
+    cJSON_AddBoolToObject(root, "peer_paired", peerKey.length()==64) &&
+    cJSON_AddStringToObject(root, "s3_ota_status", s3OtaStatus.c_str()) &&
+    cJSON_AddStringToObject(root, "s3_ota_version", s3OtaVersion.c_str()) &&
+    cJSON_AddNumberToObject(root, "s3_ota_report_age_seconds", s3HaveOtaReply?double((millis()-s3ReplyAt)/1000):-1.0) &&
     cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str()) &&
     cJSON_AddStringToObject(root, "s3_link", peerStatus.c_str()) &&
     cJSON_AddStringToObject(root, "s3_last_version", peerVersion.c_str()) &&
@@ -532,8 +540,6 @@ void __attribute__((noinline)) sendTelemetry() {
 
 #include "ping_rpc.h"
 #include "peer_status.h"
-void discardNavigation();
-#include "peer_ota_client.h"
 #include "oled_status.h"
 #include "navigation.h"
 
