@@ -37,7 +37,7 @@ static void diagnosticPage(){
     oledLine(3,"RAM minima "+diagnosticBytes(remote?peerFrame.minimum:diagnosticMemory.minimum));
     oledLine(4,"Maior bloco "+diagnosticBytes(remote?peerFrame.largest:diagnosticMemory.largest));
     oledLine(5,"PSRAM livre "+diagnosticBytes(remote?peerFrame.psram:diagnosticMemory.psram));
-    oledLine(6,"Firmware cabe +"+diagnosticBytes(remote?peerFrame.otaFree:diagnosticMemory.otaFree));
+    oledLine(6,"Margem OTA "+diagnosticBytes(remote?peerFrame.otaFree:diagnosticMemory.otaFree));
   }else if(navDiagnostic==1){
     oledLine(2,"Pausa max "+diagnosticMs(remote?peerFrame.loopMax:diagnosticLoopMaxUs));
     oledLine(3,"Git max "+diagnosticMs(remote?peerFrame.gitMax:diagnosticOps[DIAG_GIT].maxUs));
