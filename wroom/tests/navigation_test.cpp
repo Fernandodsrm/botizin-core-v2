@@ -19,6 +19,16 @@ bool oledMenu=true,oledDetail=false;
 uint8_t oledMenuChoice=0,oledOtaChoice=0,oledPage=0;
 uint32_t nextPeerPoll=0,nextOledRefresh=0;
 const char *otaCandidateId="id",*otaTargetVersion="0.0.9",*otaTargetSHA="sha",*telemetryBootId="boot";
+struct QueueMock{bool empty=true;bool isEmpty()const{return empty;}}s3QueuedAction;
+uint8_t oledS3Choice=0;bool s3Candidate=false;int s3checks=0,s3installs=0,s3cancels=0,s3stages=0;
+bool s3CandidateReady(){return s3Candidate;}
+void stageS3Confirmation(){++s3stages;}
+bool queueS3Action(const char *action){
+ if(action[0]=='c'&&action[1]=='h')++s3checks;
+ else if(action[0]=='c'&&action[1]=='o')++s3installs;
+ else ++s3cancels;
+ return true;
+}
 bool candidate=false,window=false;int installs=0,checks=0,cancels=0;
 bool candidateReady(){return candidate;}
 bool manualWindowActive(){return window;}
@@ -40,5 +50,14 @@ int main(){
  oledDetail=false;press(8);press(1);assert(cancels==1); // separate cancel action
  uploadActive=true;auto page=oledPage;press(4);assert(oledPage==page&&!oledMenu);uploadActive=false;
  press(4);assert(oledMenu);press(4);assert(oledMenu); // no side effect at home
+ oledMenuChoice=2;press(8);assert(oledMenuChoice==3);press(8);assert(oledMenuChoice==4);press(1);assert(oledPage==5&&!oledMenu);
+ press(1);assert(s3checks==1);press(8);press(1);assert(s3installs==0&&!oledDetail);
+ s3Candidate=true;press(1);assert(s3stages==1&&s3installs==0&&oledDetail);
+ press(4);assert(!oledDetail&&!oledMenu&&s3installs==0);
+ press(1);s3Candidate=false;press(1);assert(s3installs==0);
+ s3Candidate=true;oledDetail=false;press(1);press(1);assert(s3installs==1);
+ press(8);press(1);assert(s3cancels==1);
+ press(4);press(8);assert(oledMenuChoice==5);press(8);assert(oledMenuChoice==0);
+ press(2);assert(oledMenuChoice==5);s3QueuedAction.empty=false;press(1);assert(oledMenu);s3QueuedAction.empty=true;
  puts("NAVIGATION_TESTS_OK: menu, disabled install, explicit confirmation, cancel, expired candidate, busy guard");
 }

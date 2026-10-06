@@ -33,14 +33,14 @@ static void pollNavigation() {
   uint8_t pending = navPending; navPending = 0;
   portEXIT_CRITICAL(&navMux);
   // Discard presses during firmware writes and pending actions.
-  if (!pending || uploadActive || uploadOK || rebootScheduled || otaCheckQueued || otaInstallQueued) return;
+  if (!pending || uploadActive || uploadOK || rebootScheduled || otaCheckQueued || otaInstallQueued || !s3QueuedAction.isEmpty()) return;
   if (pending & 4) {
-    if (oledPage == 2 && oledDetail && !oledMenu) oledDetail = false;
+    if ((oledPage == 2 || oledPage == 5) && oledDetail && !oledMenu) oledDetail = false;
     else { oledMenu = true; oledDetail = false; }
   } else if (oledMenu) {
-    if (pending & (2 | 8)) oledMenuChoice = (oledMenuChoice + ((pending & 8) ? 1 : 4)) % 5;
+    if (pending & (2 | 8)) oledMenuChoice = (oledMenuChoice + ((pending & 8) ? 1 : 5)) % 6;
     else if (pending & 1) {
-      const uint8_t pages[] = {3, 0, 1, 2, 4};
+      const uint8_t pages[] = {3, 0, 1, 2, 5, 4};
       oledPage = pages[oledMenuChoice]; oledMenu = false; oledDetail = false;
     }
   } else if (oledPage == 2) {
@@ -54,10 +54,19 @@ static void pollNavigation() {
         else { confirmOta(otaCandidateId, otaTargetVersion, otaTargetSHA, telemetryBootId); oledDetail = false; }
       } else if (oledOtaChoice == 2 && manualWindowActive()) { cancelOtaCheck(); oledDetail = false; }
     }
+  } else if (oledPage == 5) {
+    if (pending & (2 | 8)) { oledDetail = false; oledS3Choice = (oledS3Choice + ((pending & 8) ? 1 : 2)) % 3; }
+    else if (pending & 1) {
+      if (oledS3Choice == 0) { oledDetail=false; queueS3Action("check"); }
+      else if (oledS3Choice == 1 && s3CandidateReady()) {
+        if (!oledDetail) { oledDetail=true; stageS3Confirmation(); }
+        else { queueS3Action("confirm"); oledDetail=false; }
+      } else if (oledS3Choice == 2) { queueS3Action("cancel"); oledDetail=false; }
+    }
   } else if (pending & (2 | 8)) {
-    const uint8_t pages[] = {3, 0, 1, 2, 4};
-    uint8_t index = 0; while (index < 4 && pages[index] != oledPage) ++index;
-    index = (index + ((pending & 8) ? 1 : 4)) % 5;
+    const uint8_t pages[] = {3, 0, 1, 2, 5, 4};
+    uint8_t index = 0; while (index < 5 && pages[index] != oledPage) ++index;
+    index = (index + ((pending & 8) ? 1 : 5)) % 6;
     oledPage = pages[index]; oledMenuChoice = index; oledDetail = false;
   } else if ((pending & 1) && oledPage != 4) oledDetail = !oledDetail;
   if (oledPage == 1 && !oledMenu) nextPeerPoll = millis();

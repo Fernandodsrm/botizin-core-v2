@@ -34,8 +34,9 @@ static void refreshOled() {
   if (oledMenu) {
     oledLine(0, "BOTIZIN - MENU");
     oledLine(1, "Cima/Baixo OK:abrir");
-    const char *areas[] = {"Conexao", "Placa WROOM", "Placa S3", "Atualizacao WROOM", "Ajuda dos botoes"};
-    for (uint8_t i = 0; i < 5; ++i) oledLine(i + 2, String(i == oledMenuChoice ? "> " : "  ") + areas[i]);
+    const char *areas[] = {"Conexao", "Placa WROOM", "Placa S3", "Atualizacao WROOM", "Atualizacao S3", "Ajuda dos botoes"};
+    uint8_t first=oledMenuChoice>=5?1:0;
+    for (uint8_t i = first; i < first+5; ++i) oledLine(i-first+2, String(i == oledMenuChoice ? "> " : "  ") + areas[i]);
   } else if (oledPage == 3) {
     oledLine(0, "CONEXAO       ^v:area");
     oledLine(1, "OK:info Voltar:menu");
@@ -78,6 +79,27 @@ static void refreshOled() {
     }
     oledLine(5, candidateReady() ? "Nova " + otaTargetVersion + " Auto:ON" : internetStatus.startsWith("UP_TO_DATE") ? "Auto:ON | sem nova" : "Automatico: LIGADO");
     oledLine(6, active[oledOtaChoice] ? (oledOtaChoice == 0 ? "Busca; nao instala" : oledOtaChoice == 1 ? "OK: abre confirmacao" : "Auto retoma em 5 min") : oledOtaChoice == 1 ? "Sem candidata valida" : oledOtaChoice == 2 ? "Sem pedido manual" : "Consulta bloqueada");
+  } else if (oledPage == 5 && oledDetail && s3CandidateReady()) {
+    oledLine(0,"INSTALAR NA S3?");oledLine(1,"OK:SIM Voltar:NAO");
+    oledLine(2,"Atual "+s3OtaVersion);oledLine(3,"Nova  "+s3ConfirmVersion);
+    oledLine(4,"Vai reiniciar a S3");
+    oledLine(5,String("Prazo ")+String((s3CandidateUntil-millis())/1000)+"s");
+    oledLine(6,"WROOM segue ligada");
+  } else if (oledPage == 5) {
+    oledLine(0,"OTA S3 "+(s3OtaVersion.isEmpty()?peerVersion:s3OtaVersion)+" ^v");
+    oledLine(1,"OK:acao Voltar:menu");
+    if(s3Busy||!s3WatchVersion.isEmpty()){
+      oledLine(2,"Acompanhando a S3");oledLine(3,s3OtaRecent()?s3OtaStatus:"Aguardando relato S3");
+      oledLine(4,s3Expected?String((unsigned long)(s3Written*100/s3Expected))+"% recebido da S3":"Sem progresso atual");
+      oledLine(5,s3WatchVersion.isEmpty()?"Automatico: LIGADO":"Destino "+s3WatchVersion);
+      oledLine(6,"Nao desligue a S3");
+    }else{
+      const char *actions[]={"Consultar GitHub","Instalar nova","Cancelar pedido"};
+      bool active[]={peerKey.length()==64&&WiFi.status()==WL_CONNECTED,s3CandidateReady(),s3OtaRecent()};
+      for(uint8_t i=0;i<3;++i)oledLine(i+2,String(i==oledS3Choice?"> ":"  ")+actions[i]+(active[i]?"":" [X]"));
+      oledLine(5,s3CandidateReady()?"Nova "+s3Target+" Auto:ON":s3OtaStatus);
+      oledLine(6,peerKey.length()!=64?"Pareamento pendente":!s3OtaRecent()?"Aguardando relato S3":oledS3Choice==0?"Busca; nao instala":oledS3Choice==1?"OK: abre confirmacao":"Auto retoma em 5 min");
+    }
   } else {
     oledLine(0, "AJUDA DOS BOTOES");
     oledLine(1, "Voltar:menu ^v:area");

@@ -51,6 +51,7 @@ uint32_t otaManualUntil = 0;
 bool otaCheckQueued = false, otaInstallQueued = false;
 void showOtaProgress(const String &phase, size_t done = 0, size_t total = 0);
 #include "ota_confirmation.h"
+#include "peer_auth.h"
 
 bool manualWindowActive() { return otaManualUntil && (int32_t)(otaManualUntil - millis()) > 0; }
 bool candidateReady() { return !otaCandidateId.isEmpty() && manualWindowActive() && !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled; }
@@ -151,6 +152,7 @@ String snapshot() {
   s += "S3_LINK: " + peerStatus + "\n";
   s += "S3_EXPECTED_URL: http://192.168.0.36/status\n";
   s += "S3_LAST_VERSION: " + peerVersion + "\n";
+  s += "PEER_PAIRED: " + String(peerKey.length()==64?"YES":"NO") + "\n";
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
   return s;
@@ -530,6 +532,8 @@ void __attribute__((noinline)) sendTelemetry() {
 
 #include "ping_rpc.h"
 #include "peer_status.h"
+void discardNavigation();
+#include "peer_ota_client.h"
 #include "oled_status.h"
 #include "navigation.h"
 
@@ -547,6 +551,7 @@ void printPartitionTable() {
 void setup() {
   Serial.begin(115200);
   delay(1500);
+  loadPeerKey();
   bool journalOK = journal.begin("wroom-journal", false);
   if (journalOK) priorAttempt = journal.getString("last", "");
   else Serial.println("JOURNAL_OPEN_FAILED");
@@ -630,6 +635,7 @@ void loop() {
   pollNavigation();
   refreshOled();
   pollPeerStatus();
+  pollS3OTA();
   pollNavigation();
   refreshOled();
   delay(2);

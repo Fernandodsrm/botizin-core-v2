@@ -48,7 +48,7 @@ void __attribute__((noinline)) pollPing() {
     id->valuedouble <= 2147483647.0 && id->valuedouble == (double)id->valueint &&
     cJSON_IsString(method) && (strcmp(method->valuestring, "ping") == 0 ||
       strcmp(method->valuestring, "ota_check") == 0 || strcmp(method->valuestring, "ota_status") == 0 ||
-      strcmp(method->valuestring, "ota_confirm") == 0 || strcmp(method->valuestring, "ota_cancel") == 0) &&
+      strcmp(method->valuestring, "ota_confirm") == 0 || strcmp(method->valuestring, "ota_cancel") == 0 || strcmp(method->valuestring, "peer_pair") == 0) &&
     cJSON_IsObject(params) && cJSON_IsString(command) &&
     strlen(command->valuestring) > 0 && strlen(command->valuestring) <= 64 &&
     cJSON_IsNumber(issued) && issued->valuedouble <= now + 30000.0 &&
@@ -58,7 +58,11 @@ void __attribute__((noinline)) pollPing() {
   String commandId(command->valuestring);
   String action(method->valuestring), result = action == "ping" ? "PONG" : "OTA_STATUS";
   bool accepted = false;
-  if (action == "ota_check") {
+  if (action == "peer_pair") {
+    cJSON *k = cJSON_GetObjectItemCaseSensitive(params, "key");
+    accepted = cJSON_IsString(k) && savePeerKey(String(k->valuestring));
+    result = accepted ? "PAIR_READY" : "PAIR_REJECTED";
+  } else if (action == "ota_check") {
     accepted = otaReady && !internetStopped && !otaCheckQueued && !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled;
     result = accepted ? "CHECK_ACCEPTED" : "BUSY_OR_BLOCKED";
   } else if (action == "ota_confirm") {
