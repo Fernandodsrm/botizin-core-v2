@@ -23,6 +23,7 @@ static bool queueS3Action(const String &action){
 }
 static String s3JsonText(cJSON *o,const char *key){cJSON*v=cJSON_GetObjectItemCaseSensitive(o,key);return cJSON_IsString(v)?String(v->valuestring):String();}
 static bool fetchS3OTA(const String &action){
+  DiagnosticScope diagnosticScope(DIAG_PEER);diagnosticScope.failed=true;
   uint32_t started=millis();String nonce;
   {
     NetworkClient c;HTTPClient h;h.setConnectTimeout(350);h.setTimeout(500);h.useHTTP10(true);
@@ -62,6 +63,7 @@ static bool fetchS3OTA(const String &action){
     expires->valuedouble>=0&&expires->valuedouble<=300&&cJSON_IsBool(ready)&&cJSON_IsNumber(written)&&cJSON_IsNumber(expected)&&
     written->valuedouble>=0&&written->valuedouble<=3145728&&expected->valuedouble>=0&&expected->valuedouble<=3145728;
   if(!valid){cJSON_Delete(o);s3Candidate="";s3OtaStatus="Resposta invalida";return false;}
+  diagnosticScope.failed=false;
   s3OtaVersion=version;s3OtaBoot=boot;s3ReplyAt=millis();s3HaveOtaReply=true;
   s3Busy=cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(o,"busy"));
   s3Written=(size_t)written->valuedouble;s3Expected=(size_t)expected->valuedouble;
@@ -94,7 +96,7 @@ static void pollS3OTA(){
   if(uploadActive||uploadOK||rebootScheduled||ESP.getFreeHeap()<85000)return;
   if(peerKey.length()!=64){s3OtaStatus="Pareamento pendente";return;}
   if(!s3WatchVersion.isEmpty()&&millis()-s3WatchStarted>300000){s3WatchVersion="";s3Busy=false;s3OtaStatus="Resultado nao provado";}
-  bool page=!oledMenu&&oledPage==5;
+  bool page=navLevel==3&&oledPage==5;
   if(!page&&s3QueuedAction.isEmpty()&&s3WatchVersion.isEmpty())return;
   if((int32_t)(millis()-nextS3OtaPoll)<0)return;
   nextS3OtaPoll=millis()+3000;

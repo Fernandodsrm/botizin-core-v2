@@ -13,7 +13,7 @@ def main():
     cores = json.loads(subprocess.check_output(["arduino-cli","core","list","--format","json"],text=True))
     assert any(p.get("id")=="esp32:esp32" and p.get("installed_version")=="3.3.12" for p in cores["platforms"])
     subprocess.run(["arduino-cli","board","details","--fqbn",FQBN],check=True)
-    for version in ("0.0.10",):
+    for version in ("0.0.11",):
         source = ROOT / "wroom-build" / "firmware"; source.parent.mkdir(exist_ok=True)
         shutil.copytree(original,source,dirs_exist_ok=True)
         (source/"version.h").write_text('#pragma once\n#define BOTIZIN_VERSION "'+version+'"\n')
