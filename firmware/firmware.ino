@@ -39,6 +39,7 @@ uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
 bool telemetryStopped = false;
 String telemetryBootId;
+#include "diagnostics.h"
 // Automatic OTA remains enabled. A manual query reserves a bounded confirmation window.
 String manualOtaStatus = "READY", otaCandidateId, otaTargetVersion, otaTargetURL, otaTargetSHA;
 size_t otaTargetBytes = 0;
@@ -125,7 +126,7 @@ String snapshot() {
   String s = "BOTIZIN CORE V" + String(BOTIZIN_VERSION) + "\n";
   s += "TEST_RESULT: Deu certo na atualização\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
-  s += "UPTIME_SECONDS: " + String(millis() / 1000) + "\n";
+  s += "UPTIME_SECONDS: " + String(diagnosticUptime()) + "\n";
   s += "RESET_REASON: " + resetInfo() + "\n";
   s += "FLASH_BYTES: " + String(ESP.getFlashChipSize()) + "\n";
   s += "PSRAM_BYTES: " + String((unsigned long)esp_psram_get_size()) + "\n";
@@ -149,6 +150,7 @@ String snapshot() {
   s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
+  s += diagnosticText();
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
   return s;
@@ -309,6 +311,7 @@ void stopInternet(const String &reason) {
 }
 
 void checkInternetOTA(bool manual) {
+  DiagnosticScope diagnosticScope(DIAG_GIT);
   if (manual) { manualOtaStatus = "CHECKING"; showOtaProgress("CONSULTANDO GITHUB"); }
   if (!otaReady) { stopInternet("hardware/partition mismatch"); return; }
   if (WiFi.status() != WL_CONNECTED) {
@@ -464,6 +467,7 @@ void __attribute__((noinline)) sendTelemetry() {
   if (telemetryStopped || rebootScheduled || uploadActive || uploadOK ||
       WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000) return;
   if (ESP.getFreeHeap() < 80000) { telemetryStatus = "SKIPPED_LOW_HEAP"; return; }
+  DiagnosticScope diagnosticScope(DIAG_TB);
   cJSON *root = cJSON_CreateObject();
   if (!root) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
   const esp_partition_t *run = esp_ota_get_running_partition();
@@ -478,7 +482,7 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "firmware_version", BOTIZIN_VERSION) &&
     cJSON_AddStringToObject(root, "boot_id", telemetryBootId.c_str()) &&
     cJSON_AddNumberToObject(root, "sequence", ++telemetrySequence) &&
-    cJSON_AddNumberToObject(root, "uptime_seconds", millis() / 1000) &&
+    cJSON_AddNumberToObject(root, "uptime_seconds", diagnosticUptime()) &&
     cJSON_AddStringToObject(root, "running_partition", runText.c_str()) &&
     cJSON_AddStringToObject(root, "boot_partition", bootText.c_str()) &&
     cJSON_AddStringToObject(root, "next_update_partition", nextText.c_str()) &&
@@ -488,6 +492,7 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddBoolToObject(root, "ota_automatic_enabled", true) &&
     cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str()) &&
     cJSON_AddBoolToObject(root, "peer_paired", peerKey.length() == 64);
+  ok = ok && diagnosticJSON(root);
   char *payload = ok ? cJSON_PrintUnformatted(root) : nullptr;
   cJSON_Delete(root);
   if (!payload) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
@@ -513,6 +518,7 @@ void __attribute__((noinline)) sendTelemetry() {
     http.end();
     tls.stop();
   }
+  diagnosticScope.failed = code != 200;
   cJSON_free(payload);
   telemetryStatus = "HTTP_" + String(code);
   Serial.println("TELEMETRY: " + telemetryStatus);
@@ -556,6 +562,7 @@ void setup() {
              a->size == 0x300000 && b->size == 0x300000 &&
              data->address == 0xe000 && data->size == 0x2000 && run &&
              (run->address == a->address || run->address == b->address);
+  sampleDiagnostics();
   Serial.println(snapshot());
   WiFi.mode(WIFI_STA);
   // Reuse the Wi-Fi configuration already saved by the validated 0.0.3.
@@ -588,6 +595,8 @@ void setup() {
 }
 
 void loop() {
+  diagnosticLoopTick();
+  if (!uploadActive && !uploadOK && !rebootScheduled) sampleDiagnostics();
   server.handleClient();
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
   if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued) {
