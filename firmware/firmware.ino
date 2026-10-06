@@ -563,6 +563,7 @@ void setup() {
              a->size == 0x300000 && b->size == 0x300000 &&
              data->address == 0xe000 && data->size == 0x2000 && run &&
              (run->address == a->address || run->address == b->address);
+  initializeDiagnosticFlash();
   sampleDiagnostics();
   Serial.println(snapshot());
   WiFi.mode(WIFI_STA);
