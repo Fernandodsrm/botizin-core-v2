@@ -123,6 +123,7 @@ void __attribute__((noinline)) pollPing() {
     }
     http.end(); tls.stop();
   }
+  diagnosticScope.failed = posted < 200 || posted >= 300;
   cJSON_free(payload);
   pingStatus = "REPLY_HTTP_" + String(posted);
   Serial.println("PING_RPC: " + commandId + " " + pingStatus);
