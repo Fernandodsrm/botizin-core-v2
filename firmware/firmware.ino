@@ -121,9 +121,13 @@ String resetInfo() {
   return String(name) + " (" + String((int)r) + ")";
 }
 
+bool hashPartition(const esp_partition_t *, size_t, String &);
+#include "timed_trial.h"
+
 String snapshot() {
   const esp_partition_t *run = esp_ota_get_running_partition();
   String s = "BOTIZIN CORE V" + String(BOTIZIN_VERSION) + "\n";
+  s += "TIMED_TRIAL: " + String(trialStatus) + "\n";
   s += "TEST_RESULT: Deu certo na atualização\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
   s += "UPTIME_SECONDS: " + String(diagnosticUptime()) + "\n";
@@ -145,7 +149,7 @@ String snapshot() {
   s += "WIFI: " + String(WiFi.status() == WL_CONNECTED ? "OK" : "DISCONNECTED") + "\n";
   s += "OTA: " + String(otaReady ? "READY" : "BLOCKED: hardware/partition mismatch") + "\n";
   s += "INTERNET_OTA: " + internetStatus + "\n";
-  s += "OTA_AUTOMATIC_ENABLED: YES\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
+  s += "OTA_AUTOMATIC_ENABLED: NO (temporary trial)\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
   s += "PEER_PAIRED: " + String(peerKey.length() == 64 ? "YES" : "NO") + "\n";
   s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
@@ -203,6 +207,10 @@ void failUpload(const String &reason) {
 }
 
 void beginUpload(const String &length, const String &sha) {
+    responseCode = 409; uploadActive = false; uploadOK = false;
+    attempt = "TIMED_TRIAL: OTA writes blocked to preserve baseline\n";
+    return;
+
     uploadOK = false;
     responseCode = 400;
     attempt = "";
@@ -490,7 +498,9 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "reset_reason", resetText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_state", stateText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_journal", evidence.c_str()) &&
-    cJSON_AddBoolToObject(root, "ota_automatic_enabled", true) &&
+    cJSON_AddBoolToObject(root, "ota_automatic_enabled", false) &&
+    cJSON_AddStringToObject(root, "timed_trial_status", trialStatus) &&
+    cJSON_AddBoolToObject(root, "timed_trial_armed", trialArmed) &&
     cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str()) &&
     cJSON_AddBoolToObject(root, "peer_paired", peerKey.length() == 64);
   ok = ok && diagnosticJSON(root);
@@ -547,6 +557,7 @@ void printPartitionTable() {
 
 void setup() {
   Serial.begin(115200);
+  armTimedTrial();
   delay(1500);
   loadPeerKey();
   bool journalOK = journal.begin("botizin-v2", false);
@@ -563,6 +574,9 @@ void setup() {
              a->size == 0x300000 && b->size == 0x300000 &&
              data->address == 0xe000 && data->size == 0x2000 && run &&
              (run->address == a->address || run->address == b->address);
+  otaReady = false; internetStopped = true;
+  internetStatus = "TIMED_TRIAL_WRITES_BLOCKED";
+  manualOtaStatus = "TIMED_TRIAL_WRITES_BLOCKED";
   initializeDiagnosticFlash();
   sampleDiagnostics();
   Serial.println(snapshot());

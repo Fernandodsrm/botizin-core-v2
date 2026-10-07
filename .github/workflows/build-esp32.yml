@@ -2,7 +2,7 @@ name: Build BOTIZIN ESP32-S3 in cloud
 
 on:
   push:
-    branches: [cloud-build]
+    branches: [cloud-build, s3-timed-trial-20261007]
     paths:
       - 'firmware/**'
       - 'ci/**'
@@ -34,6 +34,10 @@ jobs:
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror tests/ota_confirmation_test.cpp -o /tmp/ota-confirmation-test
           /tmp/ota-confirmation-test
+      - name: Validate timed return guards
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror tests/timed_trial_test.cpp -o /tmp/timed-trial-test
+          /tmp/timed-trial-test
       - name: Compile and validate firmware package
         env:
           BOTIZIN_TB_DEVICE_TOKEN: ${{ secrets.BOTIZIN_TB_DEVICE_TOKEN }}
