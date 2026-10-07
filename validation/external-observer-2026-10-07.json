@@ -1,0 +1,421 @@
+{
+  "generated_at_ms": 1791403682720,
+  "window_hours": 6,
+  "devices": {
+    "S3": {
+      "firmware_sizes": [
+        {
+          "version": "0.0.10",
+          "bytes": 1154272,
+          "slot_bytes": 3145728,
+          "remaining_bytes": 1991456,
+          "slot_used_percent": 36.69,
+          "sha256": "b0ad415a8dee35ac647b26b24260983040ea2a969cb577a9162587464c72abf9",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.11",
+          "bytes": 1163424,
+          "slot_bytes": 3145728,
+          "remaining_bytes": 1982304,
+          "slot_used_percent": 36.98,
+          "sha256": "1cb6dde0d86481ea4779f40e2bcb9db368245eb8fe239fed88d9d881072de2de",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.12",
+          "bytes": 1166528,
+          "slot_bytes": 3145728,
+          "remaining_bytes": 1979200,
+          "slot_used_percent": 37.08,
+          "sha256": "c248118fb22dca336d9b8ea76be3d87a2a2ebde222fb1580e8d71b2655b8397c",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.13",
+          "bytes": 1166784,
+          "slot_bytes": 3145728,
+          "remaining_bytes": 1978944,
+          "slot_used_percent": 37.09,
+          "sha256": "db682f24db7af0624f4ed0603738d6536643ce7cb5e34eb08a5e99ff4fc8adab",
+          "manifest_selected": true,
+          "manifest_matches": true
+        },
+        {
+          "version": "0.0.14",
+          "bytes": 1164880,
+          "slot_bytes": 3145728,
+          "remaining_bytes": 1980848,
+          "slot_used_percent": 37.03,
+          "sha256": "553591a8ceab9f12b01a873d496cc6d55d86993af867ba569fff58dd09fbf66a",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.15",
+          "bytes": 1164880,
+          "slot_bytes": 3145728,
+          "remaining_bytes": 1980848,
+          "slot_used_percent": 37.03,
+          "sha256": "64d3ab72abafc46cadbe4b6b6092624fbdf182f780765dbcdf2b9cc323de3c71",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.7",
+          "bytes": 1145648,
+          "slot_bytes": 3145728,
+          "remaining_bytes": 2000080,
+          "slot_used_percent": 36.42,
+          "sha256": "08eea6677702ef8b0fc166da018e5485bd3ebd54355e91701680515ff1fc8929",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.8",
+          "bytes": 1145648,
+          "slot_bytes": 3145728,
+          "remaining_bytes": 2000080,
+          "slot_used_percent": 36.42,
+          "sha256": "8c050e655aef076f07cd871836053162c9a4eda12803c66bb56bedb0376cb817",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.9",
+          "bytes": 1150624,
+          "slot_bytes": 3145728,
+          "remaining_bytes": 1995104,
+          "slot_used_percent": 36.58,
+          "sha256": "427e11ed9642b23fc594f3a36aa10659a2208f627ed09c3beeeb667c00c30c30",
+          "manifest_selected": false,
+          "manifest_matches": null
+        }
+      ],
+      "telemetry": {
+        "latest_fields": {
+          "firmware_version": {
+            "ts": 1791403652150,
+            "value": "0.0.13"
+          },
+          "boot_id": {
+            "ts": 1791403652150,
+            "value": "946d0bbf4b6962dd"
+          },
+          "uptime_seconds": {
+            "ts": 1791403652150,
+            "value": "5905"
+          },
+          "reset_reason": {
+            "ts": 1791403652150,
+            "value": "SOFTWARE (3)"
+          },
+          "ram_internal_free_bytes": {
+            "ts": 1791403652150,
+            "value": "259704"
+          },
+          "ram_internal_min_bytes": {
+            "ts": 1791403652150,
+            "value": "201068"
+          },
+          "ram_largest_block_bytes": {
+            "ts": 1791403652150,
+            "value": "167924"
+          },
+          "loop_max_gap_us": {
+            "ts": 1791403652150,
+            "value": "2491011"
+          },
+          "diag_tb_failures": {
+            "ts": 1791403652150,
+            "value": "0"
+          },
+          "running_partition": {
+            "ts": 1791403652150,
+            "value": "app1 / ota_1 / address=0x00310000 / size=3145728"
+          },
+          "boot_partition": {
+            "ts": 1791403652150,
+            "value": "app1 / ota_1 / address=0x00310000 / size=3145728"
+          }
+        },
+        "heartbeat_samples": 128,
+        "last_heartbeat_age_seconds": 30.57,
+        "largest_observed_report_gap_seconds": 6918.284,
+        "observed_boot_transitions": 3,
+        "minimum_reported_free_heap_bytes": 259164.0,
+        "maximum_reported_loop_gap_us": 2562012.0,
+        "reset_reasons_reported_in_window": [
+          "BROWNOUT (9)",
+          "POWERON (1)",
+          "SOFTWARE (3)"
+        ],
+        "limitations": "Gaps include transport delays; silence has no identified cause. Loop gap is not CPU load. Mixed firmware/boot history is not a single performance test."
+      },
+      "history_limit_per_key": 2000,
+      "possibly_truncated": false,
+      "event_samples": {
+        "boot_id": [
+          {
+            "ts": 1791389229935,
+            "value": "6498bc9b2cd8b911"
+          },
+          {
+            "ts": 1791396388258,
+            "value": "b68c4a773105085d"
+          },
+          {
+            "ts": 1791397172140,
+            "value": "40a729e7711f169"
+          },
+          {
+            "ts": 1791397772205,
+            "value": "946d0bbf4b6962dd"
+          }
+        ],
+        "reset_reason": [
+          {
+            "ts": 1791389229935,
+            "value": "BROWNOUT (9)"
+          },
+          {
+            "ts": 1791396388258,
+            "value": "POWERON (1)"
+          },
+          {
+            "ts": 1791397172140,
+            "value": "SOFTWARE (3)"
+          }
+        ],
+        "firmware_version": [
+          {
+            "ts": 1791389229935,
+            "value": "0.0.13"
+          },
+          {
+            "ts": 1791397172140,
+            "value": "0.0.15"
+          },
+          {
+            "ts": 1791397772205,
+            "value": "0.0.13"
+          }
+        ]
+      }
+    },
+    "WROOM": {
+      "firmware_sizes": [
+        {
+          "version": "0.0.10",
+          "bytes": 1242816,
+          "slot_bytes": 1310720,
+          "remaining_bytes": 67904,
+          "slot_used_percent": 94.82,
+          "sha256": "56fe79fc6b916c66f7f7284ae1e7101633d9bde11209153a24c451db93cd22a3",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.11",
+          "bytes": 1247856,
+          "slot_bytes": 1310720,
+          "remaining_bytes": 62864,
+          "slot_used_percent": 95.2,
+          "sha256": "cd95284826f7b574f01498406b6f17fd28847028056ad6efbddee8f7e81b9961",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.12",
+          "bytes": 1248160,
+          "slot_bytes": 1310720,
+          "remaining_bytes": 62560,
+          "slot_used_percent": 95.23,
+          "sha256": "11a0a1c68a8b7bd7c9c1bd7782df070ece556e2ff1eec94f3899e01e4c6aa2f5",
+          "manifest_selected": true,
+          "manifest_matches": true
+        },
+        {
+          "version": "0.0.2",
+          "bytes": 1170400,
+          "slot_bytes": 1310720,
+          "remaining_bytes": 140320,
+          "slot_used_percent": 89.29,
+          "sha256": "5fc9ea1e3a681d21824e9a3528fba56fd27a5d395751786d60b347490e072eb1",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.3",
+          "bytes": 1170400,
+          "slot_bytes": 1310720,
+          "remaining_bytes": 140320,
+          "slot_used_percent": 89.29,
+          "sha256": "a7b4b0a991d5bb4ee0efd69659b3a72385c53e751e286cda8cfbb302a4ad1d77",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.4",
+          "bytes": 1210528,
+          "slot_bytes": 1310720,
+          "remaining_bytes": 100192,
+          "slot_used_percent": 92.36,
+          "sha256": "5abe41a8e67bab9f1679aec645f25e08e2f22731895e15af3492312280ecc752",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.5",
+          "bytes": 1218384,
+          "slot_bytes": 1310720,
+          "remaining_bytes": 92336,
+          "slot_used_percent": 92.96,
+          "sha256": "b57d740f4f127128b268454718b220b4ffa327da2f68a7eca97eae8cfab3ab8a",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.6",
+          "bytes": 1224256,
+          "slot_bytes": 1310720,
+          "remaining_bytes": 86464,
+          "slot_used_percent": 93.4,
+          "sha256": "f85308d75759bab3533ac89f724cb4422632a352f8fe47e0443f81be93d66e8c",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.7",
+          "bytes": 1224256,
+          "slot_bytes": 1310720,
+          "remaining_bytes": 86464,
+          "slot_used_percent": 93.4,
+          "sha256": "407fde034f75761a47671e81e71952a91b85e4195d3da4b89f2afb13233be115",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.8",
+          "bytes": 1227392,
+          "slot_bytes": 1310720,
+          "remaining_bytes": 83328,
+          "slot_used_percent": 93.64,
+          "sha256": "deeba61f4c9c8fab6840f55a39a0eb71b62c0d42cfff98a222e4571b9b1bfd21",
+          "manifest_selected": false,
+          "manifest_matches": null
+        },
+        {
+          "version": "0.0.9",
+          "bytes": 1227440,
+          "slot_bytes": 1310720,
+          "remaining_bytes": 83280,
+          "slot_used_percent": 93.65,
+          "sha256": "98db9a6d520e303963d90b823613f2fbfcb367397adf0707c2a9077fa118ce1d",
+          "manifest_selected": false,
+          "manifest_matches": null
+        }
+      ],
+      "telemetry": {
+        "latest_fields": {
+          "firmware_version": {
+            "ts": 1791403638624,
+            "value": "0.0.12"
+          },
+          "boot_id": {
+            "ts": 1791403638624,
+            "value": "2a1f3f71bf588813"
+          },
+          "uptime_seconds": {
+            "ts": 1791403638624,
+            "value": "1707"
+          },
+          "reset_reason": {
+            "ts": 1791403638624,
+            "value": "BROWNOUT (9)"
+          },
+          "ram_internal_free_bytes": {
+            "ts": 1791403638624,
+            "value": "160104"
+          },
+          "ram_internal_min_bytes": {
+            "ts": 1791403638624,
+            "value": "94320"
+          },
+          "ram_largest_block_bytes": {
+            "ts": 1791403638624,
+            "value": "110580"
+          },
+          "loop_max_gap_us": {
+            "ts": 1791403638624,
+            "value": "2474020"
+          },
+          "diag_tb_failures": {
+            "ts": 1791403638624,
+            "value": "0"
+          },
+          "running_partition": {
+            "ts": 1791403638624,
+            "value": "app1 / ota_1 / address=0x00150000 / size=1310720"
+          },
+          "boot_partition": {
+            "ts": 1791403638624,
+            "value": "app1 / ota_1 / address=0x00150000 / size=1310720"
+          }
+        },
+        "heartbeat_samples": 245,
+        "last_heartbeat_age_seconds": 44.096,
+        "largest_observed_report_gap_seconds": 72.197,
+        "observed_boot_transitions": 3,
+        "minimum_reported_free_heap_bytes": 159512.0,
+        "maximum_reported_loop_gap_us": 3225021.0,
+        "reset_reasons_reported_in_window": [
+          "BROWNOUT (9)",
+          "POWERON (1)"
+        ],
+        "limitations": "Gaps include transport delays; silence has no identified cause. Loop gap is not CPU load. Mixed firmware/boot history is not a single performance test."
+      },
+      "history_limit_per_key": 2000,
+      "possibly_truncated": false,
+      "event_samples": {
+        "boot_id": [
+          {
+            "ts": 1791389020436,
+            "value": "8592b3b7564453d"
+          },
+          {
+            "ts": 1791396384479,
+            "value": "ef6e0de87452e017"
+          },
+          {
+            "ts": 1791399006449,
+            "value": "23899f05c0039d39"
+          },
+          {
+            "ts": 1791401958646,
+            "value": "2a1f3f71bf588813"
+          }
+        ],
+        "reset_reason": [
+          {
+            "ts": 1791389020436,
+            "value": "POWERON (1)"
+          },
+          {
+            "ts": 1791399006449,
+            "value": "BROWNOUT (9)"
+          }
+        ],
+        "firmware_version": [
+          {
+            "ts": 1791389020436,
+            "value": "0.0.12"
+          }
+        ]
+      }
+    }
+  }
+}

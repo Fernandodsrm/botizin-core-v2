@@ -1,0 +1,26 @@
+name: External observer (read only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate timestamp handling
+        run: python -m unittest discover -s tests -p external_observer_test.py
+      - name: Read firmware sizes and existing cloud history
+        env:
+          TB_READ_API_KEY: ${{ secrets.TB_READ_API_KEY }}
+        run: python ci/external_observer.py
+      - name: Show report
+        run: cat observer-output/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: external-observer
+          path: observer-output/
+          retention-days: 7
