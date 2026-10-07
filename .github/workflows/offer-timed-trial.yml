@@ -28,3 +28,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 ci/offer_timed_trial.py
+
+# Retry brief offer: first window produced no observed installation.
