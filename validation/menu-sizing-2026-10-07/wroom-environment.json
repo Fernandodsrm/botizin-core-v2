@@ -1,0 +1,5 @@
+{
+  "cli": "arduino-cli  Version: 1.5.1 Commit: 01f3d4f2b Date: 2026-06-05T10:22:17Z",
+  "cores": "ID          Installed Latest Name\nesp32:esp32 3.3.12    3.3.12 esp32\n\n",
+  "fqbn": "esp32:esp32:esp32:FlashSize=4M,FlashMode=dio,CPUFreq=240,EraseFlash=none"
+}
