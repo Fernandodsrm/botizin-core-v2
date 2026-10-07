@@ -32,7 +32,7 @@ static bool armTimedTrial() {
   if (esp_timer_create(&args, &trialTimer) != ESP_OK) {
     trialStatus = "FAILED_TIMER_CREATE"; return false;
   }
-  if (esp_timer_start_once(trialTimer, 120000000ULL) != ESP_OK) {
+  if (esp_timer_start_once(trialTimer, 600000000ULL) != ESP_OK) {
     esp_timer_delete(trialTimer); trialTimer = nullptr;
     trialStatus = "FAILED_TIMER_START"; return false;
   }
@@ -47,6 +47,6 @@ static bool armTimedTrial() {
     esp_timer_stop(trialTimer); esp_timer_delete(trialTimer); trialTimer = nullptr;
     trialStatus = "FAILED_BOOT_READBACK"; return false;
   }
-  trialArmed = true; trialStatus = "ARMED_120_SECONDS_RETURN_0.0.13";
+  trialArmed = true; trialStatus = "ARMED_600_SECONDS_RETURN_0.0.13";
   return true;
 }

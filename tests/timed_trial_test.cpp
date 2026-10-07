@@ -39,7 +39,7 @@ void reset() {
   timerMicros=0; savedCallback=nullptr; trialArmed=false; trialTimer=nullptr;
 }
 int main() {
-  reset(); assert(armTimedTrial()); assert(boot==previous && trialArmed && timerMicros==120000000);
+  reset(); assert(armTimedTrial()); assert(boot==previous && trialArmed && timerMicros==600000000);
   savedCallback(nullptr); assert(restarts==1);
   reset(); running=&b; previous=&a; boot=&b; assert(armTimedTrial() && boot==&a);
   reset(); goodHash=false; assert(!armTimedTrial() && bootCalls==0);

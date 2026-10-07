@@ -1,4 +1,4 @@
-"""Offer the authorized S3 trial briefly, then restore its baseline manifest."""
+"""Offer the authorized ten-minute S3 trial for five minutes, then restore its baseline manifest."""
 import base64
 import hashlib
 import json
@@ -39,16 +39,16 @@ def main():
     manifest = json.loads((folder / 'manifest.json').read_text())
     record = json.loads((folder / 'build-record.json').read_text())
     image = (folder / 'firmware.bin').read_bytes()
-    assert record['source_commit'] == 'aa9e3340e50bb6f7a2ff2ba38e3418f1a89610b8'
+    assert record['source_commit'] == os.environ['EXPECTED_SOURCE_COMMIT']
     assert record['publishable'] and record['device_token_compiled']
-    assert manifest['version'] == '0.0.14' and manifest['board'] == 'esp32s3-n16r8'
+    assert manifest['version'] == '0.0.15' and manifest['board'] == 'esp32s3-n16r8'
     assert manifest['size'] == len(image) <= 3145728
-    assert manifest['sha256'] == hashlib.sha256(image).hexdigest() == '553591a8ceab9f12b01a873d496cc6d55d86993af867ba569fff58dd09fbf66a'
+    assert manifest['sha256'] == hashlib.sha256(image).hexdigest() == os.environ['EXPECTED_IMAGE_SHA256']
     original = request('manifest.json')
     original_bytes = decode(original)
     original_manifest = json.loads(original_bytes)
     assert original_manifest['version'] == '0.0.13' and original_manifest['sha256'] == BASE_SHA
-    path = 'releases/0.0.14/firmware.bin'
+    path = 'releases/0.0.15/firmware.bin'
     try:
         existing = request(path)
     except urllib.error.HTTPError as error:
@@ -59,13 +59,13 @@ def main():
         git_sha = hashlib.sha1(b'blob ' + str(len(image)).encode() + b'\0' + image).hexdigest()
         assert existing['size'] == len(image) and existing['sha'] == git_sha, 'Existing release differs; stop'
     else:
-        put(path, image, 'Store verified S3 0.0.14 timed trial image')
+        put(path, image, 'Store verified S3 0.0.15 timed trial image')
     trial_bytes = (json.dumps(manifest, indent=2) + '\n').encode()
     # try/finally begins before PUT: a lost response must not skip withdrawal.
     try:
-        put('manifest.json', trial_bytes, 'Offer authorized two-minute S3 trial', original['sha'])
-        print('TRIAL_OFFERED: 0.0.14; withdrawal in 90 seconds', flush=True)
-        time.sleep(90)
+        put('manifest.json', trial_bytes, 'Offer authorized ten-minute S3 trial', original['sha'])
+        print('TRIAL_OFFERED: 0.0.15; withdrawal in 300 seconds', flush=True)
+        time.sleep(300)
     finally:
         for attempt in range(5):
             try:
