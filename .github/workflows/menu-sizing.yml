@@ -1,0 +1,51 @@
+name: Menu sizing only - no deployment
+on:
+  push:
+    branches: [menu-sizing-20261007]
+    paths: ['ci/size_lab/**', '.github/workflows/menu-sizing.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  size:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        board: [wroom, s3]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Install exact core and OLED dependencies
+        run: |
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib update-index
+          arduino-cli lib install "Adafruit BusIO@1.17.4" --no-deps
+          arduino-cli lib install "Adafruit GFX Library@1.12.6" --no-deps
+          arduino-cli lib install "Adafruit SSD1306@2.5.17" --no-deps
+      - name: Compile independent sizing variants
+        env:
+          SIZE_BOARD: ${{ matrix.board }}
+        run: python3 ci/size_lab/build_matrix.py --board "$SIZE_BOARD" --out "size-results/$SIZE_BOARD"
+      - name: Summary
+        if: always()
+        env:
+          SIZE_BOARD: ${{ matrix.board }}
+        run: python3 ci/size_lab/report_matrix.py "size-results/$SIZE_BOARD" >> "$GITHUB_STEP_SUMMARY"
+      - name: Save measurements and logs (no flashable images)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: menu-sizing-${{ matrix.board }}
+          path: |
+            size-results/${{ matrix.board }}/matrix.json
+            size-results/${{ matrix.board }}/matrix.csv
+            size-results/${{ matrix.board }}/environment.json
+            size-results/${{ matrix.board }}/builds/*/compile.log
+          retention-days: 14
