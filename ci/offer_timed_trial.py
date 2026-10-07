@@ -55,7 +55,9 @@ def main():
         if error.code != 404: raise
         existing = None
     if existing:
-        assert decode(existing) == image, 'Existing release differs; stop'
+        # GitHub omits inline content for files over 1 MiB. Verify Git blob identity.
+        git_sha = hashlib.sha1(b'blob ' + str(len(image)).encode() + b'\0' + image).hexdigest()
+        assert existing['size'] == len(image) and existing['sha'] == git_sha, 'Existing release differs; stop'
     else:
         put(path, image, 'Store verified S3 0.0.14 timed trial image')
     trial_bytes = (json.dumps(manifest, indent=2) + '\n').encode()
