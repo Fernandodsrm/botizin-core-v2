@@ -1,0 +1,14 @@
+{
+  "version": "0.0.17",
+  "module_id": "menu_led_trial",
+  "bytes": 1162544,
+  "sha256": "75aac11d82cf1daabcdbdd1a94922f837c91bae8105b0e9d94462af9d412b733",
+  "source_commit": "c2eda9ccfc83644fc07b774f4a78fd71259e6cc6",
+  "fqbn": "esp32:esp32:esp32:FlashSize=4M,FlashMode=dio,CPUFreq=240,EraseFlash=none",
+  "partitions_verified": true,
+  "credentials_compiled": false,
+  "published": false,
+  "return_seconds": 600,
+  "baseline_version": "0.0.15",
+  "baseline_sha256": "5428313389336d48831e9228fb98d18603f848d44fdd1557a3de337f1b45580c"
+}
