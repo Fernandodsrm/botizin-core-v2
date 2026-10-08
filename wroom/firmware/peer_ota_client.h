@@ -1,5 +1,5 @@
 #pragma once
-static const char *peerBaseURL="http://192.168.0.36";
+
 static String s3OtaStatus="Aguardando S3",s3OtaVersion,s3OtaBoot,s3Candidate,s3Target,s3SHA,s3QueuedAction;
 static String s3WatchVersion,s3WatchBoot,s3ConfirmId,s3ConfirmVersion,s3ConfirmSHA,s3ConfirmBoot;
 static uint32_t s3CandidateUntil=0,s3WindowUntil=0,s3ReplyAt=0,nextS3OtaPoll=0,s3WatchStarted=0;
@@ -24,16 +24,17 @@ static bool queueS3Action(const String &action){
 static String s3JsonText(cJSON *o,const char *key){cJSON*v=cJSON_GetObjectItemCaseSensitive(o,key);return cJSON_IsString(v)?String(v->valuestring):String();}
 static bool fetchS3OTA(const String &action){
   DiagnosticScope diagnosticScope(DIAG_PEER);diagnosticScope.failed=true;
+  String base=peerBaseURL();if(base.isEmpty()){s3OtaStatus="Endereco S3 pendente";return false;}
   uint32_t started=millis();String nonce;
   {
     NetworkClient c;HTTPClient h;h.setConnectTimeout(350);h.setTimeout(500);h.useHTTP10(true);
-    if(h.begin(c,String(peerBaseURL)+"/peer/challenge")){
+    if(h.begin(c,base+"/peer/challenge")){
       int code=h.GET();int size=h.getSize();
       if(code==200&&size>0&&size<=80)nonce=h.getString();
       else s3OtaStatus=code==503?"Pareamento pendente":code==404?"S3 precisa 0.0.11":"S3 sem resposta";
     }h.end();c.stop();
   }
-  if(nonce.isEmpty()||nonce.length()>80)return false;
+  if(nonce.isEmpty()||nonce.length()>80){invalidatePeerAddress();return false;}
   cJSON *o=cJSON_CreateObject();if(!o)return false;
   String id=telemetryBootId+"-s3-"+String((unsigned long)esp_random(),HEX);
   bool ok=cJSON_AddStringToObject(o,"action",action.c_str())&&cJSON_AddStringToObject(o,"command_id",id.c_str());
@@ -45,7 +46,7 @@ static bool fetchS3OTA(const String &action){
   {
     NetworkClient c;HTTPClient h;h.setConnectTimeout(350);h.setTimeout(700);h.useHTTP10(true);
     const char*headers[]={"X-Botizin-MAC"};h.collectHeaders(headers,1);
-    if(h.begin(c,String(peerBaseURL)+"/peer/ota")){
+    if(h.begin(c,base+"/peer/ota")){
       h.addHeader("Content-Type","application/json");h.addHeader("X-Botizin-Nonce",nonce);
       h.addHeader("X-Botizin-MAC",peerMAC("request\n"+nonce+"\n"+body));
       int code=h.POST((uint8_t*)body.c_str(),body.length()),length=h.getSize();

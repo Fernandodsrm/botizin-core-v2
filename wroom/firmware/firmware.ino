@@ -13,6 +13,9 @@
 #include <time.h>
 #include "internet_config.h"
 #include "version.h"
+#define BOTIZIN_LOCAL_NAME "botizin-wroom"
+#define BOTIZIN_LOCAL_BOARD "esp32-wroom-4mb"
+#include "local_name.h"
 #include "provisioning.h"
 
 WebServer server(80);
@@ -55,6 +58,7 @@ void showOtaProgress(const String &phase, size_t done = 0, size_t total = 0);
 #include "peer_auth.h"
 static void discardNavigation();
 #include "navigation_model.h"
+#include "peer_address.h"
 #include "peer_ota_client.h"
 
 bool manualWindowActive() { return otaManualUntil && (int32_t)(otaManualUntil - millis()) > 0; }
@@ -128,6 +132,8 @@ String snapshot() {
   const esp_partition_t *run = esp_ota_get_running_partition();
   String s = "BOTIZIN WROOM V" + String(BOTIZIN_VERSION) + "\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
+  s += "LOCAL_NAME: " BOTIZIN_LOCAL_NAME ".local\n";
+  s += "MDNS: " + String(localNameReady ? "READY" : "WAITING") + "\n";
   s += "UPTIME_SECONDS: " + String(diagnosticUptime()) + "\n";
   s += "RESET_REASON: " + resetInfo() + "\n";
   s += "FLASH_BYTES: " + String(ESP.getFlashChipSize()) + "\n";
@@ -154,7 +160,10 @@ String snapshot() {
   s += "OLED: " + oledStatus + "\n";
   s += "OLED_PAGE: " + String(oledMenu ? "MENU" : navLevel == 1 ? "BOARD_LIST" : navLevel == 2 ? "DIAGNOSTIC_LIST" : oledPage == 7 ? "DIAGNOSTICS" : oledPage == 8 ? "CONNECTION" : oledPage == 9 ? "CONTROLS" : oledPage == 2 ? "OTA_WROOM" : oledPage == 5 ? "OTA_S3" : "HELP") + "\n";
   s += "S3_LINK: " + peerStatus + "\n";
-  s += "S3_EXPECTED_URL: http://192.168.0.36/status\n";
+  s += "S3_EXPECTED_NAME: botizin-s3.local\n";
+  s += "S3_RESOLVED_IP: " + peerAddress.toString() + "\n";
+  s += "S3_ADDRESS_SOURCE: " + peerAddressSource + "\n";
+  s += "S3_MANUAL_IP: " + peerManualIP + "\n";
   s += "S3_LAST_VERSION: " + peerVersion + "\n";
   s += "PEER_PAIRED: " + String(peerKey.length()==64?"YES":"NO") + "\n";
   s += "S3_OTA_STATUS: " + s3OtaStatus + "\n";
@@ -488,6 +497,9 @@ void __attribute__((noinline)) sendTelemetry() {
   bool ok = cJSON_AddStringToObject(root, "origin", "ESP32_REAL") &&
     cJSON_AddBoolToObject(root, "simulated", false) &&
     cJSON_AddStringToObject(root, "firmware_version", BOTIZIN_VERSION) &&
+    cJSON_AddStringToObject(root,"wifi_ip",WiFi.localIP().toString().c_str()) &&
+    cJSON_AddStringToObject(root,"local_name",BOTIZIN_LOCAL_NAME ".local") &&
+    cJSON_AddBoolToObject(root,"mdns_ready",localNameReady) &&
     cJSON_AddStringToObject(root, "board", "esp32-wroom-4mb") &&
     cJSON_AddStringToObject(root, "device_id", WiFi.macAddress().c_str()) &&
     cJSON_AddStringToObject(root, "boot_id", telemetryBootId.c_str()) &&
@@ -506,6 +518,8 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddNumberToObject(root, "s3_ota_report_age_seconds", s3HaveOtaReply?double((millis()-s3ReplyAt)/1000):-1.0) &&
     cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str()) &&
     cJSON_AddStringToObject(root, "s3_link", peerStatus.c_str()) &&
+    cJSON_AddStringToObject(root,"s3_resolved_ip",peerAddress.toString().c_str()) &&
+    cJSON_AddStringToObject(root,"s3_address_source",peerAddressSource.c_str()) &&
     cJSON_AddStringToObject(root, "s3_last_version", peerVersion.c_str()) &&
     cJSON_AddNumberToObject(root, "s3_last_seen_age_seconds", peerVersion.length() ? double((millis() - peerSeenAt) / 1000) : -1.0);
   ok = ok && diagnosticJSON(root);
@@ -583,6 +597,7 @@ void setup() {
   sampleDiagnostics();
   Serial.println(snapshot());
   loadProvisioning();
+  loadPeerAddress();
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
@@ -608,6 +623,7 @@ void setup() {
   nextTelemetry = millis() + 20000;
   nextInternetCheck = millis() + 10000;
   server.begin();
+  maintainLocalName();
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
   beginOled();
   beginNavigation();
@@ -615,6 +631,7 @@ void setup() {
 }
 
 void loop() {
+  maintainLocalName();
   diagnosticLoopTick();
   if (!uploadActive && !uploadOK && !rebootScheduled) sampleDiagnostics();
   pollNavigation();

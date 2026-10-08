@@ -2,7 +2,7 @@
 #include "peer_status_parser.h"
 
 // Read-only link to the S3's existing local status server. No S3 firmware change.
-static const char *peerStatusURL = "http://192.168.0.36/status";
+
 static PeerStatusFrame peerFrame = {};
 static bool peerHaveReport = false;
 static uint32_t nextPeerPoll = 0;
@@ -18,12 +18,14 @@ static void pollPeerStatus() {
   if ((int32_t)(millis() - nextPeerPoll) < 0) return;
   nextPeerPoll = millis() + (!oledMenu && navBoard && (oledPage == 7 || oledPage == 8) ? 10000 : 30000);
   DiagnosticScope diagnosticScope(DIAG_PEER);diagnosticScope.failed=true;
+  String base=peerBaseURL();
+  if(base.isEmpty()) {peerStatus="ADDRESS_NOT_FOUND";return;}
   NetworkClient client;
   HTTPClient http;
   http.setConnectTimeout(350); http.setTimeout(400);
   http.useHTTP10(true); http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
   peerStatus = "CONNECT_FAILED";
-  if (http.begin(client, peerStatusURL)) {
+  if (http.begin(client, base+"/status")) {
     int code = http.GET(), length = http.getSize();
     peerStatus = "HTTP_" + String(code);
     if (code == 200 && length > 0 && length <= 8192) {
@@ -48,5 +50,6 @@ static void pollPeerStatus() {
     } else if (code == 200) peerStatus = "INVALID_LENGTH";
   }
   http.end(); client.stop();
+  if(peerStatus!="OK")invalidatePeerAddress();
   Serial.println("S3_LINK: " + peerStatus + (peerHaveReport ? " / last_version=" + peerVersion : ""));
 }
