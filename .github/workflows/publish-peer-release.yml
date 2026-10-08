@@ -1,0 +1,49 @@
+name: Publish verified WROOM address discovery release
+on:
+  push:
+    branches: [wroom-peer-discovery-20261008]
+    paths: ['release-activation.json']
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: botizin-peer-release-WROOM
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify source build
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import urllib.request,json,os,pathlib
+          a=json.loads(pathlib.Path('release-activation.json').read_text())
+          assert a=={'device':'WROOM','version':'0.0.15'}
+          req=urllib.request.Request('https://api.github.com/repos/Fernandodsrm/botizin-core-v2/actions/runs/37738581260',headers={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'Accept':'application/vnd.github+json'})
+          r=json.load(urllib.request.urlopen(req,timeout=30))
+          assert r['conclusion']=='success' and r['head_sha']=='78dec420ea4b89a552d0152737940ae5643c33ed'
+          print('PINNED_BUILD_VERIFIED')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: botizin-wroom-78dec420ea4b89a552d0152737940ae5643c33ed
+          path: release-package
+          run-id: 37738581260
+          github-token: ${{ github.token }}
+      - name: Publish pinned image and manifest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DEVICE: WROOM
+          VERSION: 0.0.15
+          SOURCE_COMMIT: 78dec420ea4b89a552d0152737940ae5643c33ed
+          IMAGE_BYTES: 1289888
+          IMAGE_SHA256: 5428313389336d48831e9228fb98d18603f848d44fdd1557a3de337f1b45580c
+          BASE_VERSION: 0.0.12
+          BASE_SHA256: 11a0a1c68a8b7bd7c9c1bd7782df070ece556e2ff1eec94f3899e01e4c6aa2f5
+        run: python3 tools/publish_peer_release.py
