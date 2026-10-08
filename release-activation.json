@@ -1,20 +1,20 @@
 {
-  "source_commit": "c47cd9dc471c2d6f26fe6531a64452063191f348",
+  "source_commit": "0df8098416699ecb8f941f33bb17ea1b76b1b70c",
   "packages": [
     {
-      "version": "0.0.18",
-      "run": 37818152711,
-      "artifact": "botizin-wroom-c47cd9dc471c2d6f26fe6531a64452063191f348",
+      "version": "0.0.20",
+      "run": 37818969872,
+      "artifact": "botizin-wroom-0df8098416699ecb8f941f33bb17ea1b76b1b70c",
       "size": 1293232,
-      "sha256": "26c9216c767ffb4490abe3f31a63ba0e1f933ea6f3c687f46eb71c47acb31150",
+      "sha256": "f955a7a2f96cd12b27168650f2bc3a4ddabb3ca609b8dac38f8e6e3f7696a39d",
       "path": "artifact-menu"
     },
     {
-      "version": "0.0.19",
-      "run": 37818152834,
-      "artifact": "botizin-ps4-c47cd9dc471c2d6f26fe6531a64452063191f348",
+      "version": "0.0.21",
+      "run": 37818969869,
+      "artifact": "botizin-ps4-0df8098416699ecb8f941f33bb17ea1b76b1b70c",
       "size": 755024,
-      "sha256": "ff5f994c079f9a15eb3439abe9613509a75e9d594d9e40cb56618bd72e69c9f1",
+      "sha256": "eb929d8cc58ccbbf90813df3837b267fbacc5bda29c04902c118fec397bd50e3",
       "path": "artifact-ps4"
     }
   ]

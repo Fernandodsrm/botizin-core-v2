@@ -11,7 +11,7 @@ def main():
         candidates=[x for x in pathlib.Path(p['path']).rglob('manifest.json') if json.loads(x.read_text()).get('version')==p['version']]
         assert len(candidates)==1
         manifest=candidates[0];d=manifest.parent
-        binary=d/('firmware.ino.bin' if p['version']=='0.0.18' else 'firmware.bin')
+        binary=next(x for x in [d/'firmware.ino.bin',d/'firmware.bin'] if x.is_file())
         content=binary.read_bytes();assert len(content)==p['size'] and hashlib.sha256(content).hexdigest()==p['sha256']
         m=json.loads(manifest.read_text());assert m['size']==p['size'] and m['sha256']==p['sha256']
         record=json.loads((d/'build-record.json').read_text());assert record['source_commit']==activation['source_commit'] and record['partitions_verified']
@@ -23,7 +23,7 @@ def main():
     before=api('/git/ref/heads/main')['object']['sha']
     base=api('/git/commits/'+before)['tree']['sha']
     tree=api('/git/trees',{'base_tree':base,'tree':entries})
-    commit=api('/git/commits',{'message':'Store verified Menu 18 and standalone PS4 19 packages without activation','tree':tree['sha'],'parents':[before]})
+    commit=api('/git/commits',{'message':'Store verified Menu 20 and standalone PS4 21 packages without activation','tree':tree['sha'],'parents':[before]})
     assert api('/git/ref/heads/main')['object']['sha']==before,'main moved; no ref update'
     api('/git/refs/heads/main',{'sha':commit['sha'],'force':False},'PATCH')
     print('RELEASE_FILES_STORED; MANIFEST_NOT_CHANGED',commit['sha'])
