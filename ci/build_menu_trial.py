@@ -26,7 +26,7 @@ def main():
     image=(out/'menu-trial.ino.bin').read_bytes()
     assert image[0]==0xe9 and struct.unpack_from('<H',image,12)[0]==0
     assert len(image)<=0x140000
-    assert b'BOTIZIN_MENU_TRIAL_0.0.13_WRITES_BLOCKED' in image
+    assert b'BOTIZIN_MENU_TRIAL_0.0.14_WRITES_BLOCKED' in image
     assert b'ARMED_600_SECONDS_RETURN_0.0.12' in image
     table=(out/'menu-trial.ino.partitions.bin').read_bytes()
     for i,expected in enumerate(EXPECTED):
@@ -34,9 +34,9 @@ def main():
         assert magic==0x50aa and (label.rstrip(b'\0').decode(),typ,sub,offset,size)==expected and flags==0
     shutil.copyfile(out/'menu-trial.ino.bin',dist/'firmware.bin')
     sha=hashlib.sha256(image).hexdigest()
-    manifest={'board':'esp32-wroom-4mb','version':'0.0.13','size':len(image),'sha256':sha,
-              'url':'https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.13/firmware.bin'}
-    record={'version':'0.0.13','module_id':'menu_trial','bytes':len(image),'sha256':sha,
+    manifest={'board':'esp32-wroom-4mb','version':'0.0.14','size':len(image),'sha256':sha,
+              'url':'https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.14/firmware.bin'}
+    record={'version':'0.0.14','module_id':'menu_led_trial','bytes':len(image),'sha256':sha,
             'source_commit':os.environ.get('GITHUB_SHA'),'fqbn':FQBN,'partitions_verified':True,
             'credentials_compiled':False,'published':False,'return_seconds':600,'baseline_version':'0.0.12',
             'baseline_sha256':'11a0a1c68a8b7bd7c9c1bd7782df070ece556e2ff1eec94f3899e01e4c6aa2f5'}

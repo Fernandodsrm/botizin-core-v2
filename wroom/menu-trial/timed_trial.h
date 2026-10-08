@@ -10,7 +10,7 @@ static const char *trialStatus = "NOT_ARMED";
 static bool trialArmed = false;
 static esp_timer_handle_t trialTimer = nullptr;
 
-static void trialReturn(void *) { esp_restart(); }
+static void trialReturn(void *) { trialTurnLedOff(); esp_restart(); }
 
 static bool armTimedTrial() {
   const esp_partition_t *run = esp_ota_get_running_partition();

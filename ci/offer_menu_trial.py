@@ -41,15 +41,15 @@ def main():
     image = (folder / 'firmware.bin').read_bytes()
     assert record['source_commit'] == os.environ['EXPECTED_SOURCE_COMMIT']
     assert record['partitions_verified'] and not record['credentials_compiled']
-    assert record['module_id'] == 'menu_trial' and record['return_seconds'] == 600
-    assert manifest['version'] == '0.0.13' and manifest['board'] == 'esp32-wroom-4mb'
+    assert record['module_id'] == 'menu_led_trial' and record['return_seconds'] == 600
+    assert manifest['version'] == '0.0.14' and manifest['board'] == 'esp32-wroom-4mb'
     assert manifest['size'] == len(image) <= 1310720
     assert manifest['sha256'] == hashlib.sha256(image).hexdigest() == os.environ['EXPECTED_IMAGE_SHA256']
     original = request('wroom/manifest.json')
     original_bytes = decode(original)
     original_manifest = json.loads(original_bytes)
     assert original_manifest['version'] == '0.0.12' and original_manifest['sha256'] == BASE_SHA
-    path = 'wroom/releases/0.0.13/firmware.bin'
+    path = 'wroom/releases/0.0.14/firmware.bin'
     try:
         existing = request(path)
     except urllib.error.HTTPError as error:
@@ -60,12 +60,12 @@ def main():
         git_sha = hashlib.sha1(b'blob ' + str(len(image)).encode() + b'\0' + image).hexdigest()
         assert existing['size'] == len(image) and existing['sha'] == git_sha, 'Existing release differs; stop'
     else:
-        put(path, image, 'Store verified WROOM Menu 0.0.13 timed trial image')
+        put(path, image, 'Store verified WROOM Menu 0.0.14 timed trial image')
     trial_bytes = (json.dumps(manifest, indent=2) + '\n').encode()
     # try/finally begins before PUT: a lost response must not skip withdrawal.
     try:
         put('wroom/manifest.json', trial_bytes, 'Offer authorized ten-minute WROOM Menu trial', original['sha'])
-        print('TRIAL_OFFERED: WROOM 0.0.13; withdrawal in 300 seconds', flush=True)
+        print('TRIAL_OFFERED: WROOM 0.0.14; withdrawal in 300 seconds', flush=True)
         time.sleep(300)
     finally:
         for attempt in range(5):

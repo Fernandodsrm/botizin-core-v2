@@ -1,7 +1,7 @@
 name: Build WROOM temporary Menu (no offer)
 on:
   push:
-    branches: [wroom-menu-trial-20261007]
+    branches: [wroom-menu-led-20261008]
     paths: ['wroom/menu-trial/**', 'wroom/tests/menu*', 'ci/build_menu_trial.py', '.github/workflows/build-menu-trial.yml']
   workflow_dispatch:
 permissions:

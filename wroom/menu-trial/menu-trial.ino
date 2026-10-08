@@ -12,20 +12,25 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include <time.h>
+#include <atomic>
 #include "menu_model.h"
 
 // Authorized temporary Menu. No downloader, upload endpoint, peer link or NVS writes.
-static const char *version = "0.0.13";
-static const char *moduleId = "menu_trial";
+static const char *version = "0.0.14";
+static const char *moduleId = "menu_led_trial";
 static String ssid, password, deviceToken, bootId;
 static bool configured = false, oledReady = false;
 static Adafruit_SSD1306 display(128, 64, &Wire, -1, 400000, 400000);
 static MenuModel menu;
-static const char *items[] = {"Modulos", "Conexoes", "Diagnostico", "Ajuda", "Voltar ao anterior"};
+static const char *items[] = {"LED (GPIO26)", "Conexoes", "Diagnostico", "Ajuda", "Voltar ao anterior"};
 static uint32_t nextTelemetry = 0, nextRpc = 0, nextOled = 0;
-static uint32_t lastLoopUs = 0, loopMaxUs = 0;
+static uint32_t lastLoopUs = 0;
+static std::atomic<uint32_t> loopMaxUs{0}, ledState{0}, selectedState{0};
+static constexpr uint8_t ledPin=26;
+static void trialTurnLedOff() { digitalWrite(ledPin, LOW); ledState.store(0); }
 static uint32_t telemetryAttempts = 0, telemetryFailures = 0, rpcAttempts = 0;
-static String telemetryStatus = "WAITING";
+static std::atomic<int> telemetryHttp{-1000};
+static bool networkWorkerReady=false;
 static uint32_t nextWifiRetry = 0;
 
 bool hashPartition(const esp_partition_t *partition, size_t bytes, String &out) {
@@ -87,11 +92,14 @@ static cJSON *statusObject() {
   cJSON_AddNumberToObject(r,"ram_internal_free_bytes",heap_caps_get_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
   cJSON_AddNumberToObject(r,"ram_internal_min_bytes",heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
   cJSON_AddNumberToObject(r,"ram_largest_block_bytes",heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
-  cJSON_AddNumberToObject(r,"loop_max_gap_us",loopMaxUs);
-  cJSON_AddNumberToObject(r,"menu_selection",menu.selected);
+  cJSON_AddNumberToObject(r,"loop_max_gap_us",loopMaxUs.load());
+  cJSON_AddNumberToObject(r,"menu_selection",selectedState.load());
   cJSON_AddNumberToObject(r,"menu_telemetry_attempts",telemetryAttempts);
   cJSON_AddNumberToObject(r,"menu_telemetry_failures",telemetryFailures);
   cJSON_AddNumberToObject(r,"menu_rpc_polls",rpcAttempts);
+  cJSON_AddBoolToObject(r,"led_on",ledState.load()!=0);
+  cJSON_AddNumberToObject(r,"led_gpio",ledPin);
+  cJSON_AddBoolToObject(r,"network_worker_ready",networkWorkerReady);
   return r;
 }
 static String cloudBase() { return "https://thingsboard.cloud/api/v1/"+deviceToken; }
@@ -115,7 +123,7 @@ static void sendTelemetry() {
   char *payload=cJSON_PrintUnformatted(r); cJSON_Delete(r); if (!payload) return;
   ++telemetryAttempts;
   int code=cloudRequest("/telemetry",payload); cJSON_free(payload);
-  telemetryStatus="HTTP_"+String(code);
+  telemetryHttp.store(code);
   if (code<200 || code>=300) ++telemetryFailures;
   // Continue sparse retries after failures; never permanently disable telemetry.
 }
@@ -156,14 +164,15 @@ static void redraw() {
   if (!menu.detail) {
     for (unsigned i=0;i<5;++i) line(i+2,String(i==menu.selected?"> ":"  ")+items[i]);
   } else if (menu.selected==0) {
-    line(2,"LED: nao instalado"); line(3,"Instalacao bloqueada"); line(5,"Referencia preservada");
+    line(2,menu.ledOn?"Estado: LIGADO":"Estado: APAGADO");
+    line(3,"Direita: liga/desliga"); line(4,"Esquerda: sair/apagar"); line(5,"GPIO26 - fio laranja");
   } else if (menu.selected==1) {
     line(2,WiFi.status()==WL_CONNECTED?"Wi-Fi conectado":"Wi-Fi sem conexao");
-    line(3,"IP "+WiFi.localIP().toString()); line(4,"Nuvem "+telemetryStatus);
+    line(3,"IP "+WiFi.localIP().toString()); line(4,"Nuvem HTTP "+String(telemetryHttp.load()));
     line(5,"Sem link com a S3");
   } else if (menu.selected==2) {
     line(2,"RAM "+String(ESP.getFreeHeap()/1024)+" KiB");
-    line(3,"Loop max "+String(loopMaxUs/1000)+" ms");
+    line(3,"Loop max "+String(loopMaxUs.load()/1000)+" ms");
     line(4,"Ligado "+String(millis()/1000)+"s");
     line(5,trialArmed?"Retorno programado":"Falha ao armar volta");
   } else if (menu.selected==3) {
@@ -174,27 +183,46 @@ static void redraw() {
   }
   display.display();
 }
-static const uint8_t pins[]={25,27,32,33};
-static const uint8_t flags[]={1,2,4,8};
-static bool previous[4]={true,true,true,true};
-static uint32_t lastPress[4]={0,0,0,0};
+struct TrialButton {uint8_t pin,flag;volatile uint32_t lastPress;};
+static TrialButton buttons[]={{25,1,0},{27,2,0},{32,4,0},{33,8,0}};
+static volatile uint8_t pendingButtons=0;
+static portMUX_TYPE buttonMux=portMUX_INITIALIZER_UNLOCKED;
+static void ARDUINO_ISR_ATTR buttonPressed(void *argument) {
+  TrialButton *button=static_cast<TrialButton*>(argument);uint32_t now=millis();
+  portENTER_CRITICAL_ISR(&buttonMux);
+  if ((uint32_t)(now-button->lastPress)>=150) {button->lastPress=now;pendingButtons|=button->flag;}
+  portEXIT_CRITICAL_ISR(&buttonMux);
+}
 static void pollButtons() {
-  uint8_t events=0; uint32_t now=millis();
-  for (unsigned i=0;i<4;++i) {
-    bool value=digitalRead(pins[i]);
-    if (!value && previous[i] && (uint32_t)(now-lastPress[i])>=150) { events|=flags[i]; lastPress[i]=now; }
-    previous[i]=value;
+  portENTER_CRITICAL(&buttonMux);uint8_t events=pendingButtons;pendingButtons=0;portEXIT_CRITICAL(&buttonMux);
+  if (!events) return;
+  bool returning=menu.handle(events);selectedState.store(menu.selected);
+  bool on=menu.ledOn && trialArmed;
+  digitalWrite(ledPin,on?HIGH:LOW);ledState.store(on?1:0);
+  if (returning && trialArmed) {trialTurnLedOff();esp_restart();}
+  nextOled=0;
+}
+static void networkWorker(void *) {
+  for (;;) {
+    uint32_t now=millis();
+    if (configured && WiFi.status()!=WL_CONNECTED && (int32_t)(now-nextWifiRetry)>=0) {
+      nextWifiRetry=now+30000;WiFi.reconnect();
+    }
+    if (configured && WiFi.status()==WL_CONNECTED && time(nullptr)>1700000000) {
+      if ((int32_t)(now-nextTelemetry)>=0) {nextTelemetry=now+60000;sendTelemetry();}
+      if ((int32_t)(millis()-nextRpc)>=0) {nextRpc=millis()+15000;pollRpc();}
+    }
+    vTaskDelay(pdMS_TO_TICKS(20));
   }
-  if (events && menu.handle(events) && trialArmed) esp_restart();
-  if (events) nextOled=0;
 }
 void setup() {
   Serial.begin(115200);
+  digitalWrite(ledPin,LOW);pinMode(ledPin,OUTPUT);trialTurnLedOff();
   // First: verify preserved firmware, select its boot, arm independent timer.
   bool flashOK=ESP.getFlashChipSize()==4*1024*1024;
   if (flashOK) armTimedTrial(); else trialStatus="FAILED_FLASH_SIZE";
   bootId=String((unsigned long)esp_random(),HEX)+String((unsigned long)esp_random(),HEX);
-  for (auto pin:pins) pinMode(pin,INPUT_PULLUP);
+  for (auto &button:buttons) {pinMode(button.pin,INPUT_PULLUP);attachInterruptArg(button.pin,buttonPressed,&button,FALLING);}
   if (Wire.begin(21,22,400000)) {
     Wire.setTimeOut(20); Wire.beginTransmission(0x3c);
     if (Wire.endTransmission()==0) oledReady=display.begin(SSD1306_SWITCHCAPVCC,0x3c,false,false);
@@ -204,20 +232,15 @@ void setup() {
   if (configured) WiFi.begin(ssid.c_str(),password.c_str());
   configTime(0,0,"pool.ntp.org","time.cloudflare.com");
   nextTelemetry=millis()+20000; nextRpc=millis()+30000; nextWifiRetry=millis()+30000;
-  redraw(); Serial.println("BOTIZIN_MENU_TRIAL_0.0.13_WRITES_BLOCKED");
+  redraw(); Serial.println("BOTIZIN_MENU_TRIAL_0.0.14_WRITES_BLOCKED");
+  networkWorkerReady=true;
+  if (xTaskCreate(networkWorker,"menu_net",8192,nullptr,1,nullptr)!=pdPASS) networkWorkerReady=false;
 }
 void loop() {
   uint32_t nowUs=micros();
-  if (lastLoopUs) loopMaxUs=max(loopMaxUs,(uint32_t)(nowUs-lastLoopUs));
+  if (lastLoopUs) {uint32_t gap=nowUs-lastLoopUs;if(gap>loopMaxUs.load())loopMaxUs.store(gap);}
   lastLoopUs=nowUs; uint32_t now=millis();
   pollButtons();
   if ((int32_t)(now-nextOled)>=0) { nextOled=now+1000; redraw(); }
-  if (configured && WiFi.status()!=WL_CONNECTED && (int32_t)(now-nextWifiRetry)>=0) {
-    nextWifiRetry=now+30000; WiFi.reconnect();
-  }
-  if (configured && WiFi.status()==WL_CONNECTED && time(nullptr)>1700000000) {
-    if ((int32_t)(now-nextTelemetry)>=0) { nextTelemetry=now+60000; sendTelemetry(); }
-    if ((int32_t)(millis()-nextRpc)>=0) { nextRpc=millis()+15000; pollRpc(); }
-  }
   delay(2);
 }

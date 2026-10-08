@@ -30,6 +30,7 @@ bool hashPartition(const esp_partition_t *, size_t n, String &result) {
   result=goodHash ? "11a0a1c68a8b7bd7c9c1bd7782df070ece556e2ff1eec94f3899e01e4c6aa2f5" : "bad";
   return readable;
 }
+static void trialTurnLedOff() {}
 #define BOTIZIN_TRIAL_HOST_TEST
 #include "../menu-trial/timed_trial.h"
 void reset() {
