@@ -35,7 +35,7 @@ void __attribute__((noinline)) pollPing() {
   if (code != 200 || body.isEmpty()) {
     diagnosticScope.failed=true;
     pingStatus = "POLL_HTTP_" + String(code);
-    if (++pingFailures >= 3) { pingStopped = true; pingStatus = "PAUSED_UNTIL_REBOOT"; }
+    if (++pingFailures >= 3) { pingFailures = 3; nextPingPoll = millis()+60000; pingStatus = "RETRY_AFTER_60_SECONDS"; }
     Serial.println("PING_RPC: " + pingStatus); return;
   }
   cJSON *root = cJSON_Parse(body.c_str());
@@ -50,7 +50,7 @@ void __attribute__((noinline)) pollPing() {
     id->valuedouble <= 2147483647.0 && id->valuedouble == (double)id->valueint &&
     cJSON_IsString(method) && (strcmp(method->valuestring, "ping") == 0 ||
       strcmp(method->valuestring, "ota_check") == 0 || strcmp(method->valuestring, "ota_status") == 0 ||
-      strcmp(method->valuestring, "ota_confirm") == 0 || strcmp(method->valuestring, "ota_cancel") == 0 || strcmp(method->valuestring, "peer_pair") == 0 || strcmp(method->valuestring, "peer_address") == 0) &&
+      strcmp(method->valuestring, "ota_confirm") == 0 || strcmp(method->valuestring, "ota_cancel") == 0 || strcmp(method->valuestring, "peer_pair") == 0 || strcmp(method->valuestring, "peer_address") == 0 || strcmp(method->valuestring, "ota_automatic") == 0 || strcmp(method->valuestring, "ps4_config") == 0) &&
     cJSON_IsObject(params) && cJSON_IsString(command) &&
     strlen(command->valuestring) > 0 && strlen(command->valuestring) <= 64 &&
     cJSON_IsNumber(issued) && issued->valuedouble <= now + 30000.0 &&
@@ -60,7 +60,15 @@ void __attribute__((noinline)) pollPing() {
   String commandId(command->valuestring);
   String action(method->valuestring), result = action == "ping" ? "PONG" : "OTA_STATUS";
   bool accepted = false;
-  if(action=="peer_address") {
+  if(action=="ps4_config") {
+    cJSON *button=cJSON_GetObjectItemCaseSensitive(params,"led_button");
+    accepted=cJSON_IsNumber(button) && button->valuedouble==button->valueint && savePS4Button(button->valueint);
+    result=accepted?"PS4_CONFIG_SAVED":"PS4_CONFIG_REJECTED";
+  } else if(action=="ota_automatic") {
+    cJSON *enabled=cJSON_GetObjectItemCaseSensitive(params,"enabled");
+    accepted=cJSON_IsBool(enabled) && !otaInstallQueued && !otaCheckQueued && saveAutomatic(cJSON_IsTrue(enabled));
+    result=accepted?"AUTOMATIC_SAVED":"AUTOMATIC_REJECTED";
+  } else if(action=="peer_address") {
     cJSON *ip=cJSON_GetObjectItemCaseSensitive(params,"ip");
     accepted=cJSON_IsString(ip) && savePeerAddress(String(ip->valuestring));
     result=accepted?"PEER_ADDRESS_SAVED":"PEER_ADDRESS_REJECTED";
@@ -94,6 +102,7 @@ void __attribute__((noinline)) pollPing() {
     cJSON_AddStringToObject(reply, "command_id", commandId.c_str()) &&
     cJSON_AddNumberToObject(reply, "request_id", requestId) &&
     cJSON_AddStringToObject(reply, "firmware_version", BOTIZIN_VERSION) &&
+    cJSON_AddNumberToObject(reply,"ps4_led_button",ps4LedButton) &&
     cJSON_AddStringToObject(reply,"wifi_ip",WiFi.localIP().toString().c_str()) &&
     cJSON_AddStringToObject(reply,"local_name",BOTIZIN_LOCAL_NAME ".local") &&
     cJSON_AddBoolToObject(reply,"mdns_ready",localNameReady) &&
@@ -107,7 +116,7 @@ void __attribute__((noinline)) pollPing() {
     cJSON_AddStringToObject(reply, "ota_state", state.c_str()) &&
     cJSON_AddStringToObject(reply, "reset_reason", reset.c_str());
   if (action != "ping") {
-    ok = ok && cJSON_AddBoolToObject(reply, "automatic_enabled", true) &&
+    ok = ok && cJSON_AddBoolToObject(reply, "automatic_enabled", otaAutomaticEnabled) &&
       cJSON_AddStringToObject(reply, "manual_status", manualOtaStatus.c_str()) &&
       cJSON_AddStringToObject(reply, "internet_status", internetStatus.c_str()) &&
       cJSON_AddBoolToObject(reply, "candidate_ready", candidateReady()) &&
@@ -145,5 +154,5 @@ void __attribute__((noinline)) pollPing() {
       otaInstallQueued = true; manualOtaStatus = "INSTALL_QUEUED";
     } else if (accepted && action == "ota_cancel") cancelOtaCheck();
   }
-  else if (++pingFailures >= 3) { pingStopped = true; pingStatus = "PAUSED_UNTIL_REBOOT"; }
+  else if (++pingFailures >= 3) { pingFailures = 3; nextPingPoll = millis()+60000; pingStatus = "RETRY_AFTER_60_SECONDS"; }
 }

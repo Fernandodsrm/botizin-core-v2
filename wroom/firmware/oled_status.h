@@ -61,9 +61,9 @@ static void refreshOled() {
   nextOledRefresh=millis()+1000;DiagnosticScope diagnosticScope(DIAG_OLED);
   if(!oledPresent()){oledReady=false;oledStatus="PAUSED_I2C_ERROR";diagnosticScope.failed=true;return;}
   oled.clearDisplay();
-  const char *areas[]={"Conexoes","Diagnostico","Atualizacoes","Controles","Ajuda"};
+  const char *areas[]={"Conexoes","Diagnostico","Atualizacoes"};
   if(navLevel==0){
-    oledLine(0,"BOTIZIN - CONJUNTO");oledLine(1,"WROOM + S3");oledList(areas,5,oledMenuChoice);
+    oledLine(0,"BOTIZIN - CONJUNTO");oledLine(1,"WROOM + S3");oledList(areas,3,oledMenuChoice);
   }else if(navLevel==1){
     oledLine(0,areas[navGroup]);oledLine(1,"Selecionar placa");
     const char *boards[]={"WROOM - robo","S3 - central"};oledList(boards,2,navBoard);
@@ -86,9 +86,6 @@ static void refreshOled() {
       oledLine(5,telemetryStatus=="HTTP_200"?"Site: ultimo envio OK":"Site: "+telemetryStatus);
       oledLine(6,"Origem: WROOM local");
     }
-  }else if(oledPage==9){
-    oledLine(0,String("CONTROLES ")+(navBoard?"S3":"WROOM"));oledLine(1,"Funcoes disponiveis");
-    oledLine(2,"  LED [X]");oledLine(4,"Ainda nao implantado");
   } else if (oledPage == 2 && oledDetail && candidateReady()) {
     oledLine(0, "INSTALAR NA WROOM?");
     oledLine(1, "OK:SIM Voltar:NAO");
@@ -96,17 +93,17 @@ static void refreshOled() {
     oledLine(3, "Nova  " + otaTargetVersion);
     oledLine(4, "Vai reiniciar WROOM");
     oledLine(5, String("Prazo ") + String((otaManualUntil - millis()) / 1000) + "s");
-    oledLine(6, "Automatico: LIGADO");
+    oledLine(6, otaAutomaticEnabled?"Automatico: LIGADO":"Automatico: DESLIGADO");
   } else if (oledPage == 2) {
     oledLine(0, String("OTA WROOM ") + BOTIZIN_VERSION + "");
-    oledLine(1, "Automatico: LIGADO");
+    oledLine(1, otaAutomaticEnabled?"Automatico: LIGADO":"Automatico: DESLIGADO");
     const char *actions[] = {"Consultar GitHub", "Instalar nova", "Cancelar pedido"};
     bool active[] = {otaReady && !internetStopped, candidateReady(), manualWindowActive()};
     for (uint8_t i = 0; i < 3; ++i) {
       oledLine(i + 2, String(i == oledOtaChoice ? "> " : "  ") + actions[i] + (active[i] ? "" : " [X]"));
     }
-    oledLine(5, candidateReady() ? "Nova " + otaTargetVersion + " Auto:ON" : internetStatus.startsWith("UP_TO_DATE") ? "Auto:ON | sem nova" : "Automatico: LIGADO");
-    oledLine(6, active[oledOtaChoice] ? (oledOtaChoice == 0 ? "Busca; nao instala" : oledOtaChoice == 1 ? "OK: abre confirmacao" : "Auto retoma em 5 min") : oledOtaChoice == 1 ? "Sem candidata valida" : oledOtaChoice == 2 ? "Sem pedido manual" : "Consulta bloqueada");
+    oledLine(5, candidateReady() ? "Nova " + otaTargetVersion : internetStatus);
+    oledLine(6, active[oledOtaChoice] ? (oledOtaChoice == 0 ? "Busca; nao instala" : oledOtaChoice == 1 ? "OK: abre confirmacao" : (otaAutomaticEnabled?"Auto retoma em 5 min":"Cancelar consulta")) : oledOtaChoice == 1 ? "Sem candidata valida" : oledOtaChoice == 2 ? "Sem pedido manual" : "Consulta bloqueada");
   } else if (oledPage == 5 && oledDetail && s3CandidateReady()) {
     oledLine(0,"INSTALAR NA S3?");oledLine(1,"OK:SIM Voltar:NAO");
     oledLine(2,"Atual "+s3OtaVersion);oledLine(3,"Nova  "+s3ConfirmVersion);
@@ -128,11 +125,8 @@ static void refreshOled() {
       oledLine(5,s3CandidateReady()?"Nova "+s3Target+" Auto:ON":s3OtaStatus);
       oledLine(6,peerKey.length()!=64?"Pareamento pendente":!s3OtaRecent()?"Aguardando relato S3":oledS3Choice==0?"Busca; nao instala":oledS3Choice==1?"OK: abre confirmacao":"Auto retoma em 5 min");
     }
-  }else{
-    oledLine(0,"AJUDA - NAVEGACAO");oledLine(1,"Mesmo modelo em tudo");
-    oledLine(2,"Cima: item anterior");oledLine(3,"Baixo: proximo item");
-    oledLine(4,"Direita: entra / OK");oledLine(5,"Esquerda: volta nivel");oledLine(6,"[X]: indisponivel");
   }
+
   oled.display();
   if(!oledPresent()){oledReady=false;oledStatus="PAUSED_I2C_ERROR";diagnosticScope.failed=true;}
 }

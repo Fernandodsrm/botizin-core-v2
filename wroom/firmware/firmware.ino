@@ -17,6 +17,7 @@
 #define BOTIZIN_LOCAL_BOARD "esp32-wroom-4mb"
 #include "local_name.h"
 #include "provisioning.h"
+#include "ps4_config.h"
 
 WebServer server(80);
 Preferences journal;
@@ -48,7 +49,15 @@ uint8_t telemetryFailures = 0;
 bool telemetryStopped = false;
 String telemetryBootId;
 #include "diagnostics.h"
-// Automatic OTA remains enabled. A manual query reserves a bounded confirmation window.
+// Automatic checks can be disabled after proving the manual cloud path.
+bool otaAutomaticEnabled = true;
+bool saveAutomatic(bool enabled) {
+  Preferences prefs; if (!prefs.begin("ota-policy", false)) return false;
+  prefs.putBool("automatic", enabled);
+  bool saved=prefs.getBool("automatic", !enabled)==enabled; prefs.end();
+  if(saved) otaAutomaticEnabled=enabled; return saved;
+}
+
 String manualOtaStatus = "READY", otaCandidateId, otaTargetVersion, otaTargetURL, otaTargetSHA;
 size_t otaTargetBytes = 0;
 uint32_t otaManualUntil = 0;
@@ -77,7 +86,7 @@ void cancelOtaCheck() {
   if (otaInstallQueued || uploadActive || uploadOK || rebootScheduled) return;
   otaCheckQueued = false; clearOtaCandidate();
   // Cancellation grants five minutes to the user before automatic installation resumes.
-  manualOtaStatus = "CANCELLED_AUTO_IN_5MIN"; otaManualUntil = millis() + 300000;
+  manualOtaStatus = otaAutomaticEnabled ? "CANCELLED_AUTO_IN_5MIN" : "CANCELLED"; otaManualUntil = millis() + 300000;
 }
 
 
@@ -153,7 +162,7 @@ String snapshot() {
   s += "WIFI: " + String(WiFi.status() == WL_CONNECTED ? "OK" : "DISCONNECTED") + "\n";
   s += "OTA: " + String(otaReady ? "READY" : "BLOCKED: hardware/partition mismatch") + "\n";
   s += "INTERNET_OTA: " + internetStatus + "\n";
-  s += "OTA_AUTOMATIC_ENABLED: YES\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
+  s += "OTA_AUTOMATIC_ENABLED: " + String(otaAutomaticEnabled?"YES":"NO") + "\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
   s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
@@ -511,7 +520,7 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "reset_reason", resetText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_state", stateText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_journal", evidence.c_str()) &&
-    cJSON_AddBoolToObject(root, "ota_automatic_enabled", true) &&
+    cJSON_AddBoolToObject(root, "ota_automatic_enabled", otaAutomaticEnabled) &&
     cJSON_AddBoolToObject(root, "peer_paired", peerKey.length()==64) &&
     cJSON_AddStringToObject(root, "s3_ota_status", s3OtaStatus.c_str()) &&
     cJSON_AddStringToObject(root, "s3_ota_version", s3OtaVersion.c_str()) &&
@@ -554,8 +563,8 @@ void __attribute__((noinline)) sendTelemetry() {
   Serial.println("TELEMETRY: " + telemetryStatus);
   if (code >= 200 && code < 300) telemetryFailures = 0;
   else if (++telemetryFailures >= 3) {
-    telemetryStopped = true;
-    telemetryStatus = "PAUSED_AFTER_3_FAILURES_UNTIL_REBOOT";
+    telemetryFailures = 3; nextTelemetry = millis() + 60000;
+    telemetryStatus = "RETRY_AFTER_60_SECONDS";
     Serial.println("TELEMETRY: " + telemetryStatus);
   }
 }
@@ -580,6 +589,7 @@ void setup() {
   Serial.begin(115200);
   delay(1500);
   loadPeerKey();
+  loadPS4Button();
   bool journalOK = journal.begin("wroom-journal", false);
   if (journalOK) priorAttempt = journal.getString("last", "");
   else Serial.println("JOURNAL_OPEN_FAILED");
@@ -598,6 +608,7 @@ void setup() {
   Serial.println(snapshot());
   loadProvisioning();
   loadPeerAddress();
+  { Preferences prefs; if(prefs.begin("ota-policy",true)) { otaAutomaticEnabled=prefs.getBool("automatic",true); prefs.end(); } }
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
@@ -654,7 +665,7 @@ void loop() {
   if (!rebootScheduled && !uploadActive && !uploadOK && !internetStopped &&
       (int32_t)(millis() - nextInternetCheck) >= 0) {
     nextInternetCheck = millis() + 60000;
-    if (!manualWindowActive()) { clearOtaCandidate(); checkInternetOTA(false); }
+    if (otaAutomaticEnabled && !manualWindowActive()) { clearOtaCandidate(); checkInternetOTA(false); }
 
   }
   if (!rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
