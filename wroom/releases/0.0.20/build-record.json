@@ -1,0 +1,10 @@
+{
+  "version": "0.0.20",
+  "bytes": 1293232,
+  "sha256": "f955a7a2f96cd12b27168650f2bc3a4ddabb3ca609b8dac38f8e6e3f7696a39d",
+  "fqbn": "esp32:esp32:esp32:FlashSize=4M,FlashMode=dio,CPUFreq=240,EraseFlash=none",
+  "source_commit": "0df8098416699ecb8f941f33bb17ea1b76b1b70c",
+  "published": false,
+  "credentials_compiled": false,
+  "partitions_verified": true
+}
