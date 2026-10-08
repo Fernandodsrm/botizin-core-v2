@@ -2,7 +2,7 @@
 import hashlib,json,os,pathlib,shutil,struct,subprocess
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 FQBN='esp32-bluepad32:esp32:esp32:FlashSize=4M,FlashMode=dio,CPUFreq=240,EraseFlash=none'
-version='0.0.19'
+version='0.0.21'
 def main():
  source=ROOT/'wroom/ps4-module';out=ROOT/'ps4-output';out.mkdir(exist_ok=True)
  target=ROOT/'dist-ps4'/version;target.mkdir(parents=True,exist_ok=True)
@@ -21,6 +21,6 @@ def main():
  shutil.copy2(out/'ps4-module.ino.elf',target/'firmware.elf')
  manifest={'board':'esp32-wroom-4mb','version':version,'size':len(binary),'sha256':sha,'url':'https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/'+version+'/firmware.bin'}
  (target/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
- record={**manifest,'source_commit':os.environ.get('GITHUB_SHA'),'core':'esp32-bluepad32:esp32@4.1.0','credentials_compiled':False,'partitions_verified':True,'return_requires':'Menu 0.0.18 plus verified NVS return anchor','wifi_compiled':False}
+ record={**manifest,'source_commit':os.environ.get('GITHUB_SHA'),'core':'esp32-bluepad32:esp32@4.1.0','credentials_compiled':False,'partitions_verified':True,'return_requires':'Menu 0.0.20 plus verified NVS return anchor','wifi_started':False}
  (target/'build-record.json').write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record),flush=True)
 if __name__=='__main__':main()

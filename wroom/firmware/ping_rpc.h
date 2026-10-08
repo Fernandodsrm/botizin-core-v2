@@ -108,7 +108,7 @@ void __attribute__((noinline)) pollPing() {
     cJSON_AddStringToObject(reply, "firmware_version", BOTIZIN_VERSION) &&
     cJSON_AddNumberToObject(reply,"ps4_led_button",ps4LedButton) &&
     cJSON_AddBoolToObject(reply,"module_available",moduleAvailable) &&
-    cJSON_AddStringToObject(reply,"slot_other_environment",moduleAvailable?"PS4 0.0.19":"Sem modulo confirmado") &&
+    cJSON_AddStringToObject(reply,"slot_other_environment",moduleAvailable?"PS4 0.0.21":"Sem modulo confirmado") &&
     cJSON_AddStringToObject(reply,"module_sha256",moduleSHA.c_str()) &&
     cJSON_AddStringToObject(reply,"wifi_ip",WiFi.localIP().toString().c_str()) &&
     cJSON_AddStringToObject(reply,"local_name",BOTIZIN_LOCAL_NAME ".local") &&

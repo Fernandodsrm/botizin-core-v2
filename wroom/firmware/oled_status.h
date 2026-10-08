@@ -98,7 +98,7 @@ static void refreshOled() {
     const esp_partition_t *run=esp_ota_get_running_partition();
     oledLine(0,"AMBIENTES WROOM");oledLine(1,oledDetail?"INICIAR PS4?":"Dois slots OTA");
     oledLine(2,String(run?run->label:"?")+": Menu "+BOTIZIN_VERSION);
-    oledLine(3,String(modulePartition?modulePartition->label:"?")+": "+(moduleAvailable?"PS4 0.0.19":"Sem modulo confirmado"));
+    oledLine(3,String(modulePartition?modulePartition->label:"?")+": "+(moduleAvailable?"PS4 0.0.21":"Sem modulo confirmado"));
     oledLine(5,moduleAvailable?(oledDetail?"Direita: confirmar":"Direita: iniciar PS4"):"Instale pelo painel");
     oledLine(6,"Esquerda: voltar OTA");
   } else if (oledPage == 2) {

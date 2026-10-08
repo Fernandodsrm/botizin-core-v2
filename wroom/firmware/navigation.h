@@ -37,7 +37,7 @@ static void pollNavigation() {
     else if(navLevel==3){navLevel=navGroup==1?2:1;}
     else if(navLevel){--navLevel;}
   }else if(navLevel==0){
-    if(pending&(2|8))oledMenuChoice=(oledMenuChoice+((pending&8)?1:(oledPage==2?3:2)))%(oledPage==2?4:3);
+    if(pending&(2|8))oledMenuChoice=(oledMenuChoice+((pending&8)?1:2))%3;
     else if(pending&1){navGroup=oledMenuChoice;navLevel=1;oledPage=4;}
   }else if(navLevel==1){
     if(pending&(2|8))navBoard=1-navBoard;

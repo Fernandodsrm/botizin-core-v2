@@ -66,5 +66,6 @@ int main(){
  assert(navLevel==0);
  oledMenuChoice=0;press(2);assert(oledMenuChoice==2);press(8);assert(oledMenuChoice==0);
  oledMenuChoice=2;press(1);navBoard=0;press(1);oledOtaChoice=3;press(1);assert(oledPage==10);press(1);assert(moduleStarts==0);moduleAvailable=true;press(1);assert(oledDetail);press(4);assert(!oledDetail&&oledPage==10);press(1);press(1);assert(moduleStarts==1);press(4);assert(oledPage==2);
+ press(4);press(4);assert(navLevel==0&&oledPage==2);oledMenuChoice=0;press(2);assert(oledMenuChoice==2);press(8);assert(oledMenuChoice==0);
  puts("NAVIGATION_TREE_OK: hierarchy, fixed button roles, expiry and explicit install confirmation");
 }

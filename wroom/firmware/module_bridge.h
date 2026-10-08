@@ -18,7 +18,7 @@ static bool saveReturnAnchor() {
 }
 static void loadInstalledModule() {
   moduleAvailable=false; modulePartition=esp_ota_get_next_update_partition(nullptr);
-  if(!modulePartition || journalField(priorAttempt,"TARGET_VERSION")!="0.0.19") return;
+  if(!modulePartition || journalField(priorAttempt,"TARGET_VERSION")!="0.0.21") return;
   moduleBytes=journalField(priorAttempt,"EXPECTED_BYTES").toInt();
   moduleSHA=journalField(priorAttempt,"SHA_CALCULATED_FLASH"); String actual;
   if(moduleBytes && moduleBytes<=modulePartition->size && moduleSHA.length()==64 &&
