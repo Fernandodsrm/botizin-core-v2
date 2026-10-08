@@ -30,6 +30,8 @@ bool queueS3Action(const char *action){
  else ++s3cancels;
  return true;
 }
+bool moduleAvailable=false;const char *moduleSHA="module";int moduleStarts=0;
+bool queueModuleStart(const char*,const char*){++moduleStarts;return true;}
 bool candidate=false,window=false;int installs=0,checks=0,cancels=0;
 bool candidateReady(){return candidate;}
 bool manualWindowActive(){return window;}
@@ -63,5 +65,6 @@ int main(){
  uploadActive=true;press(4);assert(navLevel==3);uploadActive=false;press(4);press(4);
  assert(navLevel==0);
  oledMenuChoice=0;press(2);assert(oledMenuChoice==2);press(8);assert(oledMenuChoice==0);
+ oledMenuChoice=2;press(1);navBoard=0;press(1);oledOtaChoice=3;press(1);assert(oledPage==10);press(1);assert(moduleStarts==0);moduleAvailable=true;press(1);assert(oledDetail);press(4);assert(!oledDetail&&oledPage==10);press(1);press(1);assert(moduleStarts==1);press(4);assert(oledPage==2);
  puts("NAVIGATION_TREE_OK: hierarchy, fixed button roles, expiry and explicit install confirmation");
 }

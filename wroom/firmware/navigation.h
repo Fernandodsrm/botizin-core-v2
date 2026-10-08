@@ -33,10 +33,11 @@ static void pollNavigation() {
   if(!pending||uploadActive||uploadOK||rebootScheduled||otaCheckQueued||otaInstallQueued||!s3QueuedAction.isEmpty())return;
   if(pending&4){
     if(oledDetail){oledDetail=false;}
+    else if(oledPage==10){oledPage=2;}
     else if(navLevel==3){navLevel=navGroup==1?2:1;}
     else if(navLevel){--navLevel;}
   }else if(navLevel==0){
-    if(pending&(2|8))oledMenuChoice=(oledMenuChoice+((pending&8)?1:2))%3;
+    if(pending&(2|8))oledMenuChoice=(oledMenuChoice+((pending&8)?1:(oledPage==2?3:2)))%(oledPage==2?4:3);
     else if(pending&1){navGroup=oledMenuChoice;navLevel=1;oledPage=4;}
   }else if(navLevel==1){
     if(pending&(2|8))navBoard=1-navBoard;
@@ -48,12 +49,18 @@ static void pollNavigation() {
   }else if(navLevel==2){
     if(pending&(2|8))navDiagnostic=(navDiagnostic+((pending&8)?1:3))%4;
     else if(pending&1){navLevel=3;oledPage=7;if(navBoard)nextPeerPoll=millis();}
+  }else if(oledPage==10){
+    if((pending&1) && moduleAvailable) {
+      if(!oledDetail) oledDetail=true;
+      else {queueModuleStart(telemetryBootId,moduleSHA);oledDetail=false;}
+    }
   }else if(oledPage==2||oledPage==5){
     uint8_t &choice=oledPage==2?oledOtaChoice:oledS3Choice;
-    if(pending&(2|8)){oledDetail=false;choice=(choice+((pending&8)?1:2))%3;}
+    if(pending&(2|8)){oledDetail=false;choice=(choice+((pending&8)?1:(oledPage==2?3:2)))%(oledPage==2?4:3);}
     else if(pending&1){
       if(oledPage==2){
-        if(choice==0){oledDetail=false;queueOtaCheck();}
+        if(choice==3){oledDetail=false;oledPage=10;}
+        else if(choice==0){oledDetail=false;queueOtaCheck();}
         else if(choice==1&&candidateReady()){
           if(!oledDetail)oledDetail=true;
           else{confirmOta(otaCandidateId,otaTargetVersion,otaTargetSHA,telemetryBootId);oledDetail=false;}

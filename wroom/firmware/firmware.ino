@@ -217,6 +217,8 @@ bool hashPartition(const esp_partition_t *p, size_t size, String &result) {
   return ok;
 }
 
+#include "module_bridge.h"
+
 void failUpload(const String &reason) {
   logLine("FAIL: " + reason);
   logLine("UPDATE_LIBRARY_ERROR: " + String(Update.getError()) + " / " + Update.errorString());
@@ -255,6 +257,7 @@ void beginUpload(const String &length, const String &sha) {
         expectedBytes > destination->size) {
       failUpload("invalid metadata, hardware, partitions or pending reboot; Update.begin NOT CALLED"); return;
     }
+    if(!saveReturnAnchor()) { failUpload("Menu return anchor could not be saved; no flash writes"); return; }
     bool beginOK = Update.begin(expectedBytes, U_FLASH);
     logLine("Update.begin: " + String(beginOK ? "TRUE" : "FALSE"));
     if (!beginOK) { failUpload("Update.begin rejected image size/partition"); return; }
@@ -593,6 +596,7 @@ void setup() {
   bool journalOK = journal.begin("wroom-journal", false);
   if (journalOK) priorAttempt = journal.getString("last", "");
   else Serial.println("JOURNAL_OPEN_FAILED");
+  loadInstalledModule();
   printPartitionTable();
   const esp_partition_t *a = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, nullptr);
   const esp_partition_t *b = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_1, nullptr);
@@ -645,6 +649,7 @@ void loop() {
   maintainLocalName();
   diagnosticLoopTick();
   if (!uploadActive && !uploadOK && !rebootScheduled) sampleDiagnostics();
+  if(moduleStartQueued && !uploadActive && !uploadOK && !rebootScheduled) startInstalledModule();
   pollNavigation();
   pollProvisioning(uploadActive || uploadOK || rebootScheduled);
   server.handleClient();

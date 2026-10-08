@@ -50,7 +50,7 @@ void __attribute__((noinline)) pollPing() {
     id->valuedouble <= 2147483647.0 && id->valuedouble == (double)id->valueint &&
     cJSON_IsString(method) && (strcmp(method->valuestring, "ping") == 0 ||
       strcmp(method->valuestring, "ota_check") == 0 || strcmp(method->valuestring, "ota_status") == 0 ||
-      strcmp(method->valuestring, "ota_confirm") == 0 || strcmp(method->valuestring, "ota_cancel") == 0 || strcmp(method->valuestring, "peer_pair") == 0 || strcmp(method->valuestring, "peer_address") == 0 || strcmp(method->valuestring, "ota_automatic") == 0 || strcmp(method->valuestring, "ps4_config") == 0) &&
+      strcmp(method->valuestring, "ota_confirm") == 0 || strcmp(method->valuestring, "ota_cancel") == 0 || strcmp(method->valuestring, "peer_pair") == 0 || strcmp(method->valuestring, "peer_address") == 0 || strcmp(method->valuestring, "ota_automatic") == 0 || strcmp(method->valuestring, "ps4_config") == 0 || strcmp(method->valuestring, "module_start") == 0) &&
     cJSON_IsObject(params) && cJSON_IsString(command) &&
     strlen(command->valuestring) > 0 && strlen(command->valuestring) <= 64 &&
     cJSON_IsNumber(issued) && issued->valuedouble <= now + 30000.0 &&
@@ -60,7 +60,11 @@ void __attribute__((noinline)) pollPing() {
   String commandId(command->valuestring);
   String action(method->valuestring), result = action == "ping" ? "PONG" : "OTA_STATUS";
   bool accepted = false;
-  if(action=="ps4_config") {
+  if(action=="module_start") {
+    cJSON *boot=cJSON_GetObjectItemCaseSensitive(params,"boot_id"), *sha=cJSON_GetObjectItemCaseSensitive(params,"sha256");
+    accepted=moduleAvailable && !otaInstallQueued && !otaCheckQueued && !moduleStartQueued && cJSON_IsString(boot) && cJSON_IsString(sha) && String(boot->valuestring)==telemetryBootId && String(sha->valuestring)==moduleSHA;
+    result=accepted?"MODULE_START_ACCEPTED":"MODULE_START_REJECTED";
+  } else if(action=="ps4_config") {
     cJSON *button=cJSON_GetObjectItemCaseSensitive(params,"led_button");
     accepted=cJSON_IsNumber(button) && button->valuedouble==button->valueint && savePS4Button(button->valueint);
     result=accepted?"PS4_CONFIG_SAVED":"PS4_CONFIG_REJECTED";
@@ -103,6 +107,9 @@ void __attribute__((noinline)) pollPing() {
     cJSON_AddNumberToObject(reply, "request_id", requestId) &&
     cJSON_AddStringToObject(reply, "firmware_version", BOTIZIN_VERSION) &&
     cJSON_AddNumberToObject(reply,"ps4_led_button",ps4LedButton) &&
+    cJSON_AddBoolToObject(reply,"module_available",moduleAvailable) &&
+    cJSON_AddStringToObject(reply,"slot_other_environment",moduleAvailable?"PS4 0.0.19":"Sem modulo confirmado") &&
+    cJSON_AddStringToObject(reply,"module_sha256",moduleSHA.c_str()) &&
     cJSON_AddStringToObject(reply,"wifi_ip",WiFi.localIP().toString().c_str()) &&
     cJSON_AddStringToObject(reply,"local_name",BOTIZIN_LOCAL_NAME ".local") &&
     cJSON_AddBoolToObject(reply,"mdns_ready",localNameReady) &&
@@ -149,7 +156,9 @@ void __attribute__((noinline)) pollPing() {
   if (posted >= 200 && posted < 300) {
     pingFailures = 0;
     // A failed acknowledgement never starts an installation.
-    if (accepted && action == "ota_check") queueOtaCheck();
+    if(accepted && action=="module_start") {
+      queueModuleStart(telemetryBootId,moduleSHA);
+    } else if (accepted && action == "ota_check") queueOtaCheck();
     else if (accepted && action == "ota_confirm" && candidateReady()) {
       otaInstallQueued = true; manualOtaStatus = "INSTALL_QUEUED";
     } else if (accepted && action == "ota_cancel") cancelOtaCheck();

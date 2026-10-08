@@ -94,16 +94,20 @@ static void refreshOled() {
     oledLine(4, "Vai reiniciar WROOM");
     oledLine(5, String("Prazo ") + String((otaManualUntil - millis()) / 1000) + "s");
     oledLine(6, otaAutomaticEnabled?"Automatico: LIGADO":"Automatico: DESLIGADO");
+  } else if(oledPage==10) {
+    const esp_partition_t *run=esp_ota_get_running_partition();
+    oledLine(0,"AMBIENTES WROOM");oledLine(1,oledDetail?"INICIAR PS4?":"Dois slots OTA");
+    oledLine(2,String(run?run->label:"?")+": Menu "+BOTIZIN_VERSION);
+    oledLine(3,String(modulePartition?modulePartition->label:"?")+": "+(moduleAvailable?"PS4 0.0.19":"Sem modulo confirmado"));
+    oledLine(5,moduleAvailable?(oledDetail?"Direita: confirmar":"Direita: iniciar PS4"):"Instale pelo painel");
+    oledLine(6,"Esquerda: voltar OTA");
   } else if (oledPage == 2) {
-    oledLine(0, String("OTA WROOM ") + BOTIZIN_VERSION + "");
+    oledLine(0, String("OTA WROOM ") + BOTIZIN_VERSION);
     oledLine(1, otaAutomaticEnabled?"Automatico: LIGADO":"Automatico: DESLIGADO");
-    const char *actions[] = {"Consultar GitHub", "Instalar nova", "Cancelar pedido"};
-    bool active[] = {otaReady && !internetStopped, candidateReady(), manualWindowActive()};
-    for (uint8_t i = 0; i < 3; ++i) {
-      oledLine(i + 2, String(i == oledOtaChoice ? "> " : "  ") + actions[i] + (active[i] ? "" : " [X]"));
-    }
-    oledLine(5, candidateReady() ? "Nova " + otaTargetVersion : internetStatus);
-    oledLine(6, active[oledOtaChoice] ? (oledOtaChoice == 0 ? "Busca; nao instala" : oledOtaChoice == 1 ? "OK: abre confirmacao" : (otaAutomaticEnabled?"Auto retoma em 5 min":"Cancelar consulta")) : oledOtaChoice == 1 ? "Sem candidata valida" : oledOtaChoice == 2 ? "Sem pedido manual" : "Consulta bloqueada");
+    const char *actions[]={"Consultar GitHub","Instalar nova","Cancelar pedido","Ver slots / PS4"};
+    bool active[]={otaReady&&!internetStopped&&!otaCheckQueued&&!otaInstallQueued,candidateReady(),manualWindowActive(),true};
+    for(uint8_t i=0;i<4;++i) oledLine(i+2,String(i==oledOtaChoice?"> ":"  ")+actions[i]+(active[i]?"":" [X]"));
+    oledLine(6,candidateReady()?"Nova "+otaTargetVersion:internetStatus);
   } else if (oledPage == 5 && oledDetail && s3CandidateReady()) {
     oledLine(0,"INSTALAR NA S3?");oledLine(1,"OK:SIM Voltar:NAO");
     oledLine(2,"Atual "+s3OtaVersion);oledLine(3,"Nova  "+s3ConfirmVersion);
