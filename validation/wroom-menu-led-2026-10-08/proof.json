@@ -1,0 +1,484 @@
+{
+  "date": "2026-10-08",
+  "source_commit": "2c0d4e8e21cd844c85332a19fb2c20d8671e28b1",
+  "image_bytes": 1162112,
+  "image_sha256": "ee3117cf69c100a8f420589b66a3866de44fbda79adefc1c806d929b8bd50baf",
+  "installation": "User PowerShell, verified local HTTP OTA on WROOM 192.168.0.8. GitHub offer withdrawn without cloud installation; PowerShell Invoke-WebRequest download timed out, curl IPv4 download succeeded.",
+  "user_observations": [
+    "OLED menu opened",
+    "GPIO26 LED switched on and off correctly",
+    "Returned to previous 0.0.12 interface",
+    "No visible success or transition feedback after right button; user perceived return after pressing left"
+  ],
+  "limitations": [
+    "No per-button event log: cannot prove which press caused reboot",
+    "LED-on transient missed by 60-second telemetry; physical success reported by user",
+    "Manual return observed before ten-minute timer; timer armed but expiry not tested in this run",
+    "No CPU percentage or radio occupancy measurement",
+    "No S3 peer communication compiled into trial; baseline still contains old IP 192.168.0.36"
+  ],
+  "trial_rpc_observed": {
+    "uptime_seconds": 107,
+    "firmware_version": "0.0.14",
+    "module_id": "menu_led_trial",
+    "boot_id": "207ce2117ede5008",
+    "running_partition": "app0 / address=10000 / size=1310720",
+    "boot_partition": "app1 / address=150000 / size=1310720",
+    "timed_trial_armed": true,
+    "network_worker_ready": true,
+    "loop_max_gap_us": 90008
+  },
+  "return_rpc": {
+    "result": "OTA_STATUS",
+    "origin": "ESP32_REAL",
+    "command_id": "physical-led-ff944c3c995a",
+    "request_id": 57,
+    "firmware_version": "0.0.12",
+    "boot_id": "838e998d70d07f72",
+    "uptime_seconds": 113,
+    "running_partition": "app1 / ota_1 / address=0x00150000 / size=1310720",
+    "boot_partition": "app1 / ota_1 / address=0x00150000 / size=1310720",
+    "ota_state": "VALID",
+    "reset_reason": "SOFTWARE (3)",
+    "automatic_enabled": true,
+    "manual_status": "READY",
+    "internet_status": "UP_TO_DATE 0.0.12",
+    "candidate_ready": false,
+    "candidate_id": "",
+    "target_version": "",
+    "sha256": "",
+    "size": 0,
+    "expires_in_seconds": 0
+  },
+  "history": {
+    "firmware_version": [
+      {
+        "ts": 1791440867478,
+        "value": "0.0.12"
+      },
+      {
+        "ts": 1791440807572,
+        "value": "0.0.12"
+      },
+      {
+        "ts": 1791440773266,
+        "value": "0.0.14"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "0.0.14"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "0.0.14"
+      },
+      {
+        "ts": 1791440598784,
+        "value": "0.0.12"
+      },
+      {
+        "ts": 1791440538890,
+        "value": "0.0.12"
+      }
+    ],
+    "module_id": [
+      {
+        "ts": 1791440773266,
+        "value": "menu_led_trial"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "menu_led_trial"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "menu_led_trial"
+      }
+    ],
+    "boot_id": [
+      {
+        "ts": 1791440867478,
+        "value": "838e998d70d07f72"
+      },
+      {
+        "ts": 1791440807572,
+        "value": "838e998d70d07f72"
+      },
+      {
+        "ts": 1791440773266,
+        "value": "207ce2117ede5008"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "207ce2117ede5008"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "207ce2117ede5008"
+      },
+      {
+        "ts": 1791440598784,
+        "value": "d3e05828e0635cb3"
+      },
+      {
+        "ts": 1791440538890,
+        "value": "d3e05828e0635cb3"
+      }
+    ],
+    "uptime_seconds": [
+      {
+        "ts": 1791440867478,
+        "value": "87"
+      },
+      {
+        "ts": 1791440807572,
+        "value": "27"
+      },
+      {
+        "ts": 1791440773266,
+        "value": "140"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "80"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "20"
+      },
+      {
+        "ts": 1791440598784,
+        "value": "2561"
+      },
+      {
+        "ts": 1791440538890,
+        "value": "2501"
+      }
+    ],
+    "timed_trial_armed": [
+      {
+        "ts": 1791440773266,
+        "value": "true"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "true"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "true"
+      }
+    ],
+    "timed_trial_status": [
+      {
+        "ts": 1791440773266,
+        "value": "ARMED_600_SECONDS_RETURN_0.0.12"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "ARMED_600_SECONDS_RETURN_0.0.12"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "ARMED_600_SECONDS_RETURN_0.0.12"
+      }
+    ],
+    "oled_initialized": [
+      {
+        "ts": 1791440773266,
+        "value": "true"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "true"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "true"
+      }
+    ],
+    "led_on": [
+      {
+        "ts": 1791440773266,
+        "value": "false"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "false"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "false"
+      }
+    ],
+    "led_gpio": [
+      {
+        "ts": 1791440773266,
+        "value": "26"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "26"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "26"
+      }
+    ],
+    "network_worker_ready": [
+      {
+        "ts": 1791440773266,
+        "value": "true"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "true"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "true"
+      }
+    ],
+    "loop_max_gap_us": [
+      {
+        "ts": 1791440867478,
+        "value": "2445020"
+      },
+      {
+        "ts": 1791440807572,
+        "value": "895018"
+      },
+      {
+        "ts": 1791440773266,
+        "value": "90008"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "51008"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "31006"
+      },
+      {
+        "ts": 1791440598784,
+        "value": "4330014"
+      },
+      {
+        "ts": 1791440538890,
+        "value": "4330014"
+      }
+    ],
+    "menu_selection": [
+      {
+        "ts": 1791440773266,
+        "value": "4"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "4"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "1"
+      }
+    ],
+    "ram_internal_free_bytes": [
+      {
+        "ts": 1791440867478,
+        "value": "159792"
+      },
+      {
+        "ts": 1791440807572,
+        "value": "160084"
+      },
+      {
+        "ts": 1791440773266,
+        "value": "166720"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "166664"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "167068"
+      },
+      {
+        "ts": 1791440598784,
+        "value": "159484"
+      },
+      {
+        "ts": 1791440538890,
+        "value": "159484"
+      }
+    ],
+    "ram_internal_min_bytes": [
+      {
+        "ts": 1791440867478,
+        "value": "98432"
+      },
+      {
+        "ts": 1791440807572,
+        "value": "100276"
+      },
+      {
+        "ts": 1791440773266,
+        "value": "95644"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "109264"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "165632"
+      },
+      {
+        "ts": 1791440598784,
+        "value": "93152"
+      },
+      {
+        "ts": 1791440538890,
+        "value": "93152"
+      }
+    ],
+    "ram_largest_block_bytes": [
+      {
+        "ts": 1791440867478,
+        "value": "110580"
+      },
+      {
+        "ts": 1791440807572,
+        "value": "110580"
+      },
+      {
+        "ts": 1791440773266,
+        "value": "110580"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "110580"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "110580"
+      },
+      {
+        "ts": 1791440598784,
+        "value": "110580"
+      },
+      {
+        "ts": 1791440538890,
+        "value": "110580"
+      }
+    ],
+    "menu_telemetry_attempts": [
+      {
+        "ts": 1791440773266,
+        "value": "2"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "1"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "0"
+      }
+    ],
+    "menu_telemetry_failures": [
+      {
+        "ts": 1791440773266,
+        "value": "0"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "0"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "0"
+      }
+    ],
+    "menu_rpc_polls": [
+      {
+        "ts": 1791440773266,
+        "value": "8"
+      },
+      {
+        "ts": 1791440713248,
+        "value": "4"
+      },
+      {
+        "ts": 1791440653262,
+        "value": "0"
+      }
+    ]
+  },
+  "coherent_trial_samples": [
+    {
+      "ts": 1791440653262,
+      "firmware_version": "0.0.14",
+      "module_id": "menu_led_trial",
+      "boot_id": "207ce2117ede5008",
+      "uptime_seconds": "20",
+      "timed_trial_armed": "true",
+      "timed_trial_status": "ARMED_600_SECONDS_RETURN_0.0.12",
+      "oled_initialized": "true",
+      "led_on": "false",
+      "led_gpio": "26",
+      "network_worker_ready": "true",
+      "loop_max_gap_us": "31006",
+      "menu_selection": "1",
+      "ram_internal_free_bytes": "167068",
+      "ram_internal_min_bytes": "165632",
+      "ram_largest_block_bytes": "110580",
+      "menu_telemetry_attempts": "0",
+      "menu_telemetry_failures": "0",
+      "menu_rpc_polls": "0"
+    },
+    {
+      "ts": 1791440713248,
+      "firmware_version": "0.0.14",
+      "module_id": "menu_led_trial",
+      "boot_id": "207ce2117ede5008",
+      "uptime_seconds": "80",
+      "timed_trial_armed": "true",
+      "timed_trial_status": "ARMED_600_SECONDS_RETURN_0.0.12",
+      "oled_initialized": "true",
+      "led_on": "false",
+      "led_gpio": "26",
+      "network_worker_ready": "true",
+      "loop_max_gap_us": "51008",
+      "menu_selection": "4",
+      "ram_internal_free_bytes": "166664",
+      "ram_internal_min_bytes": "109264",
+      "ram_largest_block_bytes": "110580",
+      "menu_telemetry_attempts": "1",
+      "menu_telemetry_failures": "0",
+      "menu_rpc_polls": "4"
+    },
+    {
+      "ts": 1791440773266,
+      "firmware_version": "0.0.14",
+      "module_id": "menu_led_trial",
+      "boot_id": "207ce2117ede5008",
+      "uptime_seconds": "140",
+      "timed_trial_armed": "true",
+      "timed_trial_status": "ARMED_600_SECONDS_RETURN_0.0.12",
+      "oled_initialized": "true",
+      "led_on": "false",
+      "led_gpio": "26",
+      "network_worker_ready": "true",
+      "loop_max_gap_us": "90008",
+      "menu_selection": "4",
+      "ram_internal_free_bytes": "166720",
+      "ram_internal_min_bytes": "95644",
+      "ram_largest_block_bytes": "110580",
+      "menu_telemetry_attempts": "2",
+      "menu_telemetry_failures": "0",
+      "menu_rpc_polls": "8"
+    }
+  ]
+}
