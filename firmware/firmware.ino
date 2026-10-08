@@ -14,6 +14,9 @@
 #include <time.h>
 #include "internet_config.h"
 #include "version.h"
+#define BOTIZIN_LOCAL_NAME "botizin-s3"
+#define BOTIZIN_LOCAL_BOARD "esp32s3-n16r8"
+#include "local_name.h"
 #include "telemetry_config.h"
 
 WebServer server(80);
@@ -126,6 +129,8 @@ String snapshot() {
   String s = "BOTIZIN CORE V" + String(BOTIZIN_VERSION) + "\n";
   s += "TEST_RESULT: Deu certo na atualização\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
+  s += "LOCAL_NAME: " BOTIZIN_LOCAL_NAME ".local\n";
+  s += "MDNS: " + String(localNameReady ? "READY" : "WAITING") + "\n";
   s += "UPTIME_SECONDS: " + String(diagnosticUptime()) + "\n";
   s += "RESET_REASON: " + resetInfo() + "\n";
   s += "FLASH_BYTES: " + String(ESP.getFlashChipSize()) + "\n";
@@ -481,6 +486,9 @@ void __attribute__((noinline)) sendTelemetry() {
   bool ok = cJSON_AddStringToObject(root, "origin", "ESP32_REAL") &&
     cJSON_AddBoolToObject(root, "simulated", false) &&
     cJSON_AddStringToObject(root, "firmware_version", BOTIZIN_VERSION) &&
+    cJSON_AddStringToObject(root,"wifi_ip",WiFi.localIP().toString().c_str()) &&
+    cJSON_AddStringToObject(root,"local_name",BOTIZIN_LOCAL_NAME ".local") &&
+    cJSON_AddBoolToObject(root,"mdns_ready",localNameReady) &&
     cJSON_AddStringToObject(root, "boot_id", telemetryBootId.c_str()) &&
     cJSON_AddNumberToObject(root, "sequence", ++telemetrySequence) &&
     cJSON_AddNumberToObject(root, "uptime_seconds", diagnosticUptime()) &&
@@ -567,6 +575,7 @@ void setup() {
   sampleDiagnostics();
   Serial.println(snapshot());
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
   // Reuse the Wi-Fi configuration already saved by the validated 0.0.3.
   // No credentials are compiled into the public Internet builds.
   WiFi.begin();
@@ -593,10 +602,12 @@ void setup() {
   nextTelemetry = millis() + 20000;
   nextInternetCheck = millis() + 10000;
   server.begin();
+  maintainLocalName();
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
 }
 
 void loop() {
+  maintainLocalName();
   diagnosticLoopTick();
   if (!uploadActive && !uploadOK && !rebootScheduled) sampleDiagnostics();
   server.handleClient();

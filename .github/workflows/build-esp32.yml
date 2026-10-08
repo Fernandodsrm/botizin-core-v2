@@ -2,7 +2,7 @@ name: Build BOTIZIN ESP32-S3 in cloud
 
 on:
   push:
-    branches: [cloud-build]
+    branches: [cloud-build, s3-peer-discovery-20261008]
     paths:
       - 'firmware/**'
       - 'ci/**'

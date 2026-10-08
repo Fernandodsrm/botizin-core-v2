@@ -90,6 +90,9 @@ void __attribute__((noinline)) pollPing() {
     cJSON_AddStringToObject(reply, "command_id", commandId.c_str()) &&
     cJSON_AddNumberToObject(reply, "request_id", requestId) &&
     cJSON_AddStringToObject(reply, "firmware_version", BOTIZIN_VERSION) &&
+    cJSON_AddStringToObject(reply,"wifi_ip",WiFi.localIP().toString().c_str()) &&
+    cJSON_AddStringToObject(reply,"local_name",BOTIZIN_LOCAL_NAME ".local") &&
+    cJSON_AddBoolToObject(reply,"mdns_ready",localNameReady) &&
     cJSON_AddStringToObject(reply, "boot_id", telemetryBootId.c_str()) &&
     cJSON_AddNumberToObject(reply, "uptime_seconds", millis() / 1000) &&
     cJSON_AddStringToObject(reply, "running_partition", running.c_str()) &&
