@@ -1,0 +1,44 @@
+name: Offer physical Menu LED trial and withdraw
+on:
+  push:
+    branches: [wroom-menu-led-20261008]
+    paths: ['ci/activate_led_trial.json']
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: wroom-menu-trial-offer
+  cancel-in-progress: false
+jobs:
+  offer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify activation and pinned build
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import urllib.request,json,os,pathlib
+          activation=json.loads(pathlib.Path('ci/activate_led_trial.json').read_text())
+          assert activation['version']=='0.0.14' and activation['device']=='WROOM'
+          req=urllib.request.Request('https://api.github.com/repos/Fernandodsrm/botizin-core-v2/actions/runs/37730807051',headers={'Authorization':'Bearer '+os.environ['GITHUB_TOKEN'],'Accept':'application/vnd.github+json'})
+          run=json.load(urllib.request.urlopen(req,timeout=30))
+          assert run['conclusion']=='success' and run['head_sha']=='2c0d4e8e21cd844c85332a19fb2c20d8671e28b1'
+          print('PINNED_BUILD_VERIFIED')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: wroom-menu-trial
+          path: trial-package
+          run-id: 37730807051
+          github-token: ${{ github.token }}
+      - name: Offer verified image and restore baseline after five minutes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_SOURCE_COMMIT: 2c0d4e8e21cd844c85332a19fb2c20d8671e28b1
+          EXPECTED_IMAGE_SHA256: ee3117cf69c100a8f420589b66a3866de44fbda79adefc1c806d929b8bd50baf
+        run: python3 ci/offer_menu_trial.py
