@@ -1,0 +1,21 @@
+{
+  "source_commit": "c47cd9dc471c2d6f26fe6531a64452063191f348",
+  "packages": [
+    {
+      "version": "0.0.18",
+      "run": 37818152711,
+      "artifact": "botizin-wroom-c47cd9dc471c2d6f26fe6531a64452063191f348",
+      "size": 1293232,
+      "sha256": "26c9216c767ffb4490abe3f31a63ba0e1f933ea6f3c687f46eb71c47acb31150",
+      "path": "artifact-menu"
+    },
+    {
+      "version": "0.0.19",
+      "run": 37818152834,
+      "artifact": "botizin-ps4-c47cd9dc471c2d6f26fe6531a64452063191f348",
+      "size": 755024,
+      "sha256": "ff5f994c079f9a15eb3439abe9613509a75e9d594d9e40cb56618bd72e69c9f1",
+      "path": "artifact-ps4"
+    }
+  ]
+}

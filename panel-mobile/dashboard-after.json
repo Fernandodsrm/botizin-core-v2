@@ -1,0 +1,243 @@
+{
+  "id": {
+    "entityType": "DASHBOARD",
+    "id": "4a411320-c088-11f1-b930-ad60e0953111"
+  },
+  "createdTime": 1791182701906,
+  "tenantId": {
+    "entityType": "TENANT",
+    "id": "043f99c0-c036-11f1-b930-ad60e0953111"
+  },
+  "customerId": null,
+  "ownerId": {
+    "entityType": "TENANT",
+    "id": "043f99c0-c036-11f1-b930-ad60e0953111"
+  },
+  "title": "BOTIZIN WROOM \u00b7 De guerra",
+  "name": "BOTIZIN WROOM \u00b7 De guerra",
+  "image": null,
+  "assignedCustomers": null,
+  "mobileHide": false,
+  "mobileOrder": null,
+  "configuration": {
+    "widgets": {
+      "c637e22d-a2ae-4870-be4c-1845586dddce": {
+        "id": "c637e22d-a2ae-4870-be4c-1845586dddce",
+        "type": "latest",
+        "typeFullFqn": "tenant.botizin_mobile_20261008",
+        "sizeX": 24,
+        "sizeY": 14,
+        "config": {
+          "showTitle": false,
+          "padding": "0px",
+          "backgroundColor": "#132839",
+          "color": "#e5eefb",
+          "settings": {},
+          "title": "BOTIZIN",
+          "dropShadow": false,
+          "enableFullscreen": true,
+          "showLegend": false,
+          "actions": {},
+          "useDashboardTimewindow": false,
+          "displayTimewindow": false,
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "BOTIZIN-WROOM",
+              "entityAliasId": "c5b1dcb8-3263-4319-a5a8-bc7d74423f6c",
+              "dataKeys": [
+                {
+                  "name": "firmware_version",
+                  "label": "firmware_version",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.01
+                },
+                {
+                  "name": "origin",
+                  "label": "origin",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.02
+                },
+                {
+                  "name": "simulated",
+                  "label": "simulated",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.03
+                },
+                {
+                  "name": "wifi_ip",
+                  "label": "wifi_ip",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.04
+                },
+                {
+                  "name": "local_name",
+                  "label": "local_name",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.05
+                },
+                {
+                  "name": "boot_id",
+                  "label": "boot_id",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.06
+                },
+                {
+                  "name": "ota_state",
+                  "label": "ota_state",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.07
+                },
+                {
+                  "name": "running_partition",
+                  "label": "running_partition",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.08
+                },
+                {
+                  "name": "ota_automatic_enabled",
+                  "label": "ota_automatic_enabled",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.09
+                },
+                {
+                  "name": "s3_link",
+                  "label": "s3_link",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.1
+                },
+                {
+                  "name": "s3_resolved_ip",
+                  "label": "s3_resolved_ip",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.11
+                },
+                {
+                  "name": "s3_last_version",
+                  "label": "s3_last_version",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.12
+                },
+                {
+                  "name": "s3_last_seen_age_seconds",
+                  "label": "s3_last_seen_age_seconds",
+                  "type": "timeseries",
+                  "color": "#65e8c3",
+                  "settings": {},
+                  "_hash": 0.13
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "states": {
+      "default": {
+        "name": "BOTIZIN WROOM",
+        "root": true,
+        "layouts": {
+          "main": {
+            "widgets": {
+              "c637e22d-a2ae-4870-be4c-1845586dddce": {
+                "sizeX": 24,
+                "sizeY": 14,
+                "row": 0,
+                "col": 0,
+                "mobileOrder": 0,
+                "mobileHeight": 14
+              }
+            },
+            "gridSettings": {
+              "backgroundColor": "#0e1727",
+              "color": "#e5eefb",
+              "columns": 24,
+              "margin": 4,
+              "outerMargin": true,
+              "autoFillHeight": false,
+              "mobileAutoFillHeight": false,
+              "mobileRowHeight": 32,
+              "layoutType": "default"
+            }
+          }
+        }
+      }
+    },
+    "entityAliases": {
+      "c5b1dcb8-3263-4319-a5a8-bc7d74423f6c": {
+        "id": "c5b1dcb8-3263-4319-a5a8-bc7d74423f6c",
+        "alias": "BOTIZIN-WROOM",
+        "filter": {
+          "type": "singleEntity",
+          "resolveMultiple": false,
+          "singleEntity": {
+            "entityType": "DEVICE",
+            "id": "368826d0-c082-11f1-8cda-091689c2cb7f"
+          }
+        }
+      }
+    },
+    "timewindow": {
+      "displayValue": "",
+      "selectedTab": 0,
+      "hideAggregation": false,
+      "hideAggInterval": false,
+      "realtime": {
+        "interval": 1000,
+        "timewindowMs": 60000
+      },
+      "history": {
+        "historyType": 0,
+        "interval": 1000,
+        "timewindowMs": 60000,
+        "fixedTimewindow": {
+          "startTimeMs": 1587473857304,
+          "endTimeMs": 1587560257304
+        }
+      },
+      "aggregation": {
+        "type": "AVG",
+        "limit": 25000
+      }
+    },
+    "settings": {
+      "stateControllerId": "entity",
+      "showTitle": false,
+      "showDashboardsSelect": true,
+      "showEntitiesSelect": false,
+      "showDashboardTimewindow": false,
+      "showDashboardExport": false,
+      "toolbarAlwaysOpen": false,
+      "hideToolbar": false,
+      "showFilters": false
+    },
+    "filters": {}
+  },
+  "resources": null,
+  "externalId": null,
+  "version": 4
+}

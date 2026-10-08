@@ -1,0 +1,31 @@
+name: Store verified Menu and PS4 releases
+on:
+  push:
+    branches: [wroom-ota-menu-20261008]
+    paths: ['release-activation.json']
+permissions:
+  contents: write
+  actions: read
+jobs:
+  store:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 37818152711
+          name: botizin-wroom-c47cd9dc471c2d6f26fe6531a64452063191f348
+          path: artifact-menu
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 37818152834
+          name: botizin-ps4-c47cd9dc471c2d6f26fe6531a64452063191f348
+          path: artifact-ps4
+      - name: Verify source, bytes, digest and partitions before storage
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 ci/store_module_releases.py
