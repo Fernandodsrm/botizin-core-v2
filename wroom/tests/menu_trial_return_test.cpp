@@ -26,8 +26,8 @@ int esp_timer_stop(esp_timer_handle_t) { ++stops; return 0; }
 int esp_timer_delete(esp_timer_handle_t) { ++deletes; return 0; }
 void esp_restart() { ++restarts; }
 bool hashPartition(const esp_partition_t *, size_t n, String &result) {
-  assert(n==1248160);
-  result=goodHash ? "11a0a1c68a8b7bd7c9c1bd7782df070ece556e2ff1eec94f3899e01e4c6aa2f5" : "bad";
+  assert(n==1289888);
+  result=goodHash ? "5428313389336d48831e9228fb98d18603f848d44fdd1557a3de337f1b45580c" : "bad";
   return readable;
 }
 static void trialTurnLedOff() {}

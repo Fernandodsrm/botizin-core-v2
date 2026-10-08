@@ -4,8 +4,8 @@
 #endif
 
 // This image is temporary. Do not change partition layout or write another OTA.
-static constexpr size_t trialBaselineBytes = 1248160;
-static constexpr const char *trialBaselineSHA = "11a0a1c68a8b7bd7c9c1bd7782df070ece556e2ff1eec94f3899e01e4c6aa2f5";
+static constexpr size_t trialBaselineBytes = 1289888;
+static constexpr const char *trialBaselineSHA = "5428313389336d48831e9228fb98d18603f848d44fdd1557a3de337f1b45580c";
 static const char *trialStatus = "NOT_ARMED";
 static bool trialArmed = false;
 static esp_timer_handle_t trialTimer = nullptr;
@@ -47,6 +47,6 @@ static bool armTimedTrial() {
     esp_timer_stop(trialTimer); esp_timer_delete(trialTimer); trialTimer = nullptr;
     trialStatus = "FAILED_BOOT_READBACK"; return false;
   }
-  trialArmed = true; trialStatus = "ARMED_600_SECONDS_RETURN_0.0.12";
+  trialArmed = true; trialStatus = "ARMED_600_SECONDS_RETURN_0.0.15";
   return true;
 }

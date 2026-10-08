@@ -16,7 +16,7 @@
 #include "menu_model.h"
 
 // Authorized temporary Menu. No downloader, upload endpoint, peer link or NVS writes.
-static const char *version = "0.0.14";
+static const char *version = "0.0.17";
 static const char *moduleId = "menu_led_trial";
 static String ssid, password, deviceToken, bootId;
 static bool configured = false, oledReady = false;
@@ -160,7 +160,7 @@ static void line(uint8_t row,const String &text) {
 static void redraw() {
   if (!oledReady) return;
   display.clearDisplay();
-  line(0,"BOTIZIN MENU - WROOM"); line(1,"Teste / volta 0.0.12");
+  line(0,"BOTIZIN MENU - WROOM"); line(1,"Teste / volta 0.0.15");
   if (!menu.detail) {
     for (unsigned i=0;i<5;++i) line(i+2,String(i==menu.selected?"> ":"  ")+items[i]);
   } else if (menu.selected==0) {
@@ -179,7 +179,7 @@ static void redraw() {
     line(2,"Cima/baixo: selecionar"); line(3,"Direita: entrar / OK");
     line(4,"Esquerda: voltar"); line(5,"Retorno automatico");
   } else {
-    line(2,"Voltar para 0.0.12?"); line(3,"Direita: confirmar"); line(4,"Esquerda: cancelar");
+    line(2,"Voltar para 0.0.15?"); line(3,"Direita: confirmar"); line(4,"Esquerda: cancelar");
   }
   display.display();
 }
@@ -199,7 +199,15 @@ static void pollButtons() {
   bool returning=menu.handle(events);selectedState.store(menu.selected);
   bool on=menu.ledOn && trialArmed;
   digitalWrite(ledPin,on?HIGH:LOW);ledState.store(on?1:0);
-  if (returning && trialArmed) {trialTurnLedOff();esp_restart();}
+  if (returning && trialArmed) {
+    trialTurnLedOff();
+    Serial.println("MENU_RETURN_CONFIRMED_RIGHT_TO_0.0.15");
+    if(oledReady) {
+      display.clearDisplay();line(0,"BOTIZIN MENU - WROOM");line(1,"Retorno confirmado");
+      line(2,"Voltando...");line(3,"Anterior: 0.0.15");display.display();
+    }
+    Serial.flush();delay(750);esp_restart();
+  }
   nextOled=0;
 }
 static void networkWorker(void *) {
@@ -232,7 +240,7 @@ void setup() {
   if (configured) WiFi.begin(ssid.c_str(),password.c_str());
   configTime(0,0,"pool.ntp.org","time.cloudflare.com");
   nextTelemetry=millis()+20000; nextRpc=millis()+30000; nextWifiRetry=millis()+30000;
-  redraw(); Serial.println("BOTIZIN_MENU_TRIAL_0.0.14_WRITES_BLOCKED");
+  redraw(); Serial.println("BOTIZIN_MENU_TRIAL_0.0.17_WRITES_BLOCKED");
   networkWorkerReady=true;
   if (xTaskCreate(networkWorker,"menu_net",8192,nullptr,1,nullptr)!=pdPASS) networkWorkerReady=false;
 }
