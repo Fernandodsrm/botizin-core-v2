@@ -6,7 +6,9 @@ static String peerAddressSource="WAITING";
 // Migration fallback; never configured as this ESP32's own static IP.
 static String peerManualIP="192.168.0.9";
 static bool usablePeerIP(const IPAddress &ip) {
-  return ip[0]!=0 && ip[0]!=127 && ip[0]<224 && ip!=WiFi.localIP();
+  return ip[0]!=0 && ip[0]!=127 && ip[0]<224 && ip!=WiFi.localIP() &&
+    (((uint32_t)ip & (uint32_t)WiFi.subnetMask()) ==
+     ((uint32_t)WiFi.localIP() & (uint32_t)WiFi.subnetMask()));
 }
 static void invalidatePeerAddress() {
   peerDiscovery.invalidate();peerAddress=IPAddress();peerAddressSource="RETRY_WAIT";
@@ -17,9 +19,10 @@ static void loadPeerAddress() {
 }
 static bool savePeerAddress(const String &text) {
   IPAddress ip;
-  if(!text.isEmpty() && (!ip.fromString(text) || !usablePeerIP(ip))) return false;
+  if(!text.isEmpty() && (text.length()>15 || text.indexOf(':')>=0 ||
+    !ip.fromString(text) || !usablePeerIP(ip))) return false;
   Preferences p;if(!p.begin("peer-address",false))return false;
-  bool ok=p.putString("ip",text)==text.length();p.end();
+  p.putString("ip",text);bool ok=p.getString("ip","__missing__")==text;p.end();
   if(ok) {peerManualIP=text;invalidatePeerAddress();peerDiscovery.reset(millis());}
   return ok;
 }
