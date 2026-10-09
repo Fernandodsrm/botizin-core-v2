@@ -97,3 +97,9 @@ Teste de lógica host passou: bloqueio por retorno inválido, ausência de ativa
 ### Pacote 24 publicado para teste manual
 
 Build 37968551099 (fonte 13de077384711772bc8d2174ff2ab33a2411ba8d) concluiu; armazenamento 37968766954 concluiu. Binário público baixado novamente: 760960 bytes, SHA256 29b71784dc7e142e58060faa899902aa1e4583e18f7134445330cc6ec2872ca2, margem do slot 549760 bytes. Manifesto principal oferece 24 no commit 226e0720e7cc09b7ef7a0cfad2634f2ffbd1c3b4. Menu 22 não foi alterado. Instalação física/servo ainda pendentes; nenhuma ordem RPC de instalação foi enviada.
+
+## Servo físico 24 e controle PS4 25 — 09/10/2026
+
+Fernando relatou que o servo se movimentou nos passos pequenos e confirmou a conclusão do teste solicitado (ajuste, sinal OFF, centro e retorno). Não observou sinais de sobrecarga e está acompanhando temperatura. Isso é validação relatada sem carga, não medição de corrente ou de tensão em movimento.
+Solicitou controlar pelo PS4 mantendo o menu. Pacote 25: L1 deve permanecer pressionado; RX do analógico direito determina posição nominal de 60° a 120°, centro 90°, zona morta ±35. Movimento limitado a 2° por 20 ms. Soltar L1 ou receber dados com idade >=250 ms desativa PWM. OK físico desativa e bloqueia até soltar L1; esquerda desativa antes de reiniciar Menu 22. Botões cima/baixo da placa não movimentam servo em 25. Desligar PWM não corta os 5 V.
+Teste host C++11 sobre as funções reais do firmware passou: L1, limites de RX, progressão, timeout, desconexão, parada manual e bloqueio por retorno inválido. Build 37969626658 concluiu com sucesso: 761232 bytes, SHA256 1bdb3c18c81e5f4a5f6667e7d826fab30789e00ea3892cbadba513f4ac14784d; fonte e8d05867f72dc7d106a95d601bc1ecada10e024f; partições preservadas. Teste físico de 25 pendente.
