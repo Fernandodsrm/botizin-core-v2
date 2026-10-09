@@ -1,8 +1,8 @@
 """Compile Bluetooth-only module against pinned previously used Bluepad32 core."""
-import hashlib,json,os,pathlib,shutil,struct,subprocess
+import hashlib,json,os,pathlib,re,shutil,struct,subprocess
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 FQBN='esp32-bluepad32:esp32:esp32:FlashSize=4M,FlashMode=dio,CPUFreq=240,EraseFlash=none'
-version='0.0.23'
+version=re.search(r'moduleVersion="([0-9.]+)"', (ROOT/'wroom/ps4-module/ps4-module.ino').read_text()).group(1)
 def main():
  source=ROOT/'wroom/ps4-module';out=ROOT/'ps4-output';out.mkdir(exist_ok=True)
  target=ROOT/'dist-ps4'/version;target.mkdir(parents=True,exist_ok=True)
