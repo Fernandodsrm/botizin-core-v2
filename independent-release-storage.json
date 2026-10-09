@@ -1,11 +1,11 @@
 {
-  "source_commit": "e8d05867f72dc7d106a95d601bc1ecada10e024f",
+  "source_commit": "9284c388f06dec76369a82fdf4e9c2f32c43daf6",
   "packages": [
     {
       "path": "artifact-ps4",
-      "version": "0.0.25",
-      "size": 761232,
-      "sha256": "1bdb3c18c81e5f4a5f6667e7d826fab30789e00ea3892cbadba513f4ac14784d"
+      "version": "0.0.26",
+      "size": 761216,
+      "sha256": "899d0e6f1a92365a342776de2990f8ae8202cc02845fdcfc0ace5bea746b30b2"
     }
   ]
 }
