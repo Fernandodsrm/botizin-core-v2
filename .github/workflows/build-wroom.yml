@@ -2,7 +2,7 @@ name: Build BOTIZIN ESP32-WROOM in cloud
 
 on:
   push:
-    branches: [wroom-cloud-build, wroom-peer-discovery-20261008, wroom-ota-menu-20261008]
+    branches: [wroom-cloud-build, wroom-peer-discovery-20261008, wroom-ota-menu-20261008, wroom-independente-20261009]
     paths:
       - 'wroom/**'
       - 'ci/build_wroom.py'
@@ -36,18 +36,10 @@ jobs:
           arduino-cli lib install "Adafruit BusIO@1.17.4" --no-deps
           arduino-cli lib install "Adafruit GFX Library@1.12.6" --no-deps
           arduino-cli lib install "Adafruit SSD1306@2.5.17" --no-deps
-      - name: Validate S3 status parser
-        run: |
-          g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/peer_status_test.cpp -o /tmp/peer-status-test
-          /tmp/peer-status-test
       - name: Validate bounded diagnostic sampler
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror -I wroom/tests/mock wroom/tests/diagnostic_sampler_test.cpp -o /tmp/diagnostic-sampler-test
           /tmp/diagnostic-sampler-test
-      - name: Validate diagnostic parser
-        run: |
-          g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/diagnostic_parser_test.cpp -o /tmp/diagnostic-parser-test
-          /tmp/diagnostic-parser-test
       - name: Validate OTA confirmation binding and expiry
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/ota_confirmation_test.cpp -o /tmp/ota-confirmation-test
@@ -56,10 +48,6 @@ jobs:
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/navigation_test.cpp -o /tmp/navigation-test
           /tmp/navigation-test
-      - name: Validate discovery retry, caching and clock rollover
-        run: |
-          g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/peer_discovery_test.cpp -o /tmp/peer-discovery-test
-          /tmp/peer-discovery-test
       - name: Compile and validate firmware package
         run: python3 ci/build_wroom.py
       - name: Save firmware, manifest, ELF and logs

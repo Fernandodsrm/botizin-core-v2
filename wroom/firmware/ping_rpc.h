@@ -50,7 +50,7 @@ void __attribute__((noinline)) pollPing() {
     id->valuedouble <= 2147483647.0 && id->valuedouble == (double)id->valueint &&
     cJSON_IsString(method) && (strcmp(method->valuestring, "ping") == 0 ||
       strcmp(method->valuestring, "ota_check") == 0 || strcmp(method->valuestring, "ota_status") == 0 ||
-      strcmp(method->valuestring, "ota_confirm") == 0 || strcmp(method->valuestring, "ota_cancel") == 0 || strcmp(method->valuestring, "peer_pair") == 0 || strcmp(method->valuestring, "peer_address") == 0 || strcmp(method->valuestring, "ota_automatic") == 0 || strcmp(method->valuestring, "ps4_config") == 0 || strcmp(method->valuestring, "module_start") == 0) &&
+      strcmp(method->valuestring, "ota_confirm") == 0 || strcmp(method->valuestring, "ota_cancel") == 0 || strcmp(method->valuestring, "ota_automatic") == 0 || strcmp(method->valuestring, "ps4_config") == 0 || strcmp(method->valuestring, "module_start") == 0) &&
     cJSON_IsObject(params) && cJSON_IsString(command) &&
     strlen(command->valuestring) > 0 && strlen(command->valuestring) <= 64 &&
     cJSON_IsNumber(issued) && issued->valuedouble <= now + 30000.0 &&
@@ -72,14 +72,6 @@ void __attribute__((noinline)) pollPing() {
     cJSON *enabled=cJSON_GetObjectItemCaseSensitive(params,"enabled");
     accepted=cJSON_IsBool(enabled) && !otaInstallQueued && !otaCheckQueued && saveAutomatic(cJSON_IsTrue(enabled));
     result=accepted?"AUTOMATIC_SAVED":"AUTOMATIC_REJECTED";
-  } else if(action=="peer_address") {
-    cJSON *ip=cJSON_GetObjectItemCaseSensitive(params,"ip");
-    accepted=cJSON_IsString(ip) && savePeerAddress(String(ip->valuestring));
-    result=accepted?"PEER_ADDRESS_SAVED":"PEER_ADDRESS_REJECTED";
-  } else if (action == "peer_pair") {
-    cJSON *k = cJSON_GetObjectItemCaseSensitive(params, "key");
-    accepted = cJSON_IsString(k) && savePeerKey(String(k->valuestring));
-    result = accepted ? "PAIR_READY" : "PAIR_REJECTED";
   } else if (action == "ota_check") {
     accepted = otaReady && !internetStopped && !otaCheckQueued && !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled;
     result = accepted ? "CHECK_ACCEPTED" : "BUSY_OR_BLOCKED";
@@ -108,14 +100,11 @@ void __attribute__((noinline)) pollPing() {
     cJSON_AddStringToObject(reply, "firmware_version", BOTIZIN_VERSION) &&
     cJSON_AddNumberToObject(reply,"ps4_led_button",ps4LedButton) &&
     cJSON_AddBoolToObject(reply,"module_available",moduleAvailable) &&
-    cJSON_AddStringToObject(reply,"slot_other_environment",moduleAvailable?"PS4 0.0.21":"Sem modulo confirmado") &&
+    cJSON_AddStringToObject(reply,"slot_other_environment",moduleAvailable?"PS4 0.0.23":"Sem modulo confirmado") &&
     cJSON_AddStringToObject(reply,"module_sha256",moduleSHA.c_str()) &&
     cJSON_AddStringToObject(reply,"wifi_ip",WiFi.localIP().toString().c_str()) &&
     cJSON_AddStringToObject(reply,"local_name",BOTIZIN_LOCAL_NAME ".local") &&
     cJSON_AddBoolToObject(reply,"mdns_ready",localNameReady) &&
-    cJSON_AddStringToObject(reply,"s3_resolved_ip",peerAddress.toString().c_str()) &&
-    cJSON_AddStringToObject(reply,"s3_address_source",peerAddressSource.c_str()) &&
-    cJSON_AddStringToObject(reply,"s3_manual_ip",peerManualIP.c_str()) &&
     cJSON_AddStringToObject(reply, "boot_id", telemetryBootId.c_str()) &&
     cJSON_AddNumberToObject(reply, "uptime_seconds", millis() / 1000) &&
     cJSON_AddStringToObject(reply, "running_partition", running.c_str()) &&

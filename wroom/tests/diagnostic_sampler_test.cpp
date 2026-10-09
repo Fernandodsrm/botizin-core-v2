@@ -30,8 +30,8 @@ int main(){
  mockMillis=5000;sampleDiagnostics();assert(diagnosticOps[DIAG_SAMPLE].calls==2&&ESP.checks==1);
  // Subsequent sampling does not rescan the firmware, including timer wraparound.
  diagnosticNextSample=UINT32_MAX-2;mockMillis=3;sampleDiagnostics();assert(ESP.checks==1&&diagnosticOps[DIAG_SAMPLE].calls==3);
- {DiagnosticScope scope(DIAG_PEER);scope.failed=true;mockTimer+=400000;}
- assert(diagnosticOps[DIAG_PEER].failures==1&&diagnosticOps[DIAG_PEER].maxUs>=400000);
+ {DiagnosticScope scope(DIAG_RPC);scope.failed=true;mockTimer+=400000;}
+ assert(diagnosticOps[DIAG_RPC].failures==1&&diagnosticOps[DIAG_RPC].maxUs>=400000);
  diagnosticLoopTick();mockTimer+=2000;diagnosticLoopTick();assert(diagnosticLoopMaxUs>=2000);
  (void)diagnosticText();(void)diagnosticUptime();cJSON obj;assert(diagnosticJSON(&obj));
  assert(obj.values["diag_sample_max_us"]<1000&&obj.values["diag_flash_init_us"]>=250000);

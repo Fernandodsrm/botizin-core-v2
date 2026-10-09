@@ -39,8 +39,6 @@ uint32_t nextInternetCheck = 0;
 int responseCode = 400;
 String telemetryStatus = "WAITING";
 String oledStatus = "WAITING";
-String peerStatus = "WAITING", peerVersion;
-uint32_t peerSeenAt = 0;
 uint8_t oledPage = 0;
 bool oledDetail = false, oledMenu = true;
 uint8_t oledMenuChoice = 0, oledOtaChoice = 0;
@@ -64,11 +62,8 @@ uint32_t otaManualUntil = 0;
 bool otaCheckQueued = false, otaInstallQueued = false;
 void showOtaProgress(const String &phase, size_t done = 0, size_t total = 0);
 #include "ota_confirmation.h"
-#include "peer_auth.h"
 static void discardNavigation();
 #include "navigation_model.h"
-#include "peer_address.h"
-#include "peer_ota_client.h"
 
 bool manualWindowActive() { return otaManualUntil && (int32_t)(otaManualUntil - millis()) > 0; }
 bool candidateReady() { return !otaCandidateId.isEmpty() && manualWindowActive() && !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled; }
@@ -167,16 +162,7 @@ String snapshot() {
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
   s += "OLED: " + oledStatus + "\n";
-  s += "OLED_PAGE: " + String(oledMenu ? "MENU" : navLevel == 1 ? "BOARD_LIST" : navLevel == 2 ? "DIAGNOSTIC_LIST" : oledPage == 7 ? "DIAGNOSTICS" : oledPage == 8 ? "CONNECTION" : oledPage == 9 ? "CONTROLS" : oledPage == 2 ? "OTA_WROOM" : oledPage == 5 ? "OTA_S3" : "HELP") + "\n";
-  s += "S3_LINK: " + peerStatus + "\n";
-  s += "S3_EXPECTED_NAME: botizin-s3.local\n";
-  s += "S3_RESOLVED_IP: " + peerAddress.toString() + "\n";
-  s += "S3_ADDRESS_SOURCE: " + peerAddressSource + "\n";
-  s += "S3_MANUAL_IP: " + peerManualIP + "\n";
-  s += "S3_LAST_VERSION: " + peerVersion + "\n";
-  s += "PEER_PAIRED: " + String(peerKey.length()==64?"YES":"NO") + "\n";
-  s += "S3_OTA_STATUS: " + s3OtaStatus + "\n";
-  s += "S3_OTA_VERSION: " + s3OtaVersion + "\n";
+  s += "OLED_PAGE: " + String(oledMenu ? "MENU" : navLevel == 2 ? "DIAGNOSTIC_LIST" : oledPage == 7 ? "DIAGNOSTICS" : oledPage == 8 ? "CONNECTION" : oledPage == 9 ? "CONTROLS" : oledPage == 2 ? "OTA_WROOM" : "HELP") + "\n";
   s += diagnosticText();
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
@@ -524,16 +510,7 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "ota_state", stateText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_journal", evidence.c_str()) &&
     cJSON_AddBoolToObject(root, "ota_automatic_enabled", otaAutomaticEnabled) &&
-    cJSON_AddBoolToObject(root, "peer_paired", peerKey.length()==64) &&
-    cJSON_AddStringToObject(root, "s3_ota_status", s3OtaStatus.c_str()) &&
-    cJSON_AddStringToObject(root, "s3_ota_version", s3OtaVersion.c_str()) &&
-    cJSON_AddNumberToObject(root, "s3_ota_report_age_seconds", s3HaveOtaReply?double((millis()-s3ReplyAt)/1000):-1.0) &&
-    cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str()) &&
-    cJSON_AddStringToObject(root, "s3_link", peerStatus.c_str()) &&
-    cJSON_AddStringToObject(root,"s3_resolved_ip",peerAddress.toString().c_str()) &&
-    cJSON_AddStringToObject(root,"s3_address_source",peerAddressSource.c_str()) &&
-    cJSON_AddStringToObject(root, "s3_last_version", peerVersion.c_str()) &&
-    cJSON_AddNumberToObject(root, "s3_last_seen_age_seconds", peerVersion.length() ? double((millis() - peerSeenAt) / 1000) : -1.0);
+    cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str());
   ok = ok && diagnosticJSON(root);
   char *payload = ok ? cJSON_PrintUnformatted(root) : nullptr;
   cJSON_Delete(root);
@@ -573,7 +550,6 @@ void __attribute__((noinline)) sendTelemetry() {
 }
 
 #include "ping_rpc.h"
-#include "peer_status.h"
 #include "oled_status.h"
 #include "navigation.h"
 
@@ -591,7 +567,6 @@ void printPartitionTable() {
 void setup() {
   Serial.begin(115200);
   delay(1500);
-  loadPeerKey();
   loadPS4Button();
   bool journalOK = journal.begin("wroom-journal", false);
   if (journalOK) priorAttempt = journal.getString("last", "");
@@ -611,7 +586,6 @@ void setup() {
   sampleDiagnostics();
   Serial.println(snapshot());
   loadProvisioning();
-  loadPeerAddress();
   { Preferences prefs; if(prefs.begin("ota-policy",true)) { otaAutomaticEnabled=prefs.getBool("automatic",true); prefs.end(); } }
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
@@ -642,7 +616,6 @@ void setup() {
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
   beginOled();
   beginNavigation();
-  nextPeerPoll = millis() + 12000;
 }
 
 void loop() {
@@ -685,8 +658,6 @@ void loop() {
   }
   pollNavigation();
   refreshOled();
-  pollPeerStatus();
-  pollS3OTA();
   pollNavigation();
   refreshOled();
   delay(2);

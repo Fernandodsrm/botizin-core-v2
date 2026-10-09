@@ -1,7 +1,7 @@
 name: Build standalone PS4 module
 on:
   push:
-    branches: [wroom-ota-menu-20261008]
+    branches: [wroom-ota-menu-20261008, wroom-independente-20261009]
     paths: ['wroom/ps4-module/**', 'ci/build_ps4_module.py', '.github/workflows/build-ps4.yml']
   workflow_dispatch:
 permissions:

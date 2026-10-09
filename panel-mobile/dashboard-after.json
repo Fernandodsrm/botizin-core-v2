@@ -117,77 +117,6 @@
                   "color": "#65e8c3",
                   "settings": {},
                   "_hash": 0.09
-                },
-                {
-                  "name": "s3_link",
-                  "label": "s3_link",
-                  "type": "timeseries",
-                  "color": "#65e8c3",
-                  "settings": {},
-                  "_hash": 0.1
-                },
-                {
-                  "name": "s3_resolved_ip",
-                  "label": "s3_resolved_ip",
-                  "type": "timeseries",
-                  "color": "#65e8c3",
-                  "settings": {},
-                  "_hash": 0.11
-                },
-                {
-                  "name": "s3_last_version",
-                  "label": "s3_last_version",
-                  "type": "timeseries",
-                  "color": "#65e8c3",
-                  "settings": {},
-                  "_hash": 0.12
-                },
-                {
-                  "name": "s3_last_seen_age_seconds",
-                  "label": "s3_last_seen_age_seconds",
-                  "type": "timeseries",
-                  "color": "#65e8c3",
-                  "settings": {},
-                  "_hash": 0.13
-                }
-              ]
-            },
-            {
-              "type": "entity",
-              "name": "BOTIZIN-S3-DIRETA",
-              "entityAliasId": "b72d43c0-2484-41cb-a1ce-37c441e8cc8c",
-              "dataKeys": [
-                {
-                  "name": "firmware_version",
-                  "label": "cloud_s3_version",
-                  "type": "timeseries",
-                  "color": "#7dd3fc",
-                  "settings": {},
-                  "_hash": 0.02
-                },
-                {
-                  "name": "wifi_ip",
-                  "label": "cloud_s3_ip",
-                  "type": "timeseries",
-                  "color": "#7dd3fc",
-                  "settings": {},
-                  "_hash": 0.04
-                },
-                {
-                  "name": "origin",
-                  "label": "cloud_s3_origin",
-                  "type": "timeseries",
-                  "color": "#7dd3fc",
-                  "settings": {},
-                  "_hash": 0.06
-                },
-                {
-                  "name": "simulated",
-                  "label": "cloud_s3_simulated",
-                  "type": "timeseries",
-                  "color": "#7dd3fc",
-                  "settings": {},
-                  "_hash": 0.08
                 }
               ]
             }
@@ -236,18 +165,6 @@
           "singleEntity": {
             "entityType": "DEVICE",
             "id": "368826d0-c082-11f1-8cda-091689c2cb7f"
-          }
-        }
-      },
-      "b72d43c0-2484-41cb-a1ce-37c441e8cc8c": {
-        "id": "b72d43c0-2484-41cb-a1ce-37c441e8cc8c",
-        "alias": "BOTIZIN-S3-DIRETA",
-        "filter": {
-          "type": "singleEntity",
-          "resolveMultiple": false,
-          "singleEntity": {
-            "entityType": "DEVICE",
-            "id": "4a771080-c036-11f1-b143-c924012d9fae"
           }
         }
       }

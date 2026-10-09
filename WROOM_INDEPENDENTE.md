@@ -13,7 +13,7 @@ Esta evidência é um relato físico do usuário; não representa novas mediçõ
 Servo e motores ainda não foram testados com este firmware. A versão 0.0.21 não contém acionamento de servo ou motores.
 
 ## Escopo autorizado
-A WROOM será independente e móvel. A S3 deixa de integrar o firmware básico e só será usada quando um módulo específico precisar dela.
+A WROOM será independente e móvel. A S3 deixa de integrar todo o projeto da WROOM e será usada em outro projeto independente, somente online e por painel. Nenhum módulo da WROOM depende da S3.
 A base deve preservar atualização sem cabo, verificação de imagem e retorno entre menu e módulo.
 O Botizin visual deverá ser a tela de descanso/entrada do menu, se couber após medição.
 

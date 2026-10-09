@@ -3,7 +3,7 @@
 #include <esp_timer.h>
 // Fixed-size counters; no trace log, NVS write, task creation or network here.
 struct DiagnosticOp { uint32_t calls=0, lastUs=0, maxUs=0, failures=0; uint64_t totalUs=0; };
-enum DiagnosticIndex { DIAG_GIT, DIAG_TB, DIAG_RPC, DIAG_PEER, DIAG_OLED, DIAG_SAMPLE, DIAG_COUNT };
+enum DiagnosticIndex { DIAG_GIT, DIAG_TB, DIAG_RPC, DIAG_OLED, DIAG_SAMPLE, DIAG_COUNT };
 static DiagnosticOp diagnosticOps[DIAG_COUNT];
 struct DiagnosticMemory { uint32_t free=0, minimum=0, largest=0, psram=0, otaFree=0, at=0; bool ready=false; };
 static DiagnosticMemory diagnosticMemory;
@@ -45,7 +45,7 @@ static String diagnosticText(){String s="DIAG_SCHEMA: 1\n";
   s+="DIAG_OTA_FREE: "+String(diagnosticMemory.otaFree)+"\nDIAG_SAMPLE_AGE: "+String((millis()-diagnosticMemory.at)/1000)+"\n";
   s+="DIAG_FLASH_INIT_US: "+String(diagnosticFlashInitUs)+"\n";
   s+="DIAG_LOOP_MAX_US: "+String(diagnosticLoopMaxUs)+"\n";
-  const char *names[]={"GIT","TB","RPC","PEER","OLED","SAMPLE"};
+  const char *names[]={"GIT","TB","RPC","OLED","SAMPLE"};
   for(uint8_t i=0;i<DIAG_COUNT;++i){s+="DIAG_"+String(names[i])+"_MAX_US: "+String(diagnosticOps[i].maxUs)+"\n";}
   return s;
 }
@@ -58,11 +58,12 @@ static bool diagnosticJSON(cJSON *o){
     cJSON_AddNumberToObject(o,"ota_free_bytes",diagnosticMemory.otaFree)&&
     cJSON_AddNumberToObject(o,"diag_sample_age_seconds",(millis()-diagnosticMemory.at)/1000)&&
     cJSON_AddNumberToObject(o,"loop_max_gap_us",diagnosticLoopMaxUs);
-  const char *names[]={"git","tb","rpc","peer","oled","sample"};char key[40];
+  const char *names[]={"git","tb","rpc","oled","sample"};char key[40];
   for(uint8_t i=0;i<DIAG_COUNT;++i){auto &d=diagnosticOps[i];
     snprintf(key,sizeof(key),"diag_%s_max_us",names[i]);ok=ok&&cJSON_AddNumberToObject(o,key,d.maxUs);
     snprintf(key,sizeof(key),"diag_%s_last_us",names[i]);ok=ok&&cJSON_AddNumberToObject(o,key,d.lastUs);
     snprintf(key,sizeof(key),"diag_%s_calls",names[i]);ok=ok&&cJSON_AddNumberToObject(o,key,d.calls);
+    snprintf(key,sizeof(key),"diag_%s_mean_us",names[i]);ok=ok&&cJSON_AddNumberToObject(o,key,d.calls?double(d.totalUs)/d.calls:0);
     snprintf(key,sizeof(key),"diag_%s_failures",names[i]);ok=ok&&cJSON_AddNumberToObject(o,key,d.failures);
   }return ok;
 }
