@@ -65,3 +65,13 @@ O manifesto público e as placas não foram alterados nesta etapa.
 - Servo e carrinho: exigir ligação elétrica conferida, testes com carga e parada segura por perda do controle. Telemetria não substitui medição elétrica com multímetro.
 - PS4: Wi-Fi não é iniciado; não existe telemetria remota simultânea. Validar OLED, serial ou retorno ao menu. Não adicionar consultas de nuvem ao controle de tempo crítico.
 - Celular: validar troca de rede e reconexão antes de adotar voz/IA externa.
+
+## Arquivos OTA publicados e conferidos — continuação de 09/10/2026
+
+Workflow de armazenamento 37952187313 concluiu com sucesso. Os arquivos foram gravados em main/wroom/releases/0.0.22 e main/wroom/releases/0.0.23, sem alterar main/wroom/manifest.json.
+Ambos os binários públicos foram baixados novamente e seus SHA256 conferem com os registros acima.
+O campo published:false do build-record do Menu é o registro original da etapa de compilação; a publicação posterior está registrada aqui.
+
+A oferta pública continua na versão 0.0.21. Não substituir diretamente por 23: o PS4 23 exige retorno íntegro ao Menu 22.
+Sequência de implantação: colocar a WROOM no menu atual, conferir estado VALID, instalar Menu 22, observar novo boot/telemetria; só então oferecer PS4 23 e comprovar retorno ao Menu 22.
+A sessão do ThingsBoard ainda solicita login; painel preparado ainda não foi aplicado online. Nenhuma placa foi atualizada nesta etapa.
