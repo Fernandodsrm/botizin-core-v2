@@ -35,4 +35,8 @@ function renderCompact(){
  text('presence',self.ready?'Contato recente':'Sem contato recente');text('version',value('firmware_version'));text('ip',value('wifi_ip'));
  text('age',age===null?'—':age+'s');text('running',value('running_partition').split(' / ')[0]);
  text('auto',value('ota_automatic_enabled')==='true'?'ligada':'desligada');
+ function metric(k,scale,unit){var n=Number(value(k));return value(k)==='—'||!isFinite(n)?'—':Math.round(n/scale)+unit;}
+ text('ram',metric('ram_internal_free_bytes',1024,' KiB'));text('ram_min',metric('ram_internal_min_bytes',1024,' KiB'));
+ text('margin',metric('ota_free_bytes',1024,' KiB'));text('loop_max',metric('loop_max_gap_us',1000,' ms'));
+ text('git_max',metric('diag_git_max_us',1000,' ms'));text('cloud_max',metric('diag_tb_max_us',1000,' ms'));
 }

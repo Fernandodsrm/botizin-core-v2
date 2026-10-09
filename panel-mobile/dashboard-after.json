@@ -117,6 +117,42 @@
                   "color": "#65e8c3",
                   "settings": {},
                   "_hash": 0.09
+                },
+                {
+                  "name": "ram_internal_free_bytes",
+                  "label": "ram_internal_free_bytes",
+                  "type": "timeseries",
+                  "settings": {}
+                },
+                {
+                  "name": "ram_internal_min_bytes",
+                  "label": "ram_internal_min_bytes",
+                  "type": "timeseries",
+                  "settings": {}
+                },
+                {
+                  "name": "ota_free_bytes",
+                  "label": "ota_free_bytes",
+                  "type": "timeseries",
+                  "settings": {}
+                },
+                {
+                  "name": "loop_max_gap_us",
+                  "label": "loop_max_gap_us",
+                  "type": "timeseries",
+                  "settings": {}
+                },
+                {
+                  "name": "diag_git_max_us",
+                  "label": "diag_git_max_us",
+                  "type": "timeseries",
+                  "settings": {}
+                },
+                {
+                  "name": "diag_tb_max_us",
+                  "label": "diag_tb_max_us",
+                  "type": "timeseries",
+                  "settings": {}
                 }
               ]
             }
