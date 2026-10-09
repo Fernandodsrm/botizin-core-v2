@@ -12,7 +12,7 @@
 
 // Full independent Bluetooth firmware: no Wi-Fi, HTTP, TLS or OTA writer.
 static constexpr uint8_t ledPin=26,backPin=32;
-static constexpr const char *moduleVersion="0.0.25";
+static constexpr const char *moduleVersion="0.0.26";
 static Adafruit_SSD1306 oled(128,64,&Wire,-1,400000,400000);
 static ControllerPtr controller=nullptr;
 static bool returnReady=false,oledReady=false,ledOn=false;
@@ -22,7 +22,7 @@ static volatile uint32_t lastBack=0;
 static uint32_t lastPacket=0,nextScreen=0,loopMaxUs=0,loopAt=0;
 static uint16_t buttons=0;static int lx=0,ly=0,rx=0,ry=0;
 static String returnError="NOT_CHECKED";
-// Local servo test: outputs stay off until a physical OK press.
+// Servo outputs stay off until the PS4 dead-man L1 is held.
 static constexpr uint8_t servoPin=14,okPin=25,upPin=27,downPin=33;
 static bool servoReady=false,servoOn=false;
 static int servoAngle=90;
@@ -52,9 +52,9 @@ static bool initServo() {
  return ledc_channel_config(&channel)==ESP_OK;
 }
 static bool writeServo(int angle) {
- servoAngle=constrain(angle,60,120);
- // Conservative 1167..1833 us range around 1500 us centre.
- uint32_t pulseUs=1000+(servoAngle*1000UL)/180;
+ servoAngle=constrain(angle,0,180);
+ // Expanded nominal travel; actual endpoints require unloaded calibration.
+ uint32_t pulseUs=600+servoAngle*10UL;
  uint32_t duty=(pulseUs*65536UL+10000)/20000;
  if(ledc_set_duty(LEDC_LOW_SPEED_MODE,LEDC_CHANNEL_0,duty)!=ESP_OK ||
     ledc_update_duty(LEDC_LOW_SPEED_MODE,LEDC_CHANNEL_0)!=ESP_OK){stopServo();return false;}
@@ -66,7 +66,7 @@ static uint32_t nextServoStep=0;
 static int servoTarget(int axis) {
  axis=constrain(axis,-512,512);
  if(axis>=-35&&axis<=35)return 90;
- return constrain(90+(axis*30)/512,60,120);
+ return constrain(90+(axis*90)/512,0,180);
 }
 static void pollPS4Servo() {
  bool ok=buttonPressed(servoButtons[0]);
@@ -140,7 +140,7 @@ void setup() {
  returnReady=armMenuReturn();
  if(returnReady){servoReady=initServo();stopServo();}
  Preferences p;if(p.begin("ps4-config",true)){uint8_t b=p.getUChar("led-button",1);p.end();if(b==1||b==2||b==4||b==8)ledButton=b;}
- Serial.println("BOTIZIN PS4 SERVO V0.0.25");
+ Serial.println("BOTIZIN PS4 SERVO V0.0.26");
  Serial.println(servoReady?"SERVO_D14: READY_OFF":"SERVO_D14: DISABLED");Serial.println("MENU_RETURN: "+returnError);
  if(returnReady) BP32.setup(&onConnected,&onDisconnected);
  drawScreen();loopAt=micros();
