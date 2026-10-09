@@ -12,7 +12,7 @@
 
 // Full independent Bluetooth firmware: no Wi-Fi, HTTP, TLS or OTA writer.
 static constexpr uint8_t ledPin=26,backPin=32;
-static constexpr const char *moduleVersion="0.0.26";
+static constexpr const char *moduleVersion="0.0.28";
 static Adafruit_SSD1306 oled(128,64,&Wire,-1,400000,400000);
 static ControllerPtr controller=nullptr;
 static bool returnReady=false,oledReady=false,ledOn=false;
@@ -100,7 +100,7 @@ static bool armMenuReturn() {
    !((run->address==0x10000&&menu->address==0x150000)||(run->address==0x150000&&menu->address==0x10000))) {returnError="PARTITIONS";return false;}
  Preferences p;if(!p.begin("module-return",true)){returnError="NO_MENU_RECORD";return false;}
  String record=p.getString("menu","");p.end();int first=record.indexOf('|'),second=record.indexOf('|',first+1);
- if(first<1||second!=first+65||record.substring(second+1)!="0.0.22"||record.substring(0,first).toInt()!=(long)menu->address){returnError="WRONG_MENU_RECORD";return false;}
+ if(first<1||second!=first+65||(record.substring(second+1)!="0.0.22"&&record.substring(second+1)!="0.0.27")||record.substring(0,first).toInt()!=(long)menu->address){returnError="WRONG_MENU_RECORD";return false;}
  unsigned char digest[32];
  if(esp_partition_get_sha256(menu,digest)!=ESP_OK||digestHex(digest)!=record.substring(first+1,second)){returnError="MENU_HASH";return false;}
  if(esp_ota_set_boot_partition(menu)!=ESP_OK){returnError="BOOT_SELECTION";return false;}
@@ -140,7 +140,7 @@ void setup() {
  returnReady=armMenuReturn();
  if(returnReady){servoReady=initServo();stopServo();}
  Preferences p;if(p.begin("ps4-config",true)){uint8_t b=p.getUChar("led-button",1);p.end();if(b==1||b==2||b==4||b==8)ledButton=b;}
- Serial.println("BOTIZIN PS4 SERVO V0.0.26");
+ Serial.println("BOTIZIN PS4 SERVO V0.0.28");
  Serial.println(servoReady?"SERVO_D14: READY_OFF":"SERVO_D14: DISABLED");Serial.println("MENU_RETURN: "+returnError);
  if(returnReady) BP32.setup(&onConnected,&onDisconnected);
  drawScreen();loopAt=micros();
