@@ -12,7 +12,7 @@
 
 // Full independent Bluetooth firmware: no Wi-Fi, HTTP, TLS or OTA writer.
 static constexpr uint8_t ledPin=26,backPin=32;
-static constexpr const char *moduleVersion="0.0.24";
+static constexpr const char *moduleVersion="0.0.25";
 static Adafruit_SSD1306 oled(128,64,&Wire,-1,400000,400000);
 static ControllerPtr controller=nullptr;
 static bool returnReady=false,oledReady=false,ledOn=false;
@@ -60,12 +60,35 @@ static bool writeServo(int angle) {
     ledc_update_duty(LEDC_LOW_SPEED_MODE,LEDC_CHANNEL_0)!=ESP_OK){stopServo();return false;}
  servoOn=true;return true;
 }
-static void pollServoButtons() {
+// PS4 dead-man control: release L1 or stale packets => no PWM.
+static bool servoL1=false,servoInhibited=false;
+static uint32_t nextServoStep=0;
+static int servoTarget(int axis) {
+ axis=constrain(axis,-512,512);
+ if(axis>=-35&&axis<=35)return 90;
+ return constrain(90+(axis*30)/512,60,120);
+}
+static void pollPS4Servo() {
  bool ok=buttonPressed(servoButtons[0]);
- bool up=buttonPressed(servoButtons[1]),down=buttonPressed(servoButtons[2]);
- if(!returnReady||!servoReady)return;
- if(ok){if(servoOn)stopServo();else writeServo(90);}
- if(servoOn&&up!=down)writeServo(servoAngle+(up?5:-5));
+ // Consume the local navigation buttons without moving the servo in this mode.
+ buttonPressed(servoButtons[1]);buttonPressed(servoButtons[2]);
+ bool fresh=controller&&controller->isConnected()&&(uint32_t)(millis()-lastPacket)<250;
+ if(ok){stopServo();servoInhibited=true;}
+ if(!servoL1||!fresh||!returnReady||!servoReady){
+  if(servoOn)stopServo();
+  if(!servoL1)servoInhibited=false;
+  return;
+ }
+ if(servoInhibited)return;
+ uint32_t now=millis();
+ if(!servoOn){
+  if(!writeServo(servoAngle)){servoInhibited=true;return;}
+  nextServoStep=now+20;
+ }
+ if((int32_t)(now-nextServoStep)<0)return;
+ nextServoStep=now+20;
+ int target=servoTarget(rx),delta=constrain(target-servoAngle,-2,2);
+ if(delta&&!writeServo(servoAngle+delta))servoInhibited=true;
 }
 
 static String digestHex(const unsigned char *bytes) {
@@ -89,7 +112,7 @@ static void ARDUINO_ISR_ATTR backISR() {
  uint32_t now=millis();if((uint32_t)(now-lastBack)>=150){lastBack=now;returnPressed.store(true);}
 }
 static void onConnected(ControllerPtr ctl) {if(!controller&&ctl->isGamepad()) controller=ctl;}
-static void onDisconnected(ControllerPtr ctl) {if(controller==ctl)controller=nullptr;}
+static void onDisconnected(ControllerPtr ctl) {if(controller==ctl){controller=nullptr;servoL1=false;stopServo();}}
 static void setLed(bool on) {ledOn=returnReady&&on;digitalWrite(ledPin,ledOn?HIGH:LOW);}
 static void line(uint8_t row,const String &text) {
  oled.setCursor(0,row<2?row*8:18+(row-2)*9);oled.print(text.substring(0,21));
@@ -102,7 +125,7 @@ static void drawScreen() {
   line(2,controller&&controller->isConnected()?"Controle conectado":"Parear: SHARE + PS");
   line(3,"Botoes: "+String(buttons,HEX)+" LED:"+(ledOn?"ON":"OFF"));
   line(4,"Servo D14: "+String(!servoReady?"ERRO":servoOn?String(servoAngle):"OFF"));
-  line(5,"OK liga; cima/baixo");
+  line(5,"L1 + analogico dir.");
   line(6,"Esquerda: voltar OTA");
  }
  oled.display();
@@ -117,7 +140,7 @@ void setup() {
  returnReady=armMenuReturn();
  if(returnReady){servoReady=initServo();stopServo();}
  Preferences p;if(p.begin("ps4-config",true)){uint8_t b=p.getUChar("led-button",1);p.end();if(b==1||b==2||b==4||b==8)ledButton=b;}
- Serial.println("BOTIZIN PS4 SERVO V0.0.24");
+ Serial.println("BOTIZIN PS4 SERVO V0.0.25");
  Serial.println(servoReady?"SERVO_D14: READY_OFF":"SERVO_D14: DISABLED");Serial.println("MENU_RETURN: "+returnError);
  if(returnReady) BP32.setup(&onConnected,&onDisconnected);
  drawScreen();loopAt=micros();
@@ -128,15 +151,15 @@ void loop() {
   setLed(false);stopServo();
   if(returnReady){if(oledReady){oled.clearDisplay();line(0,"RETORNO CONFIRMADO");line(2,"Voltando ao OTA...");oled.display();}delay(750);esp_restart();}
  }
- pollServoButtons();
  if(returnReady) {
   bool updated=BP32.update();
   if(updated&&controller&&controller->isConnected()&&controller->hasData()) {
-   lastPacket=millis();buttons=controller->buttons();lx=controller->axisX();ly=controller->axisY();rx=controller->axisRX();ry=controller->axisRY();
+   lastPacket=millis();servoL1=controller->l1();buttons=controller->buttons();lx=controller->axisX();ly=controller->axisY();rx=controller->axisRX();ry=controller->axisRY();
    setLed((buttons&ledButton)!=0);
   }
-  if(!controller||!controller->isConnected()||(uint32_t)(millis()-lastPacket)>1000){buttons=0;setLed(false);}
+  if(!controller||!controller->isConnected()||(uint32_t)(millis()-lastPacket)>1000){buttons=0;servoL1=false;setLed(false);}
  }
+ pollPS4Servo();
  if((int32_t)(millis()-nextScreen)>=0){nextScreen=millis()+250;drawScreen();}
  delay(1);
 }
