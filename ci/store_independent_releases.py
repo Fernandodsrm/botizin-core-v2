@@ -23,7 +23,7 @@ def main():
     before=api('/git/ref/heads/main')['object']['sha']
     base=api('/git/commits/'+before)['tree']['sha']
     tree=api('/git/trees',{'base_tree':base,'tree':entries})
-    commit=api('/git/commits',{'message':'Store verified independent Menu 22 and PS4 23 packages without activation','tree':tree['sha'],'parents':[before]})
+    commit=api('/git/commits',{'message':'Store verified standalone module packages without activation','tree':tree['sha'],'parents':[before]})
     assert api('/git/ref/heads/main')['object']['sha']==before,'main moved; no ref update'
     api('/git/refs/heads/main',{'sha':commit['sha'],'force':False},'PATCH')
     print('RELEASE_FILES_STORED; MANIFEST_NOT_CHANGED',commit['sha'])
