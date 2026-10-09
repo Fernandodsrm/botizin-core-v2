@@ -26,7 +26,9 @@ static String returnError="NOT_CHECKED";
 static constexpr uint8_t servoPin=14,okPin=25,upPin=27,downPin=33;
 static bool servoReady=false,servoOn=false;
 static int servoAngle=90;
-struct ServoButton {uint8_t pin;bool raw=true,stable=true;uint32_t changed=0;};
+struct ServoButton {uint8_t pin;bool raw,stable;uint32_t changed;
+ ServoButton(uint8_t p):pin(p),raw(true),stable(true),changed(0){}
+};
 static ServoButton servoButtons[]={{okPin},{upPin},{downPin}};
 static bool buttonPressed(ServoButton &b) {
  bool raw=digitalRead(b.pin);uint32_t now=millis();
