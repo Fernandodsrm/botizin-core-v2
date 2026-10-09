@@ -1,0 +1,13 @@
+{
+  "board": "esp32-wroom-4mb",
+  "version": "0.0.28",
+  "size": 761344,
+  "sha256": "3e6c7be2fbb17c207a4023fefabb9f4d44a46dc0690986f586ce24de649aa801",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.28/firmware.bin",
+  "source_commit": "8a461051b350f03b65c15b4b70f4cbf211d125ad",
+  "core": "esp32-bluepad32:esp32@4.1.0",
+  "credentials_compiled": false,
+  "partitions_verified": true,
+  "return_requires": "Menu 0.0.22 or 0.0.27 plus verified NVS return anchor",
+  "wifi_started": false
+}
