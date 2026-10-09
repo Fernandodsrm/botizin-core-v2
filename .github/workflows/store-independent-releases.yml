@@ -17,8 +17,8 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           github-token: ${{ github.token }}
-          run-id: 37969626658
-          name: botizin-ps4-e8d05867f72dc7d106a95d601bc1ecada10e024f
+          run-id: 37972496338
+          name: botizin-ps4-9284c388f06dec76369a82fdf4e9c2f32c43daf6
           path: artifact-ps4
       - name: Verify exact source, partitions, sizes and SHA256 before storing
         env:
