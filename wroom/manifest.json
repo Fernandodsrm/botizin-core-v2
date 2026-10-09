@@ -1,7 +1,7 @@
 {
   "board": "esp32-wroom-4mb",
-  "version": "0.0.21",
+  "version": "0.0.23",
   "size": 755024,
-  "sha256": "eb929d8cc58ccbbf90813df3837b267fbacc5bda29c04902c118fec397bd50e3",
-  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.21/firmware.bin"
+  "sha256": "d0b88834186518403a176894a820ab2b7a0bc54cf9de49fa3ae1271906b12113",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.23/firmware.bin"
 }
