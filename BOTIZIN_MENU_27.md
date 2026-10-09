@@ -50,3 +50,16 @@ the same custom widget; the dashboard/device/layout are preserved.
 Host tests cover navigation/OTA guards, timeout/rollover and lit geometry and
 all expressions across 100 random seeds. Cloud compilation additionally
 checks the classic ESP32 image, exact preserved partition table and slot fit.
+
+## Verified packages
+
+Menu 27: 1,276,448 bytes; OTA margin 34,272 bytes. SHA256:
+`dd949d04edbbbfa42455f0920303f23c2e089ba3e84ae4e5db3e6c9e4b0385d7`.
+PS4 28: 761,344 bytes. SHA256:
+`3e6c7be2fbb17c207a4023fefabb9f4d44a46dc0690986f586ce24de649aa801`.
+Both builds use exact source `8a461051b350f03b65c15b4b70f4cbf211d125ad`.
+Build runs 37976443043 (Menu) and 37976442937 (module) succeeded. Storage run
+37976808971 succeeded; public downloads were independently checked for size
+and SHA256. The live manifest now offers Menu 27 only. Physical validation
+of boot, animation smoothness, buttons, idle return and module return remains
+pending the user's hardware test.
