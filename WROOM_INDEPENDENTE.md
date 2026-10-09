@@ -93,3 +93,7 @@ Pendência do painel: distinguir módulo ativo com nuvem pausada de telemetria r
 Servo SG90: marrom→azul→GND dedicado; vermelho→verde→5V dedicado; laranja→amarelo→S de D14. Fernando confirmou leitura estável aproximadamente 5 V com pontas firmes, sem carga; capacidade da alimentação em movimento ainda não validada. Barramento V geral continua em 3,3 V.
 Teste 0.0.24 mantém Menu 22 intacto e retorno validado por digest/NVS. Servo inicia com sinal desativado; OK físico (GPIO25) ativa centro nominal 90°, cima27/baixo33 ajustam 5° por toque entre 60° e 120°, OK desativa pulsos; esquerda32 desativa pulsos antes do retorno. Desativar pulsos não corta alimentação elétrica. Não depende de controle PS4 conectado; PS4 continua acionando LED26.
 Teste de lógica host passou: bloqueio por retorno inválido, ausência de ativação automática, debounce, limites, desligamento e falha de driver. Compilação contra Bluepad32 4.1.0 corrigida para construtor C++11 explícito. Teste físico ainda pendente.
+
+### Pacote 24 publicado para teste manual
+
+Build 37968551099 (fonte 13de077384711772bc8d2174ff2ab33a2411ba8d) concluiu; armazenamento 37968766954 concluiu. Binário público baixado novamente: 760960 bytes, SHA256 29b71784dc7e142e58060faa899902aa1e4583e18f7134445330cc6ec2872ca2, margem do slot 549760 bytes. Manifesto principal oferece 24 no commit 226e0720e7cc09b7ef7a0cfad2634f2ffbd1c3b4. Menu 22 não foi alterado. Instalação física/servo ainda pendentes; nenhuma ordem RPC de instalação foi enviada.
