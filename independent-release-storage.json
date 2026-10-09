@@ -1,11 +1,17 @@
 {
-  "source_commit": "9284c388f06dec76369a82fdf4e9c2f32c43daf6",
+  "source_commit": "8a461051b350f03b65c15b4b70f4cbf211d125ad",
   "packages": [
     {
+      "path": "artifact-menu",
+      "version": "0.0.27",
+      "size": 1276448,
+      "sha256": "dd949d04edbbbfa42455f0920303f23c2e089ba3e84ae4e5db3e6c9e4b0385d7"
+    },
+    {
       "path": "artifact-ps4",
-      "version": "0.0.26",
-      "size": 761216,
-      "sha256": "899d0e6f1a92365a342776de2990f8ae8202cc02845fdcfc0ace5bea746b30b2"
+      "version": "0.0.28",
+      "size": 761344,
+      "sha256": "3e6c7be2fbb17c207a4023fefabb9f4d44a46dc0690986f586ce24de649aa801"
     }
   ]
 }
