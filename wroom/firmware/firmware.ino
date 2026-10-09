@@ -64,6 +64,7 @@ void showOtaProgress(const String &phase, size_t done = 0, size_t total = 0);
 #include "ota_confirmation.h"
 static void discardNavigation();
 #include "navigation_model.h"
+#include "face_state.h"
 
 bool manualWindowActive() { return otaManualUntil && (int32_t)(otaManualUntil - millis()) > 0; }
 bool candidateReady() { return !otaCandidateId.isEmpty() && manualWindowActive() && !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled; }
@@ -162,7 +163,9 @@ String snapshot() {
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
   s += "OLED: " + oledStatus + "\n";
-  s += "OLED_PAGE: " + String(oledMenu ? "MENU" : navLevel == 2 ? "DIAGNOSTIC_LIST" : oledPage == 7 ? "DIAGNOSTICS" : oledPage == 8 ? "CONNECTION" : oledPage == 9 ? "CONTROLS" : oledPage == 2 ? "OTA_WROOM" : "HELP") + "\n";
+  s += "FACE_FRAMES: " + String(faceFrames.load()) + "\n";
+  s += "FACE_MAX_GAP_MS: " + String(faceMaxGapMs.load()) + "\n";
+  s += "OLED_PAGE: " + String(faceActive.load() ? "BOTIZIN" : oledMenu ? "MENU" : navLevel == 2 ? "DIAGNOSTIC_LIST" : oledPage == 7 ? "DIAGNOSTICS" : oledPage == 8 ? "CONNECTION" : oledPage == 9 ? "CONTROLS" : oledPage == 2 ? "OTA_WROOM" : "HELP") + "\n";
   s += diagnosticText();
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
@@ -218,6 +221,7 @@ void failUpload(const String &reason) {
 }
 
 void beginUpload(const String &length, const String &sha) {
+    pauseFace();
     uploadOK = false;
     responseCode = 400;
     attempt = "";
@@ -511,7 +515,9 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "ota_journal", evidence.c_str()) &&
     cJSON_AddBoolToObject(root, "ota_automatic_enabled", otaAutomaticEnabled) &&
     cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str());
-  ok = ok && diagnosticJSON(root);
+  ok = ok && cJSON_AddBoolToObject(root,"face_active",faceActive.load()) &&
+    cJSON_AddNumberToObject(root,"face_frames",faceFrames.load()) &&
+    cJSON_AddNumberToObject(root,"face_max_gap_ms",faceMaxGapMs.load()) && diagnosticJSON(root);
   char *payload = ok ? cJSON_PrintUnformatted(root) : nullptr;
   cJSON_Delete(root);
   if (!payload) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
@@ -566,6 +572,9 @@ void printPartitionTable() {
 
 void setup() {
   Serial.begin(115200);
+  beginOled();
+  beginNavigation();
+  beginFaceTask();
   delay(1500);
   loadPS4Button();
   bool journalOK = journal.begin("wroom-journal", false);
@@ -614,8 +623,6 @@ void setup() {
   server.begin();
   maintainLocalName();
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
-  beginOled();
-  beginNavigation();
 }
 
 void loop() {
@@ -657,8 +664,7 @@ void loop() {
     pollPing();
   }
   pollNavigation();
-  refreshOled();
-  pollNavigation();
+  pollFaceIdle();
   refreshOled();
   delay(2);
 }

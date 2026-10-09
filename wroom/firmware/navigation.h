@@ -30,7 +30,12 @@ static void discardNavigation() {
 
 static void pollNavigation() {
   portENTER_CRITICAL(&navMux);uint8_t pending=navPending;navPending=0;portEXIT_CRITICAL(&navMux);
-  if(!pending||uploadActive||uploadOK||rebootScheduled||otaCheckQueued||otaInstallQueued)return;
+  if(!pending)return;
+  faceLastActivity=millis();
+  if(uploadActive||uploadOK||rebootScheduled||otaCheckQueued||otaInstallQueued)return;
+  if(faceActive.exchange(false)){
+    navLevel=0;navGroup=0;oledPage=0;oledMenu=true;oledDetail=false;nextOledRefresh=0;return;
+  }
   if(pending&4){
     if(oledDetail){oledDetail=false;}
     else if(oledPage==10){oledPage=2;}
@@ -62,4 +67,10 @@ static void pollNavigation() {
     }
   }
   oledMenu=navLevel==0;nextOledRefresh=0;
+}
+
+static void pollFaceIdle(){
+  bool busy=uploadActive||uploadOK||rebootScheduled||otaCheckQueued||otaInstallQueued||moduleStartQueued||candidateReady()||oledDetail;
+  if(busy){faceLastActivity=millis();return;}
+  if(faceIdleDue(millis(),faceLastActivity,false))faceActive.store(true);
 }

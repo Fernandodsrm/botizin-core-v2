@@ -10,7 +10,7 @@ using portMUX_TYPE=int;
 #define portEXIT_CRITICAL_ISR(x) ((void)x)
 #define portENTER_CRITICAL(x) ((void)x)
 #define portEXIT_CRITICAL(x) ((void)x)
-uint32_t millis(){return 1000;}
+uint32_t testNow=1000;uint32_t millis(){return testNow;}
 void pinMode(uint8_t,int){}
 void attachInterruptArg(uint8_t,void(*)(void*),void*,int){}
 struct SerialMock{void println(const char*){} template<typename... T>void printf(const char*,T...){} }Serial;
@@ -27,11 +27,25 @@ bool manualWindowActive(){return window;}
 bool queueOtaCheck(){++checks;return true;}
 bool confirmOta(const char*,const char*,const char*,const char*){++installs;return true;}
 void cancelOtaCheck(){++cancels;candidate=false;}
+#include "../firmware/face_state.h"
+bool moduleStartQueued=false;
 #include "../firmware/navigation_model.h"
 #include "../firmware/navigation.h"
 void press(uint8_t p){navPending=p;pollNavigation();}
 int main(){
  beginNavigation();discardNavigation();
+ // The first press dismisses the character, never selects or installs.
+ assert(faceActive.load());press(1);assert(!faceActive.load()&&navLevel==0&&checks==0);
+ testNow=30999;pollFaceIdle();assert(!faceActive.load());
+ testNow=31000;pollFaceIdle();assert(faceActive.load());
+ press(4);assert(!faceActive.load()&&navLevel==0);
+ testNow=62000;uploadActive=true;pollFaceIdle();assert(!faceActive.load());uploadActive=false;
+ testNow=91999;pollFaceIdle();assert(!faceActive.load());testNow=92000;pollFaceIdle();assert(faceActive.load());
+ press(8);assert(navLevel==0&&oledMenuChoice==0&&!faceActive.load());
+ candidate=true;testNow+=30000;pollFaceIdle();assert(!faceActive.load());candidate=false;
+ oledDetail=true;testNow+=30000;pollFaceIdle();assert(!faceActive.load());oledDetail=false;
+ assert(!faceIdleDue(20000,0xfffffff0u,false));assert(faceIdleDue(30000,0xfffffff0u,false));
+
  // Local connection opens directly, with no board selector.
  press(1);assert(navLevel==3&&oledPage==8);press(8);assert(oledPage==8);press(4);assert(navLevel==0);
  // Diagnostics category back returns directly to root.

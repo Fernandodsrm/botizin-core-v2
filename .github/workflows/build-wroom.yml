@@ -48,6 +48,10 @@ jobs:
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/navigation_test.cpp -o /tmp/navigation-test
           /tmp/navigation-test
+      - name: Validate procedural face geometry and expression variety
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/face_engine_test.cpp -o /tmp/face-test
+          /tmp/face-test
       - name: Compile and validate firmware package
         run: python3 ci/build_wroom.py
       - name: Save firmware, manifest, ELF and logs

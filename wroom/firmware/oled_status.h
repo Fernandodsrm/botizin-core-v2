@@ -1,11 +1,24 @@
 #pragma once
 #include <Wire.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/semphr.h>
+#include "face_engine.h"
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
 // Existing V5 wiring. Display failures disable only this optional display.
 static Adafruit_SSD1306 oled(128, 64, &Wire, -1, 400000, 400000);
 static bool oledReady = false;
+static SemaphoreHandle_t oledMutex=nullptr;
+// One owner at a time for the framebuffer AND the entire I2C transaction.
+class OledLock {
+  bool held;
+public:
+  OledLock():held(oledMutex && xSemaphoreTake(oledMutex,pdMS_TO_TICKS(100))==pdTRUE){}
+  ~OledLock(){if(held)xSemaphoreGive(oledMutex);}
+  operator bool() const{return held;}
+};
 static uint32_t nextOledRefresh = 0;
 
 static bool oledPresent() {
@@ -47,7 +60,7 @@ static void diagnosticPage(){
   }else if(navDiagnostic==2){
     oledLine(2,"Tela max "+diagnosticMs(diagnosticOps[DIAG_OLED].maxUs));
     oledLine(3,"Coleta max "+diagnosticMs(diagnosticOps[DIAG_SAMPLE].maxUs));
-    oledLine(4,"Tela: ate 1 vez/s");
+    oledLine(4,"Rosto: alvo 16 fps");
     oledLine(5,"Coleta: a cada 5s");oledLine(6,"Max desde reinicio");
   }else{
     uint32_t uptime=diagnosticUptime();
@@ -57,9 +70,11 @@ static void diagnosticPage(){
   }
 }
 static void refreshOled() {
-  if(!oledReady||uploadActive||uploadOK||rebootScheduled||(int32_t)(millis()-nextOledRefresh)<0)return;
+  if(!faceDisplayEnabled.load()&&oledReady){oledReady=false;faceDisplayEnabled.store(false);oledStatus="PAUSED_I2C_ERROR";}
+  if(faceActive.load()||!oledReady||uploadActive||uploadOK||rebootScheduled||(int32_t)(millis()-nextOledRefresh)<0)return;
+  OledLock lock;if(!lock)return;
   nextOledRefresh=millis()+1000;DiagnosticScope diagnosticScope(DIAG_OLED);
-  if(!oledPresent()){oledReady=false;oledStatus="PAUSED_I2C_ERROR";diagnosticScope.failed=true;return;}
+  if(!oledPresent()){oledReady=false;faceDisplayEnabled.store(false);oledStatus="PAUSED_I2C_ERROR";diagnosticScope.failed=true;return;}
   oled.clearDisplay();
   const char *areas[]={"Conexoes","Diagnostico","Atualizacoes"};
   if(navLevel==0){
@@ -86,7 +101,7 @@ static void refreshOled() {
     const esp_partition_t *run=esp_ota_get_running_partition();
     oledLine(0,"AMBIENTES WROOM");oledLine(1,oledDetail?"INICIAR PS4?":"Dois slots OTA");
     oledLine(2,String(run?run->label:"?")+": Menu "+BOTIZIN_VERSION);
-    oledLine(3,String(modulePartition?modulePartition->label:"?")+": "+(moduleAvailable?"PS4 0.0.23":"Sem modulo confirmado"));
+    oledLine(3,String(modulePartition?modulePartition->label:"?")+": "+(moduleAvailable?"PS4 0.0.28":"Sem modulo confirmado"));
     oledLine(5,moduleAvailable?(oledDetail?"Direita: confirmar":"Direita: iniciar PS4"):"Instale pelo painel");
     oledLine(6,"Esquerda: voltar OTA");
   } else if (oledPage == 2) {
@@ -99,9 +114,11 @@ static void refreshOled() {
   }
 
   oled.display();
-  if(!oledPresent()){oledReady=false;oledStatus="PAUSED_I2C_ERROR";diagnosticScope.failed=true;}
+  if(!oledPresent()){oledReady=false;faceDisplayEnabled.store(false);oledStatus="PAUSED_I2C_ERROR";diagnosticScope.failed=true;}
 }
 static void beginOled() {
+  oledMutex=xSemaphoreCreateMutex();
+  if(!oledMutex){oledStatus="SKIPPED_NO_MUTEX";return;}
   // I2C timeout bounds each transaction; no reset or flash writes on failure.
   if (!Wire.begin(21, 22, 400000)) {
     oledStatus = "I2C_INIT_FAILED";
@@ -110,7 +127,7 @@ static void beginOled() {
     if (!oledPresent()) oledStatus = "NOT_FOUND_0x3C";
     else if (ESP.getFreeHeap() < 82000) oledStatus = "SKIPPED_LOW_HEAP";
     else if (!oled.begin(SSD1306_SWITCHCAPVCC, 0x3c, false, false)) oledStatus = "INIT_FAILED";
-    else { oledReady = true; oledStatus = "READY_128x64_SDA21_SCL22"; }
+    else { oledReady = true; faceDisplayEnabled.store(true); oledStatus = "READY_128x64_SDA21_SCL22"; }
   }
   Serial.println("OLED: " + oledStatus);
   if (oledReady) {
@@ -121,8 +138,10 @@ static void beginOled() {
 
 // OTA runs sequentially on loopTask. Bounded OLED writes only at progress checkpoints.
 void showOtaProgress(const String &phase, size_t done, size_t total) {
+  pauseFace();
   if (!oledReady) return;
-  if (!oledPresent()) { oledReady = false; oledStatus = "PAUSED_I2C_ERROR"; return; }
+  OledLock lock;if(!lock)return;
+  if (!oledPresent()) { oledReady = false; faceDisplayEnabled.store(false); oledStatus = "PAUSED_I2C_ERROR"; return; }
   oled.clearDisplay();
   oledLine(0, "ATUALIZANDO WROOM");
   oledLine(1, "Botoes: bloqueados");
@@ -134,4 +153,40 @@ void showOtaProgress(const String &phase, size_t done, size_t total) {
   }
   oledLine(6, "Nao desligue a placa");
   oled.display();
+}
+
+// This task owns only the face and OLED. TLS, flash, navigation and Strings stay on loopTask.
+static void faceTask(void *){
+  BotizinFace face(esp_random());
+  TickType_t lastWake=xTaskGetTickCount();
+  uint32_t lastFrame=0;bool wasActive=false;
+  for(;;){
+    bool active=faceActive.load()&&faceDisplayEnabled.load();
+    if(active){
+      OledLock lock;
+      if(lock && faceActive.load() && faceDisplayEnabled.load()){
+        uint32_t now=millis();
+        if(!oledPresent()){faceDisplayEnabled.store(false);}
+        else{
+          face.draw(oled,now);oled.display();
+          if(!oledPresent())faceDisplayEnabled.store(false);
+          else{
+            faceFrames.fetch_add(1);
+            if(wasActive && lastFrame){uint32_t gap=now-lastFrame;if(gap>faceMaxGapMs.load())faceMaxGapMs.store(gap);}
+            lastFrame=now;
+          }
+        }
+      }
+    }
+    wasActive=active;
+    // Start the next deadline from now after a long pause; never burst to catch up.
+    if(xTaskGetTickCount()-lastWake>pdMS_TO_TICKS(124))lastWake=xTaskGetTickCount();
+    vTaskDelayUntil(&lastWake,pdMS_TO_TICKS(62));
+  }
+}
+static void beginFaceTask(){
+  faceLastActivity=millis();
+  if(oledReady && xTaskCreatePinnedToCore(faceTask,"botizin-face",4096,nullptr,1,nullptr,1)!=pdPASS){
+    faceActive.store(false);oledStatus="FACE_TASK_FAILED_MENU_READY";nextOledRefresh=0;
+  }
 }
