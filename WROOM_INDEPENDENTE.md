@@ -75,3 +75,11 @@ O campo published:false do build-record do Menu é o registro original da etapa 
 A oferta pública continua na versão 0.0.21. Não substituir diretamente por 23: o PS4 23 exige retorno íntegro ao Menu 22.
 Sequência de implantação: colocar a WROOM no menu atual, conferir estado VALID, instalar Menu 22, observar novo boot/telemetria; só então oferecer PS4 23 e comprovar retorno ao Menu 22.
 A sessão do ThingsBoard ainda solicita login; painel preparado ainda não foi aplicado online. Nenhuma placa foi atualizada nesta etapa.
+
+## Primeiro boot físico do Menu 22 — 09/10/2026
+
+Fernando forneceu /status às 13:41 (America/Sao_Paulo): versão 0.0.22, boot 5dd84950e4640e33, uptime 46 s, reset SOFTWARE, app0/ota_0 rodando e selecionada para boot, estado VALID. Wi-Fi OK, mDNS READY, OTA READY, OLED MENU e TELEMETRY HTTP_200. Nenhum campo S3 ou contador de consultas ao peer permanece no status.
+A gravação local a partir do Menu 20 escreveu 1270976 bytes, com SHA recebido e lido da flash f33bad604443e37a878099920f4d65020e8c920685dd6c6c98fbd3f31f0686e9 e Update.end TRUE, sem erro.
+Margem OTA confirmada: 39744 bytes (antes 17488; ganho 22256). RAM livre 160556, mínima 95912, maior bloco 110580. Pico do ciclo 2422069 us, RPC 2390416 us, nuvem 1328918 us. Estes são valores de um boot curto; não demonstram melhora sustentada de RAM ou latência frente ao boot anterior de 464 s.
+Atualizações automáticas permanecem desligadas. Após esta confirmação, main/wroom/manifest.json passou a oferecer PS4 23 no commit 8c953835926a71856c643e0e16a90a9eb5ea6b3f. A instalação depende de consulta e confirmação manual pelo Fernando; não foi enviado comando de instalação remota.
+Próximo teste pendente: instalar 23 pela consulta ao GitHub no menu, parear PS4, testar LED, retornar fisicamente ao Menu 22 e reiniciar módulo já instalado pelo menu de slots. O módulo substituirá o antigo Menu 20 em app1; Menu 22 permanecerá em app0. Painel ThingsBoard revisado ainda não aplicado por falta de autenticação.
