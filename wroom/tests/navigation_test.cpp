@@ -71,7 +71,7 @@ int main(){
  press(1);assert(prepares==1&&oledDetail&&otaEnvironment=="servo");press(4);assert(oledPage==11&&!oledDetail);
  press(1);assert(prepares==2&&oledDetail);press(1);assert(installs==2);
  press(4);assert(oledPage==10);press(2);press(1);assert(catalogChoice==1&&oledPage==11);
- moduleAvailable=true;press(8);assert(prepares==3&&otaEnvironment=="ps4"&&oledDetail);press(1);assert(installs==3);clearOtaCandidate();press(1);assert(oledDetail&&moduleStarts==0);press(1);assert(moduleStarts==1);
+ moduleAvailable=true;press(8);candidate=false;press(1);assert(moduleStarts==0&&!oledDetail&&otaEnvironment.empty());press(8);assert(prepares==4&&otaEnvironment=="ps4"&&oledDetail);press(1);assert(installs==3);clearOtaCandidate();press(1);assert(oledDetail&&moduleStarts==0);press(1);assert(moduleStarts==1);
  press(4);assert(oledPage==10);press(4);assert(navLevel==0);
  oledMenuChoice=0;press(2);assert(oledMenuChoice==3);press(8);assert(oledMenuChoice==0);
  puts("NAVIGATION_TREE_OK: hierarchy, fixed button roles, expiry and explicit install confirmation");

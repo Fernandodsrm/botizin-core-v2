@@ -58,7 +58,7 @@ static void pollNavigation() {
     auto &e=environments[catalogChoice-1];
     if((pending&8)&&moduleAvailable&&moduleId==e.id){oledDetail=prepareEnvironment(e.id);}
     else if(pending&1){
-      if(oledDetail&&candidateReady()&&otaEnvironment==e.id){confirmOta(otaCandidateId,otaTargetVersion,otaTargetSHA,telemetryBootId);oledDetail=false;}
+      if(oledDetail&&otaEnvironment==e.id){if(candidateReady())confirmOta(otaCandidateId,otaTargetVersion,otaTargetSHA,telemetryBootId);else clearOtaCandidate();oledDetail=false;}
       else if(moduleAvailable&&moduleId==e.id){if(!oledDetail)oledDetail=true;else{queueModuleStart(telemetryBootId,moduleSHA);oledDetail=false;}}
       else{oledDetail=prepareEnvironment(e.id);}
     }

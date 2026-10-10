@@ -108,8 +108,9 @@ static void refreshOled() {
   } else if(oledPage==11 && catalogChoice>0 && catalogChoice<=environmentCount){
     auto &e=environments[catalogChoice-1];bool installed=moduleAvailable&&moduleId==e.id;
     oledLine(0,e.title);oledLine(1,"Versao "+(installed&&otaEnvironment!=e.id?moduleVersion:e.version));
-    oledLine(2,installed?"Instalado: abre offline":e.bytes?"Disponivel para baixar":"Atualize a lista");
-    oledLine(3,installed?"Menu sera preservado":"Substitui outro slot");
+    bool downloadPrepared=oledDetail&&otaEnvironment==e.id;
+    oledLine(2,downloadPrepared?"Baixar esta versao?":installed?"Instalado: abre offline":e.bytes?"Disponivel para baixar":"Atualize a lista");
+    oledLine(3,installed&&!downloadPrepared?"Menu sera preservado":"Substitui outro slot");
     oledLine(4,installed?"Baixo: baixar/atual.":"Atual: "+(moduleAvailable?moduleId:String("sem ambiente")));
     oledLine(5,oledDetail?"Direita: confirmar":installed?"Direita: abrir":"Direita: preparar");
     oledLine(6,"Esquerda: voltar");
