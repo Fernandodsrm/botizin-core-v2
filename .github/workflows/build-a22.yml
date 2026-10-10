@@ -1,0 +1,53 @@
+name: Build A22 Expresso environment
+
+on:
+  push:
+    branches: [wroom-cloud-build, wroom-peer-discovery-20261008, wroom-ota-menu-20261008, wroom-independente-20261009]
+    paths:
+      - 'wroom/a22-expresso/**'
+      - 'wroom/tests/a22_expresso_test.cpp'
+      - 'ci/build_a22.py'
+      - '.github/workflows/build-a22.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install Arduino CLI 1.5.1
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Install exact ESP32 core 3.3.12
+        run: |
+          arduino-cli version
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - name: Install pinned OLED libraries
+        run: |
+          arduino-cli lib update-index
+          arduino-cli lib install "Adafruit BusIO@1.17.4" --no-deps
+          arduino-cli lib install "Adafruit GFX Library@1.12.6" --no-deps
+          arduino-cli lib install "Adafruit SSD1306@2.5.17" --no-deps
+      - name: Validate expression commands, expiry and geometry
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/a22_expresso_test.cpp -o /tmp/a22-test
+          /tmp/a22-test
+      - name: Compile and validate firmware package
+        run: python3 ci/build_a22.py
+      - name: Save firmware, manifest, ELF and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: botizin-a22-${{ github.sha }}
+          path: dist-a22/
+          if-no-files-found: error
+          retention-days: 30
