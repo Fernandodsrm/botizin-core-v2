@@ -6,7 +6,7 @@ def api(path,body=None,method=None):
     return json.load(urllib.request.urlopen(req,timeout=30))
 def main():
     activation=json.loads(pathlib.Path('independent-release-storage.json').read_text())
-    entries=[]
+    entries=[];environments=[]
     for p in activation['packages']:
         candidates=[x for x in pathlib.Path(p['path']).rglob('manifest.json') if json.loads(x.read_text()).get('version')==p['version']]
         assert len(candidates)==1
@@ -14,12 +14,16 @@ def main():
         binary=next(x for x in [d/'firmware.ino.bin',d/'firmware.bin'] if x.is_file())
         content=binary.read_bytes();assert len(content)==p['size'] and hashlib.sha256(content).hexdigest()==p['sha256']
         m=json.loads(manifest.read_text());assert m['size']==p['size'] and m['sha256']==p['sha256']
-        record=json.loads((d/'build-record.json').read_text());assert record['source_commit']==activation['source_commit'] and record['partitions_verified']
+        record=json.loads((d/'build-record.json').read_text());assert record['source_commit']==p.get('source_commit',activation['source_commit']) and record['partitions_verified']
         blob=api('/git/blobs',{'content':base64.b64encode(content).decode(),'encoding':'base64'})
+        if 'environment_id' in p:
+            assert m['board']=='esp32-wroom-4mb' and m['url']=='https://raw.githubusercontent.com/'+REPO+'/main/wroom/releases/'+p['version']+'/firmware.bin'
+            environments.append({**m,'id':p['environment_id'],'title':p['title'],'return_protocol':2})
         prefix='wroom/releases/'+p['version']+'/'
         entries.append({'path':prefix+'firmware.bin','mode':'100644','type':'blob','sha':blob['sha']})
         for name in ['manifest.json','build-record.json']:
             entries.append({'path':prefix+name,'mode':'100644','type':'blob','content':(d/name).read_text()})
+    if environments:entries.append({'path':'wroom/catalog.json','mode':'100644','type':'blob','content':json.dumps({'schema':1,'environments':environments},indent=2)+'\n'})
     before=api('/git/ref/heads/main')['object']['sha']
     base=api('/git/commits/'+before)['tree']['sha']
     tree=api('/git/trees',{'base_tree':base,'tree':entries})
