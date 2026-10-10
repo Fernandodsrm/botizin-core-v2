@@ -17,14 +17,14 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           github-token: ${{ github.token }}
-          run-id: 37976443043
-          name: botizin-wroom-8a461051b350f03b65c15b4b70f4cbf211d125ad
+          run-id: 38038677846
+          name: botizin-wroom-67163f4665c3633bea6cb7c253e4183924d84d4e
           path: artifact-menu
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           github-token: ${{ github.token }}
-          run-id: 37976442937
-          name: botizin-ps4-8a461051b350f03b65c15b4b70f4cbf211d125ad
+          run-id: 38038303027
+          name: botizin-ps4-8f2c81ffd85e17b0c72c1d52a397981017aa6ed0
           path: artifact-ps4
       - name: Verify exact source, partitions, sizes and SHA256 before storing
         env:
