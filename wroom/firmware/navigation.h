@@ -56,9 +56,10 @@ static void pollNavigation() {
     }
   }else if(oledPage==11 && catalogChoice>0 && catalogChoice<=environmentCount){
     auto &e=environments[catalogChoice-1];
-    if(pending&1){
-      if(moduleAvailable&&moduleId==e.id){if(!oledDetail)oledDetail=true;else{queueModuleStart(telemetryBootId,moduleSHA);oledDetail=false;}}
-      else if(oledDetail&&candidateReady()&&otaEnvironment==e.id){confirmOta(otaCandidateId,otaTargetVersion,otaTargetSHA,telemetryBootId);oledDetail=false;}
+    if((pending&8)&&moduleAvailable&&moduleId==e.id){oledDetail=prepareEnvironment(e.id);}
+    else if(pending&1){
+      if(oledDetail&&candidateReady()&&otaEnvironment==e.id){confirmOta(otaCandidateId,otaTargetVersion,otaTargetSHA,telemetryBootId);oledDetail=false;}
+      else if(moduleAvailable&&moduleId==e.id){if(!oledDetail)oledDetail=true;else{queueModuleStart(telemetryBootId,moduleSHA);oledDetail=false;}}
       else{oledDetail=prepareEnvironment(e.id);}
     }
   }else if(oledPage==2){

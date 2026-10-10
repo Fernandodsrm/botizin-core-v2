@@ -24,3 +24,6 @@ O retorno ao Botizin restabelece Wi-Fi, telemetria e comandos do painel.
 Verificações: navegação, vinculação de confirmação a boot/versão/SHA/prazo, diagnóstico e geometria do rosto;
 teste do controlador do painel incluindo catálogo, candidata de ambiente e confirmação exata.
 Compilação com partições existentes e SHA do pacote; teste físico de ida e volta ainda necessário.
+
+No detalhe de um ambiente instalado, baixo prepara download/atualização; direita confirma.
+Direita, sem preparação de download, abre a versão já instalada offline.
