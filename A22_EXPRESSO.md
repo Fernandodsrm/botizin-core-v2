@@ -32,3 +32,13 @@ Serviços de voz, memória e processamento no A22 ficam para a etapa seguinte.
 
 Teste físico informado pelo Fernando: abriu ambientes LED/servo e voltou ao menu; relatou melhora de estabilidade com WROOM independente.
 Isso confirma o fluxo anterior; o teste físico de A22 Expresso ainda está pendente.
+
+## Verificação automatizada
+
+Testes de todas as expressões, duração de oito segundos, retorno automático e relógio atravessando rollover passaram.
+O teste executa o JavaScript real da página e confere comando, confirmação aplicada, falha de rede e retorno ao menu.
+Compilação: Arduino core 3.3.12, bibliotecas OLED fixadas e validação das partições existentes, sem apagamento de flash.
+
+Compilação aprovada: run 38073862432, fonte 91c536adc74dd31e6607de16ff6f874a2126090a.
+Binário: 1.021.696 bytes; margem no slot: 289.024 bytes.
+SHA256: fb10267fcd5ae321bf41c236119a2b2d60adc434369eacf6930904c7f7d83419.
