@@ -65,10 +65,11 @@ void showOtaProgress(const String &phase, size_t done = 0, size_t total = 0);
 static void discardNavigation();
 #include "navigation_model.h"
 #include "face_state.h"
+#include "catalog_state.h"
 
 bool manualWindowActive() { return otaManualUntil && (int32_t)(otaManualUntil - millis()) > 0; }
-bool candidateReady() { return !otaCandidateId.isEmpty() && manualWindowActive() && !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled; }
-void clearOtaCandidate() { otaCandidateId = ""; otaTargetVersion = ""; otaTargetURL = ""; otaTargetSHA = ""; otaTargetBytes = 0; }
+bool candidateReady() { return !otaCandidateId.isEmpty() && manualWindowActive() && !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled && !catalogRefreshQueued; }
+void clearOtaCandidate() { otaEnvironment=""; otaCandidateId = ""; otaTargetVersion = ""; otaTargetURL = ""; otaTargetSHA = ""; otaTargetBytes = 0; }
 bool queueOtaCheck() {
   if (!otaReady || internetStopped || otaCheckQueued || otaInstallQueued || uploadActive || uploadOK || rebootScheduled) return false;
   clearOtaCandidate(); otaManualUntil = millis() + 300000;
@@ -165,7 +166,9 @@ String snapshot() {
   s += "OLED: " + oledStatus + "\n";
   s += "FACE_FRAMES: " + String(faceFrames.load()) + "\n";
   s += "FACE_MAX_GAP_MS: " + String(faceMaxGapMs.load()) + "\n";
-  s += "OLED_PAGE: " + String(faceActive.load() ? "BOTIZIN" : oledMenu ? "MENU" : navLevel == 2 ? "DIAGNOSTIC_LIST" : oledPage == 7 ? "DIAGNOSTICS" : oledPage == 8 ? "CONNECTION" : oledPage == 9 ? "CONTROLS" : oledPage == 2 ? "OTA_WROOM" : "HELP") + "\n";
+  s += "ENVIRONMENT_INSTALLED: " + (moduleAvailable?moduleId:String("NONE")) + "\n";
+  s += "CATALOG_STATUS: " + catalogStatus + "\n";
+  s += "OLED_PAGE: " + String(faceActive.load() ? "BOTIZIN" : oledMenu ? "MENU" : navLevel == 2 ? "DIAGNOSTIC_LIST" : oledPage == 7 ? "DIAGNOSTICS" : oledPage == 8 ? "CONNECTION" : oledPage == 9 ? "CONTROLS" : oledPage == 2 ? "OTA_WROOM" : oledPage==10||oledPage==11 ? "ENVIRONMENTS" : "HELP") + "\n";
   s += diagnosticText();
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
@@ -207,6 +210,7 @@ bool hashPartition(const esp_partition_t *p, size_t size, String &result) {
 }
 
 #include "module_bridge.h"
+#include "environment_catalog.h"
 
 void failUpload(const String &reason) {
   logLine("FAIL: " + reason);
@@ -399,7 +403,7 @@ void checkInternetOTA(bool manual) {
     internetStatus = "UP_TO_DATE " + targetVersion;
     Serial.println("INTERNET_OTA: " + internetStatus); return;
   }
-  if (!newerVersion(targetVersion)) {
+  if ((otaEnvironment.isEmpty() && !newerVersion(targetVersion))) {
     stopInternet("manifest version is invalid or older"); return;
   }
   if (manual) {
@@ -412,7 +416,7 @@ void checkInternetOTA(bool manual) {
 }
 
 void installInternetOTA(const String &targetVersion, const String &targetURL, const String &targetSHA, size_t targetBytes) {
-  if (!otaReady || internetStopped || uploadActive || uploadOK || rebootScheduled || WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000 || !newerVersion(targetVersion)) {
+  if (!otaReady || internetStopped || uploadActive || uploadOK || rebootScheduled || WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000 || (otaEnvironment.isEmpty() && !newerVersion(targetVersion))) {
     manualOtaStatus = "INSTALL_REJECTED"; return;
   }
   showOtaProgress("ABRINDO DOWNLOAD");
@@ -437,6 +441,7 @@ void installInternetOTA(const String &targetVersion, const String &targetURL, co
   beginUpload(String(targetBytes), targetSHA);
   logLine("TRANSPORT: HTTPS / authenticated CA bundle");
   logLine("TARGET_VERSION: " + targetVersion);
+  if(!otaEnvironment.isEmpty())logLine("ENVIRONMENT_ID: "+otaEnvironment);
   checkpoint();
   if (!uploadActive) {
     download.end(); stopInternet("Update.begin/SHA rejected; inspect journal"); return;
@@ -471,6 +476,9 @@ void installInternetOTA(const String &targetVersion, const String &targetURL, co
   showOtaProgress("VERIFICANDO SHA256", writtenBytes, expectedBytes);
   if (uploadActive) finishUpload();
   if (!uploadOK) { stopInternet("download/write verification failed; no retry or reboot"); return; }
+  if(!otaEnvironment.isEmpty() && !saveInstalledEnvironment(otaEnvironment,targetVersion,targetSHA,targetBytes,destination)) {
+    esp_ota_set_boot_partition(originalBoot);uploadOK=false;manualOtaStatus="ENVIRONMENT_RECORD_FAILED";return;
+  }
   internetStatus = "VERIFIED " + targetVersion + "; REBOOT_PENDING";
   manualOtaStatus = "VERIFIED_REBOOT_PENDING";
   showOtaProgress("SHA OK REINICIANDO", writtenBytes, expectedBytes);
@@ -499,6 +507,8 @@ void __attribute__((noinline)) sendTelemetry() {
   bool ok = cJSON_AddStringToObject(root, "origin", "ESP32_REAL") &&
     cJSON_AddBoolToObject(root, "simulated", false) &&
     cJSON_AddStringToObject(root, "firmware_version", BOTIZIN_VERSION) &&
+    cJSON_AddStringToObject(root,"installed_environment",moduleAvailable?moduleId.c_str():"") &&
+    cJSON_AddStringToObject(root,"catalog_status",catalogStatus.c_str()) &&
     cJSON_AddStringToObject(root,"wifi_ip",WiFi.localIP().toString().c_str()) &&
     cJSON_AddStringToObject(root,"local_name",BOTIZIN_LOCAL_NAME ".local") &&
     cJSON_AddBoolToObject(root,"mdns_ready",localNameReady) &&
@@ -580,6 +590,7 @@ void setup() {
   bool journalOK = journal.begin("wroom-journal", false);
   if (journalOK) priorAttempt = journal.getString("last", "");
   else Serial.println("JOURNAL_OPEN_FAILED");
+  loadCatalog();
   loadInstalledModule();
   printPartitionTable();
   const esp_partition_t *a = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, nullptr);
@@ -633,11 +644,13 @@ void loop() {
   pollNavigation();
   pollProvisioning(uploadActive || uploadOK || rebootScheduled);
   server.handleClient();
+  if(catalogRefreshQueued && !uploadActive && !uploadOK && !rebootScheduled && !otaInstallQueued && !otaCheckQueued){catalogRefreshQueued=false;checkCatalog();discardNavigation();nextOledRefresh=0;nextTelemetry=millis();}
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
   if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued) {
     String version = otaTargetVersion, url = otaTargetURL, sha = otaTargetSHA;
     size_t bytes = otaTargetBytes;
-    otaInstallQueued = false; clearOtaCandidate(); otaManualUntil = 0;
+    String environment=otaEnvironment;
+    otaInstallQueued = false; clearOtaCandidate(); otaEnvironment=environment; otaManualUntil = 0;
     installInternetOTA(version, url, sha, bytes);
   }
   if (!rebootScheduled && !uploadActive && !uploadOK && otaCheckQueued) {

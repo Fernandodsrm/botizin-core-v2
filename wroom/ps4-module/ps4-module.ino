@@ -1,5 +1,8 @@
 #include <Arduino.h>
+#include "environment_build.h"
+#if ENVIRONMENT_KIND==0
 #include <Bluepad32.h>
+#endif
 #include <Preferences.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
@@ -12,9 +15,11 @@
 
 // Full independent Bluetooth firmware: no Wi-Fi, HTTP, TLS or OTA writer.
 static constexpr uint8_t ledPin=26,backPin=32;
-static constexpr const char *moduleVersion="0.0.28";
+static constexpr const char *moduleVersion=ENVIRONMENT_VERSION;
 static Adafruit_SSD1306 oled(128,64,&Wire,-1,400000,400000);
+#if ENVIRONMENT_KIND==0
 static ControllerPtr controller=nullptr;
+#endif
 static bool returnReady=false,oledReady=false,ledOn=false;
 static uint8_t ledButton=1;
 static std::atomic<bool> returnPressed{false};
@@ -68,6 +73,7 @@ static int servoTarget(int axis) {
  if(axis>=-35&&axis<=35)return 90;
  return constrain(90+(axis*90)/512,0,180);
 }
+#if ENVIRONMENT_KIND==0
 static void pollPS4Servo() {
  bool ok=buttonPressed(servoButtons[0]);
  // Consume the local navigation buttons without moving the servo in this mode.
@@ -91,6 +97,8 @@ static void pollPS4Servo() {
  if(delta&&!writeServo(servoAngle+delta))servoInhibited=true;
 }
 
+#endif
+
 static String digestHex(const unsigned char *bytes) {
  char text[65];for(unsigned i=0;i<32;++i)snprintf(text+i*2,3,"%02x",bytes[i]);text[64]=0;return String(text);
 }
@@ -100,7 +108,7 @@ static bool armMenuReturn() {
    !((run->address==0x10000&&menu->address==0x150000)||(run->address==0x150000&&menu->address==0x10000))) {returnError="PARTITIONS";return false;}
  Preferences p;if(!p.begin("module-return",true)){returnError="NO_MENU_RECORD";return false;}
  String record=p.getString("menu","");p.end();int first=record.indexOf('|'),second=record.indexOf('|',first+1);
- if(first<1||second!=first+65||(record.substring(second+1)!="0.0.22"&&record.substring(second+1)!="0.0.27")||record.substring(0,first).toInt()!=(long)menu->address){returnError="WRONG_MENU_RECORD";return false;}
+ if(first<1||second!=first+65||(record.substring(second+1).isEmpty()||record.substring(second+1).length()>16)||record.substring(0,first).toInt()!=(long)menu->address){returnError="WRONG_MENU_RECORD";return false;}
  unsigned char digest[32];
  if(esp_partition_get_sha256(menu,digest)!=ESP_OK||digestHex(digest)!=record.substring(first+1,second)){returnError="MENU_HASH";return false;}
  if(esp_ota_set_boot_partition(menu)!=ESP_OK){returnError="BOOT_SELECTION";return false;}
@@ -111,22 +119,31 @@ static bool armMenuReturn() {
 static void ARDUINO_ISR_ATTR backISR() {
  uint32_t now=millis();if((uint32_t)(now-lastBack)>=150){lastBack=now;returnPressed.store(true);}
 }
+#if ENVIRONMENT_KIND==0
 static void onConnected(ControllerPtr ctl) {if(!controller&&ctl->isGamepad()) controller=ctl;}
 static void onDisconnected(ControllerPtr ctl) {if(controller==ctl){controller=nullptr;servoL1=false;stopServo();}}
+#endif
 static void setLed(bool on) {ledOn=returnReady&&on;digitalWrite(ledPin,ledOn?HIGH:LOW);}
 static void line(uint8_t row,const String &text) {
  oled.setCursor(0,row<2?row*8:18+(row-2)*9);oled.print(text.substring(0,21));
 }
 static void drawScreen() {
  if(!oledReady)return;
- oled.clearDisplay();line(0,"BOTIZIN PS4 "+String(moduleVersion));line(1,returnReady?"Wi-Fi OFF | BT ON":"SAIDA BLOQUEADA");
+ oled.clearDisplay();line(0,String(ENVIRONMENT_TITLE)+" "+moduleVersion);line(1,returnReady?"Ambiente offline":"SAIDA BLOQUEADA");
  if(!returnReady){line(2,"Retorno nao validado");line(3,returnError);line(5,"LED permanece apagado");}
  else {
+#if ENVIRONMENT_KIND==0
   line(2,controller&&controller->isConnected()?"Controle conectado":"Parear: SHARE + PS");
   line(3,"Botoes: "+String(buttons,HEX)+" LED:"+(ledOn?"ON":"OFF"));
   line(4,"Servo D14: "+String(!servoReady?"ERRO":servoOn?String(servoAngle):"OFF"));
   line(5,"L1 + analogico dir.");
-  line(6,"Esquerda: voltar OTA");
+#else
+  line(2,ENVIRONMENT_KIND==1?"Servo D14":"LED D26");
+  line(3,ENVIRONMENT_KIND==1?String("Angulo: ")+servoAngle:String("LED: ")+(ledOn?"ON":"OFF"));
+  line(4,ENVIRONMENT_KIND==1?"Cima/baixo: 15 graus":"Direita: ligar/apagar");
+  line(5,ENVIRONMENT_KIND==1?"Direita: parar PWM":"Wi-Fi e BT desligados");
+#endif
+  line(6,"Esquerda: Botizin");
  }
  oled.display();
 }
@@ -138,11 +155,13 @@ void setup() {
  Wire.begin(21,22);Wire.setTimeOut(25);oledReady=oled.begin(SSD1306_SWITCHCAPVCC,0x3c);
  if(oledReady){oled.setTextSize(1);oled.setTextColor(SSD1306_WHITE);oled.setTextWrap(false);}
  returnReady=armMenuReturn();
- if(returnReady){servoReady=initServo();stopServo();}
+ if(returnReady&&ENVIRONMENT_KIND!=2){servoReady=initServo();stopServo();}
  Preferences p;if(p.begin("ps4-config",true)){uint8_t b=p.getUChar("led-button",1);p.end();if(b==1||b==2||b==4||b==8)ledButton=b;}
- Serial.println("BOTIZIN PS4 SERVO V0.0.28");
+ Serial.println(String(ENVIRONMENT_TITLE)+" V"+moduleVersion);
  Serial.println(servoReady?"SERVO_D14: READY_OFF":"SERVO_D14: DISABLED");Serial.println("MENU_RETURN: "+returnError);
+#if ENVIRONMENT_KIND==0
  if(returnReady) BP32.setup(&onConnected,&onDisconnected);
+#endif
  drawScreen();loopAt=micros();
 }
 void loop() {
@@ -151,6 +170,7 @@ void loop() {
   setLed(false);stopServo();
   if(returnReady){if(oledReady){oled.clearDisplay();line(0,"RETORNO CONFIRMADO");line(2,"Voltando ao OTA...");oled.display();}delay(750);esp_restart();}
  }
+#if ENVIRONMENT_KIND==0
  if(returnReady) {
   bool updated=BP32.update();
   if(updated&&controller&&controller->isConnected()&&controller->hasData()) {
@@ -160,6 +180,13 @@ void loop() {
   if(!controller||!controller->isConnected()||(uint32_t)(millis()-lastPacket)>1000){buttons=0;servoL1=false;setLed(false);}
  }
  pollPS4Servo();
+#else
+ bool ok=buttonPressed(servoButtons[0]),up=buttonPressed(servoButtons[1]),down=buttonPressed(servoButtons[2]);
+ if(returnReady){
+  if(ENVIRONMENT_KIND==1){if(ok)stopServo();else if(servoReady&&(up||down))writeServo(constrain(servoAngle+(up?15:-15),15,165));}
+  else if(ok)setLed(!ledOn);
+ }
+#endif
  if((int32_t)(millis()-nextScreen)>=0){nextScreen=millis()+250;drawScreen();}
  delay(1);
 }

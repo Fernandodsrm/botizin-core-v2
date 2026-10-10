@@ -2,9 +2,10 @@
 import hashlib,json,os,pathlib,re,shutil,struct,subprocess
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 FQBN='esp32-bluepad32:esp32:esp32:FlashSize=4M,FlashMode=dio,CPUFreq=240,EraseFlash=none'
-version=re.search(r'moduleVersion="([0-9.]+)"', (ROOT/'wroom/ps4-module/ps4-module.ino').read_text()).group(1)
-def main():
- source=ROOT/'wroom/ps4-module';out=ROOT/'ps4-output';out.mkdir(exist_ok=True)
+def build(version,kind,title):
+ source=ROOT/'environment-build'/version/'ps4-module';shutil.copytree(ROOT/'wroom/ps4-module',source,dirs_exist_ok=True)
+ (source/'environment_build.h').write_text('#pragma once\n#define ENVIRONMENT_KIND '+str(kind)+'\n#define ENVIRONMENT_VERSION "'+version+'"\n#define ENVIRONMENT_TITLE "'+title+'"\n')
+ out=ROOT/'ps4-output'/version;out.mkdir(parents=True,exist_ok=True)
  target=ROOT/'dist-ps4'/version;target.mkdir(parents=True,exist_ok=True)
  with (target/'compile.log').open('w') as log:
   p=subprocess.Popen(['arduino-cli','compile','--fqbn',FQBN,'--output-dir',str(out),str(source)],stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
@@ -21,6 +22,8 @@ def main():
  shutil.copy2(out/'ps4-module.ino.elf',target/'firmware.elf')
  manifest={'board':'esp32-wroom-4mb','version':version,'size':len(binary),'sha256':sha,'url':'https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/'+version+'/firmware.bin'}
  (target/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
- record={**manifest,'source_commit':os.environ.get('GITHUB_SHA'),'core':'esp32-bluepad32:esp32@4.1.0','credentials_compiled':False,'partitions_verified':True,'return_requires':'Menu 0.0.22 or 0.0.27 plus verified NVS return anchor','wifi_started':False}
+ record={**manifest,'source_commit':os.environ.get('GITHUB_SHA'),'core':'esp32-bluepad32:esp32@4.1.0','credentials_compiled':False,'partitions_verified':True,'return_requires':'Verified Menu NVS anchor, protocol 2','wifi_started':False}
  (target/'build-record.json').write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record),flush=True)
+def main():
+ for version,kind,title in [('0.0.30',0,'PS4 + servo'),('0.0.31',1,'Servo'),('0.0.32',2,'LED')]:build(version,kind,title)
 if __name__=='__main__':main()

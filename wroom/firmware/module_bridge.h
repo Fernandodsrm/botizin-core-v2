@@ -1,8 +1,5 @@
 #pragma once
 // Menu owns installation. A module may only boot the intact recorded Menu.
-static bool moduleStartQueued=false, moduleAvailable=false;
-static String moduleSHA; static size_t moduleBytes=0;
-static const esp_partition_t *modulePartition=nullptr;
 static String journalField(const String &body,const char *key) {
   String prefix=String(key)+": "; int at=body.indexOf(prefix);
   if(at<0 || (at>0 && body[at-1]!='\n')) return String();
@@ -18,11 +15,20 @@ static bool saveReturnAnchor() {
 }
 static void loadInstalledModule() {
   moduleAvailable=false; modulePartition=esp_ota_get_next_update_partition(nullptr);
-  if(!modulePartition || journalField(priorAttempt,"TARGET_VERSION")!="0.0.28") return;
-  moduleBytes=journalField(priorAttempt,"EXPECTED_BYTES").toInt();
-  moduleSHA=journalField(priorAttempt,"SHA_CALCULATED_FLASH"); String actual;
+  if(!modulePartition)return;
+  Preferences p;
+  if(p.begin("environment",true)){
+    moduleId=p.getString("id","");moduleVersion=p.getString("version","");moduleSHA=p.getString("sha","");moduleBytes=p.getUInt("bytes",0);
+    if(p.getUInt("address",0)!=modulePartition->address)moduleBytes=0;
+    p.end();
+  }
+  if(moduleId.isEmpty() && journalField(priorAttempt,"TARGET_VERSION")=="0.0.28"){
+    moduleId="ps4";moduleVersion="0.0.28";moduleBytes=journalField(priorAttempt,"EXPECTED_BYTES").toInt();
+    moduleSHA=journalField(priorAttempt,"SHA_CALCULATED_FLASH");
+  }
+  String actual;
   if(moduleBytes && moduleBytes<=modulePartition->size && moduleSHA.length()==64 &&
-     moduleSHA==journalField(priorAttempt,"SHA_EXPECTED") &&
+     !moduleId.isEmpty() &&
      hashPartition(modulePartition,moduleBytes,actual) && actual==moduleSHA) moduleAvailable=true;
 }
 static bool queueModuleStart(const String &boot,const String &sha) {
@@ -38,5 +44,5 @@ static void startInstalledModule() {
   }
   const esp_partition_t *boot=esp_ota_get_boot_partition();
   if(!boot || boot->address!=modulePartition->address) {manualOtaStatus="MODULE_BOOT_READBACK_FAILED";return;}
-  showOtaProgress("INICIANDO PS4");rebootScheduled=true;rebootAt=millis()+750;
+  showOtaProgress("ABRINDO AMBIENTE");rebootScheduled=true;rebootAt=millis()+750;
 }

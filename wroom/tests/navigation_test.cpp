@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cassert>
+#include <string>
 #define ARDUINO_ISR_ATTR
 #define INPUT_PULLUP 0
 #define FALLING 0
@@ -30,6 +31,11 @@ void cancelOtaCheck(){++cancels;candidate=false;}
 #include "../firmware/face_state.h"
 bool moduleStartQueued=false;
 #include "../firmware/navigation_model.h"
+struct Environment{std::string id;};Environment environments[]={{"ps4"},{"servo"},{"led"}};
+uint8_t catalogChoice=0,environmentCount=3;bool catalogRefreshQueued=false;std::string otaEnvironment,moduleId="ps4";
+bool catalogBusy(){return uploadActive||otaCheckQueued||otaInstallQueued||catalogRefreshQueued;}
+void clearOtaCandidate(){candidate=false;otaEnvironment="";}
+int prepares=0;bool prepareEnvironment(const std::string &id){if(catalogBusy())return false;otaEnvironment=id;candidate=true;++prepares;return true;}
 #include "../firmware/navigation.h"
 void press(uint8_t p){navPending=p;pollNavigation();}
 int main(){
@@ -58,10 +64,15 @@ int main(){
  press(1);candidate=false;press(1);assert(installs==0);candidate=true;oledDetail=false;press(1);press(1);assert(installs==1);
  press(8);press(1);assert(cancels==1);
  uploadActive=true;press(4);assert(navLevel==3);uploadActive=false;
- // Slot start also requires two explicit presses and can be cancelled.
- oledOtaChoice=3;press(1);assert(oledPage==10);press(1);assert(moduleStarts==0);
- moduleAvailable=true;press(1);assert(oledDetail);press(4);assert(!oledDetail&&oledPage==10);
- press(1);press(1);assert(moduleStarts==1);press(4);assert(oledPage==2);press(4);assert(navLevel==0);
- oledMenuChoice=0;press(2);assert(oledMenuChoice==2);press(8);assert(oledMenuChoice==0);
+ // Catalog: refresh explicitly, confirm replacement, then open installed offline.
+ press(4);oledMenuChoice=3;press(1);assert(oledPage==10);
+ press(1);assert(catalogRefreshQueued);catalogRefreshQueued=false;
+ press(8);press(8);press(1);assert(oledPage==11&&catalogChoice==2);
+ press(1);assert(prepares==1&&oledDetail&&otaEnvironment=="servo");press(4);assert(oledPage==11&&!oledDetail);
+ press(1);assert(prepares==2&&oledDetail);press(1);assert(installs==2);
+ press(4);assert(oledPage==10);press(2);press(1);assert(catalogChoice==1&&oledPage==11);
+ moduleAvailable=true;press(1);assert(oledDetail&&moduleStarts==0);press(1);assert(moduleStarts==1);
+ press(4);assert(oledPage==10);press(4);assert(navLevel==0);
+ oledMenuChoice=0;press(2);assert(oledMenuChoice==3);press(8);assert(oledMenuChoice==0);
  puts("NAVIGATION_TREE_OK: hierarchy, fixed button roles, expiry and explicit install confirmation");
 }

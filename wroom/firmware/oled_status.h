@@ -76,9 +76,9 @@ static void refreshOled() {
   nextOledRefresh=millis()+1000;DiagnosticScope diagnosticScope(DIAG_OLED);
   if(!oledPresent()){oledReady=false;faceDisplayEnabled.store(false);oledStatus="PAUSED_I2C_ERROR";diagnosticScope.failed=true;return;}
   oled.clearDisplay();
-  const char *areas[]={"Conexoes","Diagnostico","Atualizacoes"};
+  const char *areas[]={"Conexoes","Diagnostico","Atualizacoes","Ambientes"};
   if(navLevel==0){
-    oledLine(0,"BOTIZIN - WROOM");oledLine(1,"Placa independente");oledList(areas,3,oledMenuChoice);
+    oledLine(0,"BOTIZIN - WROOM");oledLine(1,"Placa independente");oledList(areas,4,oledMenuChoice);
   }else if(navLevel==2){
     oledLine(0,String("DIAGNOSTICO ")+"WROOM");oledLine(1,"Recursos e esperas");
     const char *items[]={"Memoria","Tempos da rede","Tela e coleta","Ultimo reinicio"};oledList(items,4,navDiagnostic);
@@ -98,16 +98,25 @@ static void refreshOled() {
     oledLine(5, String("Prazo ") + String((otaManualUntil - millis()) / 1000) + "s");
     oledLine(6, otaAutomaticEnabled?"Automatico: LIGADO":"Automatico: DESLIGADO");
   } else if(oledPage==10) {
-    const esp_partition_t *run=esp_ota_get_running_partition();
-    oledLine(0,"AMBIENTES WROOM");oledLine(1,oledDetail?"INICIAR PS4?":"Dois slots OTA");
-    oledLine(2,String(run?run->label:"?")+": Menu "+BOTIZIN_VERSION);
-    oledLine(3,String(modulePartition?modulePartition->label:"?")+": "+(moduleAvailable?"PS4 0.0.28":"Sem modulo confirmado"));
-    oledLine(5,moduleAvailable?(oledDetail?"Direita: confirmar":"Direita: iniciar PS4"):"Instale pelo painel");
-    oledLine(6,"Esquerda: voltar OTA");
+    oledLine(0,"AMBIENTES WROOM");oledLine(1,catalogStatus);
+    uint8_t first=catalogChoice>=5?catalogChoice-4:0;
+    for(uint8_t i=first;i<=environmentCount&&i<first+5;++i){
+      String title=i?environments[i-1].title:String("Atualizar lista");
+      if(i&&moduleAvailable&&moduleId==environments[i-1].id)title="* "+title;
+      oledLine(2+i-first,String(i==catalogChoice?"> ":"  ")+title);
+    }
+  } else if(oledPage==11 && catalogChoice>0 && catalogChoice<=environmentCount){
+    auto &e=environments[catalogChoice-1];bool installed=moduleAvailable&&moduleId==e.id;
+    oledLine(0,e.title);oledLine(1,"Versao "+(installed?moduleVersion:e.version));
+    oledLine(2,installed?"Instalado: abre offline":e.bytes?"Disponivel para baixar":"Atualize a lista");
+    oledLine(3,installed?"Menu sera preservado":"Substitui outro slot");
+    if(!installed)oledLine(4,"Atual: "+(moduleAvailable?moduleId:String("sem ambiente")));
+    oledLine(5,oledDetail?"Direita: confirmar":installed?"Direita: abrir":"Direita: preparar");
+    oledLine(6,"Esquerda: voltar");
   } else if (oledPage == 2) {
     oledLine(0, String("OTA WROOM ") + BOTIZIN_VERSION);
     oledLine(1, otaAutomaticEnabled?"Automatico: LIGADO":"Automatico: DESLIGADO");
-    const char *actions[]={"Consultar GitHub","Instalar nova","Cancelar pedido","Ver slots / PS4"};
+    const char *actions[]={"Consultar GitHub","Instalar nova","Cancelar pedido","Ver ambientes"};
     bool active[]={otaReady&&!internetStopped&&!otaCheckQueued&&!otaInstallQueued,candidateReady(),manualWindowActive(),true};
     for(uint8_t i=0;i<4;++i) oledLine(i+2,String(i==oledOtaChoice?"> ":"  ")+actions[i]+(active[i]?"":" [X]"));
     oledLine(6,candidateReady()?"Nova "+otaTargetVersion:internetStatus);
