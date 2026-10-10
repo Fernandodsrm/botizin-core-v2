@@ -27,3 +27,18 @@ Compilação com partições existentes e SHA do pacote; teste físico de ida e 
 
 No detalhe de um ambiente instalado, baixo prepara download/atualização; direita confirma.
 Direita, sem preparação de download, abre a versão já instalada offline.
+
+## Pacotes publicados e verificados
+
+Menu 0.0.29: 1.286.144 bytes, margem de 24.576 bytes no slot.
+SHA256: 97150c7ed17b93ce4af148ee2d88fdff77cc29f4e71882fa3b42f1d76478238b
+Fonte: 67163f4665c3633bea6cb7c253e4183924d84d4e; build 38038677846.
+
+PS4 0.0.30: 761.360 bytes; SHA256 225fcc4a132bc8918adb3374b7392e4706c8a6e210b51ee0f1f8a75ff9688c25.
+Servo 0.0.31: 758.992 bytes; SHA256 2f3c152373c097b93941304cec74f2782efdfb30cee50cf8478102fb1a7d20ff.
+LED 0.0.32: 753.328 bytes; SHA256 a45d4963571d144b0a316e787b7977e3594cd8c0f9907dceefc207e897d7564b.
+Fonte dos ambientes: 8f2c81ffd85e17b0c72c1d52a397981017aa6ed0; build 38038303027.
+Publicação de pacotes e catálogo: build 38038894448.
+
+Teste físico proposto: instalar menu29, atualizar lista, instalar LED32, alternar LED, voltar ao Botizin, abrir instalado sem download e repetir sem rede.
+Depois testar Servo31 e PS4/servo30.
