@@ -41,6 +41,8 @@ jobs:
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror wroom/tests/a22_expresso_test.cpp -o /tmp/a22-test
           /tmp/a22-test
+      - name: Validate actual local panel command flow
+        run: node wroom/tests/a22_panel_test.js
       - name: Compile and validate firmware package
         run: python3 ci/build_a22.py
       - name: Save firmware, manifest, ELF and logs

@@ -83,7 +83,7 @@ void setup(){
   String name=server.arg("expression");uint32_t mood;
   if(name.length()>16||!validCommand(name.c_str(),mood)){response(400,"{\"error\":\"Expressao invalida\"}");return;}
   if(!oledReady){response(503,"{\"error\":\"Tela indisponivel\"}");return;}
-  commandId=commandId%0x00fffffe+1;desired.store((commandId<<8)|mood);
+  commandId=commandId % 0x00fffffeu + 1u;desired.store((commandId<<8)|mood);
   response(202,String("{\"accepted\":true,\"command_id\":")+commandId+"}");
  });
  server.on("/api/return",HTTP_POST,[]{if(!authorized())return;response(202,"{\"accepted\":true}");returnAt=millis()+750;});
