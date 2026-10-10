@@ -28,7 +28,8 @@ static void loadCatalog(){
  Preferences p;if(p.begin("catalog",true)){String body=p.getString("json","");p.end();if(body.length()<=4096&&parseCatalog(body))catalogStatus="CACHED";}
 }
 static void checkCatalog(){
- clearOtaCandidate();oledDetail=false;oledPage=10;navLevel=3;oledMenu=false;\n pauseFace();showOtaProgress("CONSULTANDO LISTA");
+ clearOtaCandidate();oledDetail=false;oledPage=10;navLevel=3;oledMenu=false;
+ pauseFace();showOtaProgress("CONSULTANDO LISTA");
  if(WiFi.status()!=WL_CONNECTED||time(nullptr)<1700000000){catalogStatus="OFFLINE_CACHE";return;}
  if(ESP.getFreeHeap()<80000){catalogStatus="LOW_MEMORY_CACHE";return;}
  NetworkClientSecure tls;tls.useBuiltinCACertBundle();tls.setHandshakeTimeout(10);
