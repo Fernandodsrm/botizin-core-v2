@@ -42,3 +42,10 @@ Compilação: Arduino core 3.3.12, bibliotecas OLED fixadas e validação das pa
 Compilação aprovada: run 38073862432, fonte 91c536adc74dd31e6607de16ff6f874a2126090a.
 Binário: 1.021.696 bytes; margem no slot: 289.024 bytes.
 SHA256: fb10267fcd5ae321bf41c236119a2b2d60adc434369eacf6930904c7f7d83419.
+
+## Retorno 0.0.34
+
+Fernando confirmou comandos e alterações físicas nos olhos na 0.0.33; o retorno iniciou Menu 0.0.29 via HTTP, mas o OLED ficou parado até reset EN.
+Causa provável investigada: reinício simultâneo à transferência I2C do renderer. Não houve diagnóstico /status do período congelado para provar a causa.
+A 0.0.34 pede parada ao renderer, aguarda sua transferência terminar e Wire.end concluir; somente depois reinicia. Botão físico e painel seguem a mesma sequência.
+A 0.0.29 continua preservada. Testar múltiplas idas e voltas; se reaparecer, capturar OLED, FACE_FRAMES e FACE_MAX_GAP_MS de /status antes do EN.

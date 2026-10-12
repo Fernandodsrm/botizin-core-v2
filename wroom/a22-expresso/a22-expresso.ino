@@ -14,13 +14,15 @@
 #include "face_engine.h"
 #include "command_model.h"
 #include "panel.h"
+#include "return_gate.h"
 static WebServer server(80);
 static Adafruit_SSD1306 oled(128,64,&Wire,-1,400000,400000);
 static bool returnReady=false,oledReady=false,configured=false;
 static String returnError="NOT_CHECKED",ssid,password,sessionKey;
-static std::atomic<bool> returnPressed{false};
+static std::atomic<bool> returnPressed{false},stopFace{false},faceStopped{true};
+static ReturnGate returnGate;
 static std::atomic<uint32_t> desired{0},applied{0},frames{0},frameMaxGap{0},currentMood{0};
-static uint32_t commandId=0,returnAt=0,nextReconnect=0;
+static uint32_t commandId=0,nextReconnect=0;
 static volatile uint32_t lastBack=0;
 #include "menu_return.h"
 #define BOTIZIN_LOCAL_NAME "botizin-wroom"
@@ -39,6 +41,10 @@ static bool loadWifi(){
 static void faceTask(void*){
  BotizinFace face(esp_random());uint32_t previous=0;TickType_t tick=xTaskGetTickCount();
  for(;;){
+  if(stopFace.load()){
+   // Only the display owner releases Wire, after its previous transfer completed.
+   Wire.end();faceStopped.store(true);vTaskDelete(nullptr);return;
+  }
   uint32_t now=millis(),packed=desired.load();
   if((packed>>8)!=applied.load()){face.command(uint8_t(packed),now);}
   Wire.beginTransmission(0x3c);
@@ -50,7 +56,7 @@ static void faceTask(void*){
 static void response(int code,const String &json){server.sendHeader("Cache-Control","no-store");server.send(code,"application/json; charset=utf-8",json);}
 static bool authorized(){
  if(!returnReady){response(503,"{\"error\":\"Retorno ao menu nao validado\"}");return false;}
- if(returnAt){response(409,"{\"error\":\"Retorno em andamento\"}");return false;}
+ if(returnGate.active()){response(409,"{\"error\":\"Retorno em andamento\"}");return false;}
  if(server.header("X-Botizin-Key")!=sessionKey){response(403,"{\"error\":\"Recarregue a pagina para conectar\"}");return false;}
  return true;
 }
@@ -67,7 +73,10 @@ void setup(){
  if(oledReady){
   oled.setTextSize(1);oled.setTextColor(SSD1306_WHITE);oled.clearDisplay();
   oled.setCursor(0,0);oled.print("A22 EXPRESSO ");oled.print(A22_VERSION);oled.setCursor(0,20);oled.print(returnReady?"Conectando Wi-Fi...":"Retorno nao validado");oled.display();
-  if(returnReady&&xTaskCreatePinnedToCore(faceTask,"a22-eyes",4096,nullptr,1,nullptr,1)!=pdPASS){oledReady=false;}
+  if(returnReady){
+   faceStopped.store(false);
+   if(xTaskCreatePinnedToCore(faceTask,"a22-eyes",4096,nullptr,1,nullptr,1)!=pdPASS){oledReady=false;faceStopped.store(true);}
+  }
  }
  if(!returnReady){Serial.println("MENU_RETURN: "+returnError);return;}
  configured=loadWifi();
@@ -86,13 +95,13 @@ void setup(){
   commandId=commandId % 0x00fffffeu + 1u;desired.store((commandId<<8)|mood);
   response(202,String("{\"accepted\":true,\"command_id\":")+commandId+"}");
  });
- server.on("/api/return",HTTP_POST,[]{if(!authorized())return;response(202,"{\"accepted\":true}");returnAt=millis()+750;});
+ server.on("/api/return",HTTP_POST,[]{if(!authorized())return;response(202,"{\"accepted\":true}");returnGate.request(millis());stopFace.store(true);});
  server.onNotFound([]{response(404,"{\"error\":\"Rota inexistente\"}");});server.begin();nextReconnect=millis()+30000;
  Serial.println("A22 EXPRESSO V" A22_VERSION);Serial.println("MENU_RETURN: READY");
 }
 void loop(){
- if(returnPressed.exchange(false)&&returnReady)esp_restart();
- if(returnAt&&(int32_t)(millis()-returnAt)>=0)esp_restart();
+ if(returnPressed.exchange(false)&&returnReady){returnGate.request(millis());stopFace.store(true);}
+ if(returnGate.ready(millis(),faceStopped.load()))esp_restart();
  if(returnReady){
   server.handleClient();maintainLocalName();
   if(configured&&WiFi.status()!=WL_CONNECTED&&(int32_t)(millis()-nextReconnect)>=0){nextReconnect=millis()+30000;WiFi.reconnect();}

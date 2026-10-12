@@ -15,7 +15,17 @@ struct Canvas {
   void drawLine(int x,int y,int a,int b,int){assert(x>=0&&a<128&&y>=0&&b<64);++draws;}
 };
 #include "../a22-expresso/command_model.h"
+#include "../a22-expresso/return_gate.h"
 int main(){
+  ReturnGate gate;
+  assert(!gate.ready(10000,true));gate.request(1000);
+  assert(gate.active());assert(!gate.ready(1749,true));
+  assert(!gate.ready(2000,false)); // Restart cannot interrupt an active OLED transfer.
+  gate.request(1700);assert(gate.ready(1750,true)); // Duplicate request does not postpone exit.
+  ReturnGate wrap;wrap.request(0xffffff00u);
+  assert(!wrap.ready(uint32_t(0xffffff00u+749),true));
+  assert(wrap.ready(uint32_t(0xffffff00u+750),true));
+
   uint32_t value=99;
   assert(!validCommand("motor",value)&&value==99);
   assert(!validCommand(nullptr,value));
