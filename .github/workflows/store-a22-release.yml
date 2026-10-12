@@ -17,8 +17,8 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           github-token: ${{ github.token }}
-          run-id: 38073862432
-          name: botizin-a22-91c536adc74dd31e6607de16ff6f874a2126090a
+          run-id: 38212557249
+          name: botizin-a22-1d2c760a7c2af92a84e58b68f05fc56940ecf41f
           path: artifact-a22
       - name: Verify and publish environment, preserve existing catalog and Menu
         env:

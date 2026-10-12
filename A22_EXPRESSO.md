@@ -1,4 +1,4 @@
-# A22 Expresso — ambiente 0.0.33
+# A22 Expresso — ambiente 0.0.34 (histórico 0.0.33)
 
 Primeiro ambiente de conexão direta entre celular e olhos da WROOM.
 Menu/Botizin 0.0.29 permanece no seu slot; este ambiente ocupa o outro.
@@ -49,3 +49,6 @@ Fernando confirmou comandos e alterações físicas nos olhos na 0.0.33; o retor
 Causa provável investigada: reinício simultâneo à transferência I2C do renderer. Não houve diagnóstico /status do período congelado para provar a causa.
 A 0.0.34 pede parada ao renderer, aguarda sua transferência terminar e Wire.end concluir; somente depois reinicia. Botão físico e painel seguem a mesma sequência.
 A 0.0.29 continua preservada. Testar múltiplas idas e voltas; se reaparecer, capturar OLED, FACE_FRAMES e FACE_MAX_GAP_MS de /status antes do EN.
+
+Compilação 0.0.34 aprovada: run 38212557249; fonte 1d2c760a7c2af92a84e58b68f05fc56940ecf41f.
+Binário: 1.021.888 bytes; SHA256 ccb52a6ce531775a4d0243d3f02dcb1894583d6dc907c39d124a62e0402fb78a.
