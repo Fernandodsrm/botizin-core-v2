@@ -1,0 +1,7 @@
+{
+  "board": "esp32-wroom-4mb",
+  "version": "0.0.34",
+  "size": 1021888,
+  "sha256": "ccb52a6ce531775a4d0243d3f02dcb1894583d6dc907c39d124a62e0402fb78a",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.34/firmware.bin"
+}
