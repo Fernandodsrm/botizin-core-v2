@@ -137,6 +137,7 @@ String resetInfo() {
 String snapshot() {
   const esp_partition_t *run = esp_ota_get_running_partition();
   String s = "BOTIZIN WROOM V" + String(BOTIZIN_VERSION) + "\n";
+  s += "LIVE_TEST: TESTE LIVE 35\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
   s += "LOCAL_NAME: " BOTIZIN_LOCAL_NAME ".local\n";
   s += "MDNS: " + String(localNameReady ? "READY" : "WAITING") + "\n";
