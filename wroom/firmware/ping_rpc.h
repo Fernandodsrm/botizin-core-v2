@@ -48,7 +48,7 @@ void __attribute__((noinline)) pollPing() {
   double now = (double)time(nullptr) * 1000.0;
   bool valid = cJSON_IsNumber(id) && id->valuedouble >= 0 &&
     id->valuedouble <= 2147483647.0 && id->valuedouble == (double)id->valueint &&
-    cJSON_IsString(method) && (strcmp(method->valuestring, "ping") == 0 ||
+    cJSON_IsString(method) && (strcmp(method->valuestring, "ping") == 0 || strcmp(method->valuestring, "led_set") == 0 ||
       strcmp(method->valuestring, "ota_check") == 0 || strcmp(method->valuestring, "ota_status") == 0 ||
       strcmp(method->valuestring, "ota_confirm") == 0 || strcmp(method->valuestring, "ota_cancel") == 0 || strcmp(method->valuestring, "ota_automatic") == 0 || strcmp(method->valuestring, "ps4_config") == 0 || strcmp(method->valuestring, "module_start") == 0 || strcmp(method->valuestring,"catalog_refresh")==0 || strcmp(method->valuestring,"catalog_status")==0 || strcmp(method->valuestring,"environment_select")==0) &&
     cJSON_IsObject(params) && cJSON_IsString(command) &&
@@ -60,7 +60,12 @@ void __attribute__((noinline)) pollPing() {
   String commandId(command->valuestring);
   String action(method->valuestring), result = action == "ping" ? "PONG" : "OTA_STATUS";
   bool accepted = false;
-  if(action=="catalog_refresh") {
+  if(action=="led_set") {
+    cJSON *enabled=cJSON_GetObjectItemCaseSensitive(params,"enabled");
+    accepted=cJSON_IsBool(enabled);
+    if(accepted) setRemoteLed(cJSON_IsTrue(enabled));
+    result=accepted?"LED_SET":"LED_REJECTED";
+  }else if(action=="catalog_refresh") {
     accepted=!catalogBusy()&&!moduleStartQueued;result=accepted?"CATALOG_REFRESH_ACCEPTED":"BUSY_OR_BLOCKED";
   }else if(action=="catalog_status"){result="CATALOG_STATUS";
   }else if(action=="environment_select"){
@@ -104,6 +109,9 @@ void __attribute__((noinline)) pollPing() {
     cJSON_AddStringToObject(reply, "command_id", commandId.c_str()) &&
     cJSON_AddNumberToObject(reply, "request_id", requestId) &&
     cJSON_AddStringToObject(reply, "firmware_version", BOTIZIN_VERSION) &&
+    cJSON_AddBoolToObject(reply,"led_on",remoteLedOn) &&
+    cJSON_AddNumberToObject(reply,"led_gpio",26) &&
+    cJSON_AddNumberToObject(reply,"led_timeout_seconds",remoteLedOn?30:0) &&
     cJSON_AddNumberToObject(reply,"ps4_led_button",ps4LedButton) &&
     cJSON_AddBoolToObject(reply,"module_available",moduleAvailable) &&
     cJSON_AddStringToObject(reply,"slot_other_environment",moduleAvailable?moduleId.c_str():"Sem modulo confirmado") &&

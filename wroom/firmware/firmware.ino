@@ -18,6 +18,7 @@
 #include "local_name.h"
 #include "provisioning.h"
 #include "ps4_config.h"
+#include "remote_led.h"
 
 WebServer server(80);
 Preferences journal;
@@ -137,7 +138,8 @@ String resetInfo() {
 String snapshot() {
   const esp_partition_t *run = esp_ota_get_running_partition();
   String s = "BOTIZIN WROOM V" + String(BOTIZIN_VERSION) + "\n";
-  s += "LIVE_TEST: TESTE LIVE 35\n";
+  s += "LIVE_TEST: TESTE LIVE 36\n";
+  s += "LED_GPIO: 26\nLED_STATE: " + String(remoteLedOn ? "ON" : "OFF") + "\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
   s += "LOCAL_NAME: " BOTIZIN_LOCAL_NAME ".local\n";
   s += "MDNS: " + String(localNameReady ? "READY" : "WAITING") + "\n";
@@ -508,6 +510,8 @@ void __attribute__((noinline)) sendTelemetry() {
   bool ok = cJSON_AddStringToObject(root, "origin", "ESP32_REAL") &&
     cJSON_AddBoolToObject(root, "simulated", false) &&
     cJSON_AddStringToObject(root, "firmware_version", BOTIZIN_VERSION) &&
+    cJSON_AddBoolToObject(root, "led_on", remoteLedOn) &&
+    cJSON_AddNumberToObject(root, "led_gpio", 26) &&
     cJSON_AddStringToObject(root,"installed_environment",moduleAvailable?moduleId.c_str():"") &&
     cJSON_AddStringToObject(root,"catalog_status",catalogStatus.c_str()) &&
     cJSON_AddStringToObject(root,"wifi_ip",WiFi.localIP().toString().c_str()) &&
@@ -583,6 +587,7 @@ void printPartitionTable() {
 
 void setup() {
   Serial.begin(115200);
+  beginRemoteLed();
   beginOled();
   beginNavigation();
   beginFaceTask();
@@ -638,6 +643,7 @@ void setup() {
 }
 
 void loop() {
+  pollRemoteLed();
   maintainLocalName();
   diagnosticLoopTick();
   if (!uploadActive && !uploadOK && !rebootScheduled) sampleDiagnostics();
