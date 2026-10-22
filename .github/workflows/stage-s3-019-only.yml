@@ -1,0 +1,79 @@
+name: Stage S3 0.0.19 release binary ONLY (keep current OTA)
+
+on:
+  push:
+    branches: [study/ota-03-mqtt-status-0.0.19]
+    paths:
+      - ".github/workflows/stage-s3-019-only.yml"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release-and-observe:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/study/ota-03-mqtt-status-0.0.19'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check release 0.0.19 is from verified successful CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=$(gh run view 39736829190 --json conclusion --jq '.conclusion')
+          test "$status" = success
+          mkdir -p "$RUNNER_TEMP/s3-verified"
+          gh run download 39736829190 -n ota03-validation-only-1f67530f7e05625513c2d1a0877488eaed0c478a -D "$RUNNER_TEMP/s3-verified"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          base=pathlib.Path(os.environ["RUNNER_TEMP"])/"s3-verified"
+          rec=json.loads((base/"build-record.json").read_text())
+          manifest=json.loads((base/"manifest.json").read_text())
+          image=(base/"firmware.bin").read_bytes()
+          sha=hashlib.sha256(image).hexdigest()
+          assert rec["source_commit"]=="1f67530f7e05625513c2d1a0877488eaed0c478a", rec["source_commit"]
+          assert rec["version"]=="0.0.19" and rec["published"] is False
+          assert rec["publishable"] is False and rec["device_token_compiled"] is False
+          assert len(image)==1209472 and len(image)<3145728 and image[0]==0xE9
+          assert manifest["version"]=="0.0.19" and manifest["board"]=="esp32s3-n16r8"
+          assert manifest["size"]==len(image)==rec["bytes"]
+          assert manifest["sha256"]==sha==rec["sha256"]=="01a01461b4f48cdc289f8f43dd2903387ac3f317f7eba17af2eda9b85ecef721"
+          assert manifest["url"]=="https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.19/firmware.bin"
+          print("VERIFIED_CI_PACKAGE",len(image),sha,flush=True)
+          PY
+
+      - name: Checkout production main without changing its other sources
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: prod
+          persist-credentials: true
+
+      - name: Publish IMMUTABLE firmware package first (no activation yet)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C prod config user.name "botizin-release-bot"
+          git -C prod config user.email "botizin-release-bot@users.noreply.github.com"
+          test ! -e prod/releases/0.0.19/firmware.bin
+          mkdir -p prod/releases/0.0.19
+          cp "$RUNNER_TEMP/s3-verified/firmware.bin" prod/releases/0.0.19/firmware.bin
+          cp "$RUNNER_TEMP/s3-verified/manifest.json" prod/releases/0.0.19/manifest.json
+          git -C prod add releases/0.0.19/firmware.bin releases/0.0.19/manifest.json
+          git -C prod commit -m "release: stage verified S3 0.0.19 MQTT-only image without activation"
+          git -C prod push origin HEAD:main
+          echo "S3_0_0_17_PACKAGE_PUBLISHED_NOT_ACTIVE"
+
+      - name: Ensure public firmware bytes match verified package before activating
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 6 --retry-all-errors --retry-delay 2 --max-time 20 \
+            -o "$RUNNER_TEMP/remote-s3-017.bin" \
+            "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.19/firmware.bin"
+          cmp -s "$RUNNER_TEMP/remote-s3-017.bin" "$RUNNER_TEMP/s3-verified/firmware.bin"
+          echo "REMOTE_RELEASE_BYTES_VERIFIED"
+
