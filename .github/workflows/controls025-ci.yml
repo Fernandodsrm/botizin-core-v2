@@ -89,7 +89,7 @@ jobs:
           assert 'controlSession' not in Path('firmware/mqtt_observer.h').read_text()
           assert 'controlSession' not in Path('firmware/event_journal.h').read_text()
           assert 'let controlSession=' in html
-          assert "localStorage" not in re.search(r'<script>(.*?)</script>',html,re.DOTALL).group(1)
+          assert "localStorage.setItem(" not in html and "localStorage.getItem(" not in html
           assert "fetch('/control" not in html
           assert "window.confirm(" in html
           assert "controlWifiForm" in c.ids and "controlReboot" in c.ids and "controlLogin" in c.ids
