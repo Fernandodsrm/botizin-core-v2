@@ -1,7 +1,7 @@
 {
   "board": "esp32s3-n16r8",
-  "version": "0.0.21",
-  "size": 1223504,
-  "sha256": "5d313f298a2404ecdcc6e8a9edb91a3ff7c5f68ed4c55a4b6479591be6283d77",
-  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.21-arduino-default/firmware.bin"
+  "version": "0.0.22",
+  "size": 1228704,
+  "sha256": "50ae9f3f7a1ae30f30d5b41b67125a55087d19c4a5dfd15a7a371e60d4429567",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.22/firmware.bin"
 }
