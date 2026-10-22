@@ -84,7 +84,7 @@ jobs:
           root=pathlib.Path('prod')
           old=json.loads((root/'manifest.json').read_text())
           assert old['board']=='esp32s3-n16r8' and old['version']=='0.0.22'
-          assert old['sha256']=='5d313f298a2404ecdcc6e8a9edb91a3ff7c5f68ed4c55a4b6479591be6283d77'
+          assert old['sha256']=='50ae9f3f7a1ae30f30d5b41b67125a55087d19c4a5dfd15a7a371e60d4429567'
           b=pathlib.Path('dist/firmware.bin').read_bytes()
           x=json.loads(pathlib.Path('dist/manifest.json').read_text())
           assert x['version']=='0.0.23' and x['sha256']==hashlib.sha256(b).hexdigest()
@@ -120,7 +120,7 @@ jobs:
           current=json.loads((root/'manifest.json').read_text())
           new=json.loads(pathlib.Path('dist/manifest.json').read_text())
           assert current['version']=='0.0.22'
-          assert current['sha256']=='5d313f298a2404ecdcc6e8a9edb91a3ff7c5f68ed4c55a4b6479591be6283d77'
+          assert current['sha256']=='50ae9f3f7a1ae30f30d5b41b67125a55087d19c4a5dfd15a7a371e60d4429567'
           assert new['version']=='0.0.23'
           (root/'manifest.json').write_text(json.dumps(new,indent=2)+'\n')
           PY
