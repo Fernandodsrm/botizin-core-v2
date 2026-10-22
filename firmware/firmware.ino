@@ -12,6 +12,11 @@
 #include <HTTPClient.h>
 #include <cJSON.h>
 #include <time.h>
+// Strong C-linkage override of the weak Arduino ESP32 boot hook.
+// Lab-only: never confirm an OTA image in initArduino() before self-tests.
+#ifdef CONFIG_APP_ROLLBACK_ENABLE
+extern "C" bool verifyRollbackLater(void) { return true; }
+#endif
 #include "internet_config.h"
 #include "version.h"
 #define BOTIZIN_LOCAL_NAME "botizin-s3"
@@ -34,6 +39,11 @@ bool hashActive = false, uploadActive = false, uploadOK = false;
 bool otaReady = false, rebootScheduled = false;
 uint32_t rebootAt = 0;
 String internetStatus = "WAITING_FOR_FIRST_CHECK";
+bool otaBootPending = false;
+bool otaBootHttpStarted = false;
+bool otaBootRecoveryBlocked = false;
+uint32_t otaBootStartedAt = 0;
+String otaBootHealthStatus = "NOT_CHECKED";
 bool internetStopped = false;
 uint32_t nextInternetCheck = 0;
 int responseCode = 400;
@@ -142,6 +152,7 @@ String snapshot() {
   s += "BOOT_PARTITION: " + partitionInfo(esp_ota_get_boot_partition()) + "\n";
   s += "NEXT_UPDATE_PARTITION: " + partitionInfo(esp_ota_get_next_update_partition(nullptr)) + "\n";
   s += "RUNNING_OTA_STATE: " + stateInfo(run) + "\n";
+  s += "OTA_BOOT_HEALTH: " + otaBootHealthStatus + "\n";
 #ifdef CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
   s += "ROLLBACK_CONFIG: ENABLED (Arduino core default confirms the image at startup)\n";
 #else
@@ -386,7 +397,9 @@ void checkInternetOTA(bool manual) {
     Serial.println("INTERNET_OTA: " + internetStatus); return;
   }
   if (!newerVersion(targetVersion)) {
-    stopInternet("manifest version is invalid or older"); return;
+    // A newer locally installed LAB candidate can see an older production
+    // manifest. This must NOT permanently disable future OTA polling.
+    internetStatus = "MANIFEST_NOT_NEWER " + targetVersion; return;
   }
   if (manual) {
     otaTargetVersion = targetVersion; otaTargetURL = targetURL; otaTargetSHA = targetSHA; otaTargetBytes = targetBytes;
@@ -542,6 +555,48 @@ void __attribute__((noinline)) sendTelemetry() {
 #include "ping_rpc.h"
 #include "peer_ota_server.h"
 #include "mqtt_observer.h"
+#include "ota_boot_health.h"
+
+void otaBootHealthBegin() {
+  const esp_partition_t* running = esp_ota_get_running_partition();
+  esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
+  otaBootPending = running && esp_ota_get_state_partition(running, &state) == ESP_OK &&
+                   state == ESP_OTA_IMG_PENDING_VERIFY;
+  otaBootStartedAt = millis();
+  otaBootHealthStatus = otaBootPending ? "PENDING_VERIFY_HEALTH" : "NOT_PENDING";
+  Serial.println("OTA_BOOT_HEALTH: " + otaBootHealthStatus);
+}
+
+void otaBootHealthTick() {
+  if (!otaBootPending || otaBootRecoveryBlocked) return;
+  const bool wifiOK = WiFi.status() == WL_CONNECTED;
+  const bool clockOK = time(nullptr) >= 1700000000;
+  OtaHealthDecision action = otaHealthDecision(
+      otaBootPending, otaReady, wifiOK, clockOK,
+      otaBootHttpStarted, botizinMqttSuccesses > 0,
+      (uint32_t)(millis() - otaBootStartedAt));
+  if (action == OtaHealthDecision::WAIT) return;
+  if (action == OtaHealthDecision::CONFIRM) {
+    const esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
+    if (err == ESP_OK) {
+      otaBootPending = false;
+      otaBootHealthStatus = "VALID_CONFIRMED_AFTER_WIFI_NTP_HTTP_MQTT";
+    } else {
+      otaBootHealthStatus = "CONFIRM_ERROR_" + String((int)err);
+      // Retry on a subsequent iteration; bounded deadline remains active.
+    }
+    Serial.println("OTA_BOOT_HEALTH: " + otaBootHealthStatus);
+  } else if (action == OtaHealthDecision::ROLLBACK) {
+    otaBootHealthStatus = "HEALTH_FAILED_ROLLBACK_REQUESTED";
+    Serial.println("OTA_BOOT_HEALTH: " + otaBootHealthStatus);
+    Serial.flush();
+    // This call restarts on success. On no valid fallback it returns an error.
+    const esp_err_t err = esp_ota_mark_app_invalid_rollback_and_reboot();
+    otaBootHealthStatus = "ROLLBACK_FAILED_" + String((int)err);
+    otaBootRecoveryBlocked = true; // do not call erase/reboot in a tight loop
+    Serial.println("OTA_BOOT_HEALTH: " + otaBootHealthStatus);
+  }
+}
 
 void printPartitionTable() {
   Serial.println("PARTITION_TABLE:");
@@ -572,6 +627,7 @@ void setup() {
              a->size == 0x300000 && b->size == 0x300000 &&
              data->address == 0xe000 && data->size == 0x2000 && run &&
              (run->address == a->address || run->address == b->address);
+  otaBootHealthBegin();
   initializeDiagnosticFlash();
   sampleDiagnostics();
   Serial.println(snapshot());
@@ -603,6 +659,7 @@ void setup() {
   nextTelemetry = millis() + 20000;
   nextInternetCheck = millis() + 10000;
   server.begin();
+  otaBootHttpStarted = true;
   maintainLocalName();
   botizinMqttSetup();
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
@@ -624,21 +681,22 @@ void loop() {
     if (manualOtaStatus == "CHECKING") manualOtaStatus = internetStatus;
     nextTelemetry = millis();
   }
-  if (!rebootScheduled && !uploadActive && !uploadOK && !internetStopped &&
+  if (!otaBootPending && !rebootScheduled && !uploadActive && !uploadOK && !internetStopped &&
       (int32_t)(millis() - nextInternetCheck) >= 0) {
     nextInternetCheck = millis() + 60000;
     if (!manualWindowActive()) { clearOtaCandidate(); peerOtaBusy = true; checkInternetOTA(false); peerOtaBusy = false; }
   }
-  if (!rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
+  if (!otaBootPending && !rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
       (int32_t)(millis() - nextTelemetry) >= 0) {
     nextTelemetry = millis() + 60000;
     sendTelemetry();
   }
-  if (!rebootScheduled && !uploadActive && !uploadOK && !pingStopped &&
+  if (!otaBootPending && !rebootScheduled && !uploadActive && !uploadOK && !pingStopped &&
       (int32_t)(millis() - nextPingPoll) >= 0) {
     nextPingPoll = millis() + 15000;
     pollPing();
   }
   botizinMqttLoop();
+  otaBootHealthTick();
   delay(2);
 }
