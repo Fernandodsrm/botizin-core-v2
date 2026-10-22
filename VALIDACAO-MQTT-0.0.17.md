@@ -62,3 +62,30 @@
 - **Limite crítico:** o tópico está em **broker público e não autenticado**. Ter recebido uma mensagem recente com campos consistentes não prova criptograficamente que veio da S3 física, nem que a credencial/OTA opera ponta a ponta após novo teste. Antes de uso como monitor confiável, migrar para broker privado com autenticação e correlacionar boot_id/slot/hash com outro canal.
 - O observador **não publicou nenhum comando MQTT**, não acionou OTA, não alterou manifestos ou firmware. Foi apenas uma segunda consulta do canal já ofertado.
 - Com a evidência nova, o bloqueio anterior `nenhuma mensagem` está superado; o próximo trabalho é profissionalizar identidade/autenticação e histórico, não presumir falha do MQTT.
+
+
+## Confirmação física local — captura fornecida pelo usuário (22/10/2026, ~00h17 BRT)
+
+Usuário abriu via navegador na mesma rede da S3 o endpoint HTTP `http://botizin-s3.local/status` e compartilhou captura da resposta textual emitida pela placa. Evidência **independente do tópico MQTT público**.
+
+| Campo exibido pela S3 | Valor |
+| --- | --- |
+| Firmware | `BOTIZIN CORE V0.0.17` |
+| `LOCAL_NAME` / `MDNS` | `botizin-s3.local` / `READY` |
+| `RUNNING_PARTITION` | `app1 / ota_1` (0x00310000, 3145728 bytes) |
+| `BOOT_PARTITION` | `app1 / ota_1` (mesma partição) |
+| `NEXT_UPDATE_PARTITION` | `app0 / ota_0` (0x00010000, 3145728 bytes) |
+| `RUNNING_OTA_STATE` | `VALID` |
+| `ROLLBACK_CONFIG` | `ENABLED` (core Arduino confirma a imagem na inicialização) |
+| `OTA` | `READY` |
+| `OTA_AUTOMATIC_ENABLED` | `YES` |
+| `INTERNET_OTA` | `UP_TO_DATE 0.0.17` |
+| `UPTIME_SECONDS` | 7935 |
+| `RESET_REASON` | `BROWNOUT (9)` |
+| `TELEMETRY` | `PAUSED_AFTER_3_FAILURES_UNTIL_REBOOT` (canal ThingsBoard antigo, NÃO MQTT) |
+
+Histórico `LAST_PERSISTED_OTA_ATTEMPT` informado pela S3: origem `0.0.16`, execução anterior em `app0/ota_0`, destino `app1/ota_1`, candidato `0.0.17`, 1.207.616 bytes, SHA calculado nos bytes recebidos e na Flash igual ao esperado, `Update.end: TRUE`, `UPDATE_LIBRARY_ERROR: 0 / No Error`, `IMAGE_DESCRIPTION: ESP_OK`, `OTA_WRITE_VERIFIED: YES`, reboot via `INTERNET_OTA`.
+
+**Resultado:** confirmação local direta de que a **S3 executa 0.0.17** no slot `ota_1` com OTA `VALID` e verificação remota de MQTT por mensagem recente em 21/10 às 23:43 BRT (workflow 39712807513). Isto comprova os aspectos essenciais da integração OTA + telemetria MQTT em teste. O broker MQTT de teste continua público e não autenticado: não interpretar mensagem MQTT como comprovação criptográfica de identidade. O mecanismo de retorno temporizado ao slot anterior **não foi testado fisicamente** e o core Arduino já confirma imagem automaticamente.
+
+**Pontos de atenção:** reset `BROWNOUT (9)` significa detecção de queda de tensão; investigar alimentação. ThingsBoard foi pausado depois de três falhas — manter separado do novo MQTT. Para estabilização, migrar MQTT para broker privado com autenticação e adicionar ao status local as métricas `mqtt_last`, `mqtt_attempts`, `mqtt_successes` (não são exibidas nessa versão). Dados de rede local e identificadores únicos omitidos desta nota por privacidade.
