@@ -88,6 +88,30 @@ temporaria. Se a senha estiver errada, o modo de configuracao reaparece.</small>
   server.sendHeader("Cache-Control","no-store");
   server.send(200,"text/html; charset=utf-8",body);
 }
+// Shared validator for captive-portal and authenticated panel Wi-Fi updates.
+// Password whitespace is significant; only SSID is trimmed by caller.
+static bool wifiOnValidCredentials(const String& proposedSsid,const String& proposedPassword) {
+  String s=proposedSsid;s.trim();
+  return !s.isEmpty() && s.length()<=32 && proposedPassword.length()<=63 &&
+         (proposedPassword.length()==0 || proposedPassword.length()>=8);
+}
+static bool wifiManagerStoreCredentials(const String& proposedSsid,const String& pass) {
+  if(!wifiManagerReady || !wifiOnValidCredentials(proposedSsid,pass))return false;
+  String ssid=proposedSsid;ssid.trim();
+  // Preserve previously configured values in RAM until BOTH writes complete.
+  String oldSsid=wifiManagerPrefs.getString("ssid","");
+  String oldPass=wifiManagerPrefs.getString("pass","");
+  if(wifiManagerPrefs.putString("ssid",ssid)!=ssid.length() ||
+     wifiManagerPrefs.putString("pass",pass)!=pass.length()) {
+    wifiManagerPrefs.putString("ssid",oldSsid);
+    wifiManagerPrefs.putString("pass",oldPass);
+    return false;
+  }
+  wifiManagerSavedSsid=ssid;
+  wifiManagerSavedPassword=pass;
+  return true;
+}
+
 static void wifiPortalSave() {
   if(!wifiRequestFromSetupAP()) {
     server.send(403,"text/plain","Only setup AP may change Wi-Fi.");
@@ -99,16 +123,12 @@ static void wifiPortalSave() {
   String ssid=server.arg("ssid"), pass=server.arg("pass");
   ssid.trim();
   // WPA2 password 8..63, or empty only for an explicitly open 2.4 GHz network.
-  if(ssid.isEmpty() || ssid.length()>32 || pass.length()>63 ||
-     (pass.length()>0 && pass.length()<8)) {
+  if(!wifiOnValidCredentials(ssid,pass)){
     server.send(400,"text/plain","SSID or password length invalid.");return;
   }
-  if(wifiManagerPrefs.putString("ssid",ssid)!=ssid.length() ||
-     wifiManagerPrefs.putString("pass",pass)!=pass.length()) {
+  if(!wifiManagerStoreCredentials(ssid,pass)){
     server.send(500,"text/plain","NVS save failed. Retry.");return;
   }
-  wifiManagerSavedSsid=ssid;
-  wifiManagerSavedPassword=pass;
   server.sendHeader("Cache-Control","no-store");
   server.send(200,"text/html; charset=utf-8",
       "<!doctype html><html><meta name=\"viewport\" content=\"width=device-width\"><body>"
