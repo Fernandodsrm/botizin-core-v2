@@ -43,6 +43,8 @@ bool otaBootPending = false;
 bool otaBootHttpStarted = false;
 bool otaBootRecoveryBlocked = false;
 uint32_t otaBootStartedAt = 0;
+uint32_t otaBootHealthySince = 0;
+bool otaBootHealthContinuous = false;
 String otaBootHealthStatus = "NOT_CHECKED";
 bool internetStopped = false;
 uint32_t nextInternetCheck = 0;
@@ -563,6 +565,8 @@ void otaBootHealthBegin() {
   otaBootPending = running && esp_ota_get_state_partition(running, &state) == ESP_OK &&
                    state == ESP_OTA_IMG_PENDING_VERIFY;
   otaBootStartedAt = millis();
+  otaBootHealthySince = 0;
+  otaBootHealthContinuous = false;
   otaBootHealthStatus = otaBootPending ? "PENDING_VERIFY_HEALTH" : "NOT_PENDING";
   Serial.println("OTA_BOOT_HEALTH: " + otaBootHealthStatus);
 }
@@ -571,10 +575,20 @@ void otaBootHealthTick() {
   if (!otaBootPending || otaBootRecoveryBlocked) return;
   const bool wifiOK = WiFi.status() == WL_CONNECTED;
   const bool clockOK = time(nullptr) >= 1700000000;
+  const bool healthyNow = otaReady && wifiOK && clockOK &&
+                          otaBootHttpStarted && botizinMqttSuccesses > 0;
+  if (!healthyNow) {
+    otaBootHealthContinuous = false;
+  } else if (!otaBootHealthContinuous) {
+    otaBootHealthContinuous = true;
+    otaBootHealthySince = millis();
+  }
+  const uint32_t healthyMs = otaBootHealthContinuous
+                                 ? (uint32_t)(millis() - otaBootHealthySince) : 0;
   OtaHealthDecision action = otaHealthDecision(
       otaBootPending, otaReady, wifiOK, clockOK,
       otaBootHttpStarted, botizinMqttSuccesses > 0,
-      (uint32_t)(millis() - otaBootStartedAt));
+      (uint32_t)(millis() - otaBootStartedAt), healthyMs);
   if (action == OtaHealthDecision::WAIT) return;
   if (action == OtaHealthDecision::CONFIRM) {
     const esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
