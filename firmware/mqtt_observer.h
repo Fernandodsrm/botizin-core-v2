@@ -55,16 +55,24 @@ static void botizinMqttLoop() {
         esp_ota_get_state_partition(active, &state) == ESP_OK &&
         state == ESP_OTA_IMG_VALID;
     // Payload is intentionally low-sensitivity and informational only.
-    char data[240];
+    // Only an OUTBOUND summary on the existing 90s MQTT schedule.
+    // Started != reachable; 'http_seen' proves a previous request was served,
+    // http_age_s is the age of the most recent successful request, not a probe.
+    char data[340];
     snprintf(data, sizeof(data),
              "{\"firmware\":\"%s\",\"uptime_s\":%lu,\"slot\":\"%s\","
              "\"ota_valid\":%s,\"ota_ready\":%s,\"heap_kb\":%lu,"
-             "\"attempt\":%lu,\"role\":\"s3-lab-readonly\"}",
+             "\"attempt\":%lu,\"http_started\":%s,\"http_seen\":%s,"
+             "\"http_age_s\":%ld,\"last_event\":\"%s\",\"role\":\"s3-lab-readonly\"}",
              BOTIZIN_VERSION,
-             (unsigned long)(millis() / 1000), slot,
-             valid ? "true" : "false", otaReady ? "true" : "false",
-             (unsigned long)(ESP.getFreeHeap() / 1024),
-             (unsigned long)botizinMqttAttempts);
+             (unsigned long)(millis()/1000),slot,
+             valid?"true":"false",otaReady?"true":"false",
+             (unsigned long)(ESP.getFreeHeap()/1024),
+             (unsigned long)botizinMqttAttempts,
+             eventHttpServerStarted?"true":"false",
+             eventHttpConfirmed?"true":"false",
+             eventHttpConfirmed?(long)((millis()-eventHttpLastGetMs)/1000):-1L,
+             botizinEvents.count?eventName(botizinEvents.oldest(botizinEvents.count-1).code):"NONE");
 
     // Only anonymous public test telemetry. Do not subscribe to ANY topics.
     // Never accept commands or URLs from this broker.
