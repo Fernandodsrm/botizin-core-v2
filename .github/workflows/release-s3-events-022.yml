@@ -1,0 +1,139 @@
+name: BOTIZIN S3 0.0.22 Event Journal OTA Release
+on:
+  push:
+    branches: [feature/s3-event-journal-0.0.22]
+    paths: ['.github/workflows/release-s3-events-022.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  build-stage-activate:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/feature/s3-event-journal-0.0.22'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout audited source
+        uses: actions/checkout@v4
+      - name: Require successful CI for unchanged firmware and event tests
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          result=$(gh run view 39820204109 --json conclusion --jq '.conclusion')
+          test "$result" = "success"
+          git merge-base --is-ancestor b819063332b980fe908677985e1be1b21effbe7d HEAD
+          git diff --exit-code b819063332b980fe908677985e1be1b21effbe7d HEAD -- firmware tests ci/build.py
+          echo EVENT_JOURNAL_022_CI_GATE_OK
+      - name: Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Install core and MQTT
+        shell: bash
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install 'PubSubClient@2.8'
+      - name: Build 0.0.22 with existing device token
+        env:
+          BOTIZIN_TB_DEVICE_TOKEN: ${{ secrets.BOTIZIN_TB_DEVICE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$BOTIZIN_TB_DEVICE_TOKEN" || { echo 'TOKEN_MISSING: no release'; exit 1; }
+          python3 ci/build.py
+          python3 - <<'PY'
+          import json,pathlib,os,hashlib
+          r=json.loads(pathlib.Path('dist/build-record.json').read_text())
+          b=pathlib.Path('dist/firmware.bin').read_bytes()
+          assert r['source_commit']==os.environ['GITHUB_SHA']
+          assert r['version']=='0.0.22' and r['core']=='3.3.12'
+          assert r['publishable'] is True and r['device_token_compiled'] is True
+          assert 0 < r['bytes']==len(b) < 3145728
+          assert r['sha256']==hashlib.sha256(b).hexdigest()
+          print('EVENTS022_PRODUCTION_IMAGE_VERIFIED',r['bytes'],r['sha256'])
+          PY
+      - name: Ensure native Arduino weak OTA hook
+        shell: bash
+        run: |
+          set -euo pipefail
+          NM=$(find "$HOME/.arduino15/packages/esp32/tools" -type f -name '*-nm' | head -1)
+          test -n "$NM"
+          "$NM" -C dist/firmware.elf > /tmp/event022-symbols.txt
+          grep -E ' [Ww] verifyRollbackLater' /tmp/event022-symbols.txt
+          if grep -E ' [Tt] verifyRollbackLater' /tmp/event022-symbols.txt; then exit 1; fi
+          echo EVENTS022_STOCK_OTA_CONFIRMATION_OK
+      - name: Checkout production main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: prod
+      - name: Stage new immutable firmware (no activation)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e prod/releases/0.0.22/firmware.bin
+          python3 - <<'PY'
+          import json,pathlib,hashlib
+          root=pathlib.Path('prod')
+          old=json.loads((root/'manifest.json').read_text())
+          assert old['board']=='esp32s3-n16r8' and old['version']=='0.0.21'
+          assert old['sha256']=='5d313f298a2404ecdcc6e8a9edb91a3ff7c5f68ed4c55a4b6479591be6283d77'
+          b=pathlib.Path('dist/firmware.bin').read_bytes()
+          x=json.loads(pathlib.Path('dist/manifest.json').read_text())
+          assert x['version']=='0.0.22' and x['sha256']==hashlib.sha256(b).hexdigest()
+          assert x['url']=='https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.22/firmware.bin'
+          PY
+          mkdir -p prod/releases/0.0.22
+          cp dist/firmware.bin prod/releases/0.0.22/firmware.bin
+          cp dist/manifest.json prod/releases/0.0.22/manifest.json
+          git -C prod config user.name 'botizin-release-bot'
+          git -C prod config user.email 'botizin-release-bot@users.noreply.github.com'
+          git -C prod add releases/0.0.22/
+          git -C prod commit -m 'release(s3): immutable 0.0.22 event journal, native OTA rollback retained'
+          git -C prod push origin HEAD:main
+          echo EVENTS022_BINARY_STAGED_ONLY
+      - name: Verify public GitHub Raw matches compiled image
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 6 --retry-all-errors --retry-delay 2 --max-time 30 \
+            -o "$RUNNER_TEMP/events022-remote.bin" \
+            'https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.22/firmware.bin'
+          cmp -s dist/firmware.bin "$RUNNER_TEMP/events022-remote.bin"
+          echo EVENTS022_PUBLIC_BYTES_VERIFIED
+      - name: Activate OTA offer once
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C prod fetch origin main
+          git -C prod reset --hard origin/main
+          python3 - <<'PY'
+          import json,pathlib
+          root=pathlib.Path('prod')
+          current=json.loads((root/'manifest.json').read_text())
+          new=json.loads(pathlib.Path('dist/manifest.json').read_text())
+          assert current['version']=='0.0.21'
+          assert current['sha256']=='5d313f298a2404ecdcc6e8a9edb91a3ff7c5f68ed4c55a4b6479591be6283d77'
+          assert new['version']=='0.0.22'
+          (root/'manifest.json').write_text(json.dumps(new,indent=2)+'\n')
+          PY
+          git -C prod add manifest.json
+          git -C prod commit -m 'ota(s3): offer event journal 0.0.22; preserve 0.0.21 recovery image'
+          git -C prod push origin HEAD:main
+          echo EVENTS022_OFFER_ACTIVE_DEVICE_CHECK_REQUIRED
+      - name: Record non-secret build metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: events022-prod-${{ github.sha }}
+          path: |
+            dist/build-record.json
+            dist/firmware.bin.sha256
+            dist/manifest.json
+          retention-days: 7
+          if-no-files-found: warn
