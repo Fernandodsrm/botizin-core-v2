@@ -52,6 +52,7 @@ int responseCode = 400;
 String telemetryStatus = "WAITING";
 // MQTT counters are declared in mqtt_observer.h after the core OTA functions.
 static String mqttStatusSnapshot();
+static String wifiManagerStatus();
 uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
 bool telemetryStopped = false;
@@ -171,6 +172,7 @@ String snapshot() {
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
   s += mqttStatusSnapshot();
+  s += wifiManagerStatus();
   s += diagnosticText();
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
@@ -561,6 +563,7 @@ void __attribute__((noinline)) sendTelemetry() {
 #include "peer_ota_server.h"
 #include "mqtt_observer.h"
 #include "ota_boot_health.h"
+#include "wifi_manager.h"
 
 void otaBootHealthBegin() {
   const esp_partition_t* running = esp_ota_get_running_partition();
@@ -579,7 +582,10 @@ void otaBootHealthTick() {
   const bool wifiOK = WiFi.status() == WL_CONNECTED;
   // MQTT is still used for diagnostics, but a public broker is NOT trusted
   // as a prerequisite for firmware acceptance.
-  const bool healthyNow = otaReady && wifiOK && otaBootHttpStarted;
+  // During first use at a NEW location the local WPA2 setup AP itself
+  // is a valid headless recovery interface; do not rollback before provisioning.
+  const bool localRecoveryReady = wifiOK || wifiPortalOn;
+  const bool healthyNow = otaReady && localRecoveryReady && otaBootHttpStarted;
   if (!healthyNow) {
     otaBootHealthContinuous = false;
   } else if (!otaBootHealthContinuous) {
@@ -589,14 +595,14 @@ void otaBootHealthTick() {
   const uint32_t healthyMs = otaBootHealthContinuous
                                  ? (uint32_t)(millis() - otaBootHealthySince) : 0;
   OtaHealthDecision action = otaHealthDecision(
-      otaBootPending, otaReady, wifiOK, otaBootHttpStarted,
+      otaBootPending, otaReady, localRecoveryReady, otaBootHttpStarted,
       (uint32_t)(millis() - otaBootStartedAt), healthyMs);
   if (action == OtaHealthDecision::WAIT) return;
   if (action == OtaHealthDecision::CONFIRM) {
     const esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
     if (err == ESP_OK) {
       otaBootPending = false;
-      otaBootHealthStatus = "VALID_CONFIRMED_AFTER_WIFI_HTTP";
+      otaBootHealthStatus = "VALID_CONFIRMED_AFTER_LOCAL_WIFI_SERVICE";
     } else {
       otaBootHealthStatus = "CONFIRM_ERROR_" + String((int)err);
       // Retry on a subsequent iteration; bounded deadline remains active.
@@ -647,17 +653,21 @@ void setup() {
   initializeDiagnosticFlash();
   sampleDiagnostics();
   Serial.println(snapshot());
-  WiFi.mode(WIFI_STA);
-  WiFi.setAutoReconnect(true);
-  // Reuse the Wi-Fi configuration already saved by the validated 0.0.3.
-  // No credentials are compiled into the public Internet builds.
-  WiFi.begin();
+  if (!wifiManagerInit()) {
+    Serial.println("WIFI_SETUP: NVS_INIT_FAILED; legacy Wi-Fi reconnect only");
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.begin();
+  } else {
+    wifiManagerConnectKnown();
+  }
   uint32_t start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - start < 30000) delay(100);
   Serial.println(snapshot());
-  server.on("/", HTTP_GET, []() { server.send(200, "text/plain; charset=utf-8", snapshot()); });
+  server.on("/", HTTP_GET, wifiPortalRouteHome);
   server.on("/status", HTTP_GET, []() { server.send(200, "text/plain; charset=utf-8", snapshot()); });
   beginPeerOtaServer();
+  wifiManagerRegisterRoutes();
   server.on("/update", HTTP_POST, []() {
     if (peerOtaBusy) { server.send(409, "text/plain", "S3 internet OTA busy"); return; }
     if (uploadActive) failUpload("request ended before file completion");
@@ -686,6 +696,7 @@ void loop() {
   diagnosticLoopTick();
   if (!uploadActive && !uploadOK && !rebootScheduled) sampleDiagnostics();
   server.handleClient();
+  wifiManagerTick();
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
   if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued) {
     String v = otaTargetVersion, u = otaTargetURL, h = otaTargetSHA; size_t n = otaTargetBytes;
