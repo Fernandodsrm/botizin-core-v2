@@ -48,9 +48,9 @@ jobs:
           assert 'otaBootHealthTick();' in src
           assert '!otaBootPending && !rebootScheduled' in src
           assert 'if (elapsedMs >= OTA02_TIMEOUT_MS)' in policy
-          assert 'VALID_CONFIRMED_AFTER_WIFI_HTTP' in src
+          assert 'VALID_CONFIRMED_AFTER_LOCAL_WIFI_SERVICE' in src
           assert 'botizinMqttSuccesses > 0' not in src
-          assert 'wifiOK && otaBootHttpStarted' in src
+          assert 'localRecoveryReady && otaBootHttpStarted' in src
           assert 's += mqttStatusSnapshot();' in src
           assert 's += wifiManagerStatus();' in src
           assert 'wifiManagerRegisterRoutes();' in src and 'wifiManagerTick();' in src
