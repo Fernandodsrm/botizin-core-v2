@@ -85,3 +85,9 @@ static void botizinMqttLoop() {
                   (unsigned long)botizinMqttAttempts,
                   (unsigned long)botizinMqttSuccesses);
 }
+
+static String mqttStatusSnapshot() {
+    return String("MQTT_LAST: ") + botizinMqttLast + "\n" +
+           "MQTT_ATTEMPTS: " + String((unsigned long)botizinMqttAttempts) + "\n" +
+           "MQTT_SUCCESSES: " + String((unsigned long)botizinMqttSuccesses) + "\n";
+}
