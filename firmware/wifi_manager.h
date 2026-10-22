@@ -119,7 +119,11 @@ static void wifiPortalSave() {
 }
 static void wifiPortalRouteHome() {
   if(wifiRequestFromSetupAP())wifiPortalPage();
-  else server.send(200,"text/plain; charset=utf-8",snapshot());
+  else {
+    eventJournalHttpReceived();
+    server.sendHeader("Cache-Control","no-store");
+    server.send_P(200,"text/html; charset=utf-8",kBotizinPanelHTML);
+  }
 }
 static void wifiManagerRegisterRoutes() {
   server.on("/wifi",HTTP_GET,wifiPortalPage);
