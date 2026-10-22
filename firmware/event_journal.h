@@ -7,6 +7,8 @@ static bool eventPrefsAvailable=false;
 static uint32_t eventBootCount=0;
 static bool eventHttpConfirmed=false;
 static bool eventHttpServerStarted=false;
+static uint32_t eventHttpGetCount=0;
+static uint32_t eventHttpLastGetMs=0;
 static int8_t eventWifiObserved=-1;
 static int8_t eventMqttObserved=-1;
 static bool eventOtaCheckReported=false;
@@ -50,6 +52,8 @@ static void eventJournalMqttResult(bool ok) {
               ok?"PUBLISH_OK":"PUBLISH_FAILED");
 }
 static void eventJournalHttpReceived() {
+  ++eventHttpGetCount;
+  eventHttpLastGetMs=millis();
   if(eventHttpConfirmed)return;
   eventHttpConfirmed=true;
   eventRecord(EV_HTTP_REQUEST_OK,EV_INFO,"FIRST_GET_SERVED");
@@ -60,7 +64,9 @@ static String eventJournalStatus() {
       "EVENTS_OVERWRITTEN: "+String(botizinEvents.overwritten())+"\n"+
       "EVENTS_BOOT_COUNT: "+String(eventBootCount)+"\n"+
       "HTTP_SERVER_STARTED: "+String(eventHttpServerStarted?"YES":"NO")+"\n"+
-      "HTTP_CONFIRMED_BY_REQUEST: "+String(eventHttpConfirmed?"YES":"NO")+"\n";
+      "HTTP_CONFIRMED_BY_REQUEST: "+String(eventHttpConfirmed?"YES":"NO")+"\n"+
+      "HTTP_REQUESTS_SINCE_BOOT: "+String(eventHttpGetCount)+"\n"+
+      "HTTP_LAST_REQUEST_AGE_S: "+String(eventHttpConfirmed? (millis()-eventHttpLastGetMs)/1000 : 0)+"\n";
 }
 static String eventJournalText() {
   String out;
