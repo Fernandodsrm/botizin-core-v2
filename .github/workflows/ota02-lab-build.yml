@@ -29,17 +29,19 @@ jobs:
           /tmp/ota02-test
           g++ -std=c++17 -Wall -Wextra -Werror tests/ota_confirmation_test.cpp -o /tmp/ota-confirm-test
           /tmp/ota-confirm-test
-      - name: Confirm lab-only source invariants and unchanged production offer
+      - name: Confirm lab-only source invariants and independent LIVE production offer
         run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --max-time 15 https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/manifest.json -o /tmp/ota02-live-manifest.json
           python3 - <<'PY'
           from pathlib import Path
           import json
           src=Path('firmware/firmware.ino').read_text()
           policy=Path('firmware/ota_boot_health.h').read_text()
           version=Path('firmware/version.h').read_text()
-          manifest=json.loads(Path('manifest.json').read_text())
+          manifest=json.loads(Path('/tmp/ota02-live-manifest.json').read_text())
           assert '#define BOTIZIN_VERSION "0.0.18"' in version
-          assert manifest['version']=='0.0.17',manifest
+          assert manifest['version']=='0.0.17' and manifest['sha256']=='7a7c16bcb2acd885c74c7d8ad77fe15f9d0e1e55d634dfd23d1ebb7abdb6884f',manifest
           assert 'extern "C" bool verifyRollbackLater(void) { return true; }' in src
           assert 'esp_ota_mark_app_valid_cancel_rollback()' in src
           assert 'esp_ota_mark_app_invalid_rollback_and_reboot()' in src
