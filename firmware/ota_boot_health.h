@@ -15,13 +15,14 @@ inline OtaHealthDecision otaHealthDecision(bool pendingVerify,
                                            bool clockSynced,
                                            bool httpStarted,
                                            bool mqttPublishSucceeded,
-                                           uint32_t elapsedMs) {
+                                           uint32_t elapsedMs,
+                                           uint32_t healthyDurationMs) {
     if (!pendingVerify) return OtaHealthDecision::NOT_PENDING;
     if (!partitionsReady) return OtaHealthDecision::ROLLBACK;
+    if (elapsedMs >= OTA02_TIMEOUT_MS) return OtaHealthDecision::ROLLBACK;
     if (wifiConnected && clockSynced && httpStarted && mqttPublishSucceeded &&
-        elapsedMs >= OTA02_MIN_STABLE_MS) {
+        healthyDurationMs >= OTA02_MIN_STABLE_MS) {
         return OtaHealthDecision::CONFIRM;
     }
-    if (elapsedMs >= OTA02_TIMEOUT_MS) return OtaHealthDecision::ROLLBACK;
     return OtaHealthDecision::WAIT;
 }
