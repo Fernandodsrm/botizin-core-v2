@@ -130,6 +130,8 @@ String resetInfo() {
   return String(name) + " (" + String((int)r) + ")";
 }
 
+#include "event_journal.h"
+
 String snapshot() {
   const esp_partition_t *run = esp_ota_get_running_partition();
   String s = "BOTIZIN CORE V" + String(BOTIZIN_VERSION) + "\n";
@@ -164,6 +166,7 @@ String snapshot() {
   s += "TELEMETRY: " + telemetryStatus + "\n";
   s += mqttStatusSnapshot();
   s += wifiManagerStatus();
+  s += eventJournalStatus();
   s += diagnosticText();
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
@@ -205,6 +208,7 @@ bool hashPartition(const esp_partition_t *p, size_t size, String &result) {
 }
 
 void failUpload(const String &reason) {
+  eventRecord(EV_OTA_ERROR, EV_ERROR, reason.c_str(), true);
   logLine("FAIL: " + reason);
   logLine("UPDATE_LIBRARY_ERROR: " + String(Update.getError()) + " / " + Update.errorString());
   if (Update.isRunning()) Update.abort();
@@ -297,7 +301,8 @@ void finishUpload() {
     uploadActive = false;
     uploadOK = true;
     responseCode = 200;
-    logLine("OTA_WRITE_VERIFIED: YES; reboot requires POST /reboot");
+    eventRecord(EV_OTA_VERIFIED,EV_INFO,"FLASH_SHA_OK",true);
+  logLine("OTA_WRITE_VERIFIED: YES; reboot requires POST /reboot");
     checkpoint();
   }
 
@@ -321,6 +326,7 @@ bool newerVersion(const String &candidate) {
 void stopInternet(const String &reason) {
   internetStatus = "STOPPED: " + reason;
   internetStopped = true;
+  eventRecord(EV_OTA_ERROR,EV_ERROR,reason.c_str(),true);
   Serial.println("INTERNET_OTA: " + internetStatus);
 }
 
@@ -336,6 +342,7 @@ void checkInternetOTA(bool manual) {
     internetStatus = "WAITING_FOR_NTP";
     Serial.println("INTERNET_OTA: " + internetStatus); return;
   }
+  if(!eventOtaCheckReported) { eventOtaCheckReported=true; eventRecord(EV_OTA_CHECK,EV_INFO,"GITHUB_MANIFEST"); }
   Serial.println("INTERNET_OTA: CHECKING_MANIFEST");
   NetworkClientSecure tls;
   tls.useBuiltinCACertBundle();
@@ -392,6 +399,7 @@ void checkInternetOTA(bool manual) {
   }
   if (targetVersion == BOTIZIN_VERSION) {
     internetStatus = "UP_TO_DATE " + targetVersion;
+    if(!eventOtaCurrentReported){eventOtaCurrentReported=true;eventRecord(EV_OTA_CURRENT,EV_INFO,"MATCHES_MANIFEST");}
     Serial.println("INTERNET_OTA: " + internetStatus); return;
   }
   if (!newerVersion(targetVersion)) {
@@ -399,6 +407,7 @@ void checkInternetOTA(bool manual) {
     // manifest. This must NOT permanently disable future OTA polling.
     internetStatus = "MANIFEST_NOT_NEWER " + targetVersion; return;
   }
+  eventRecord(EV_OTA_AVAILABLE,EV_INFO,"NEW_MANIFEST_VERSION");
   if (manual) {
     otaTargetVersion = targetVersion; otaTargetURL = targetURL; otaTargetSHA = targetSHA; otaTargetBytes = targetBytes;
     otaCandidateId = telemetryBootId + "-" + String((unsigned long)esp_random(), HEX);
@@ -412,6 +421,7 @@ void installInternetOTA(const String &targetVersion, const String &targetURL, co
   if (!otaReady || internetStopped || uploadActive || uploadOK || rebootScheduled || WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000 || !newerVersion(targetVersion)) {
     manualOtaStatus = "INSTALL_REJECTED"; return;
   }
+  eventRecord(EV_OTA_START,EV_INFO,"HTTPS_DOWNLOAD");
   showOtaProgress("ABRINDO DOWNLOAD");
   Serial.println("TARGET_VERSION: " + targetVersion);
   Serial.println("DOWNLOAD_URL: " + targetURL);
@@ -472,6 +482,7 @@ void installInternetOTA(const String &targetVersion, const String &targetURL, co
   internetStatus = "VERIFIED " + targetVersion + "; REBOOT_PENDING";
   manualOtaStatus = "VERIFIED_REBOOT_PENDING";
   showOtaProgress("SHA OK REINICIANDO", writtenBytes, expectedBytes);
+  eventRecord(EV_OTA_REBOOT,EV_INFO,"VERIFIED_IMAGE_READY",true);
   logLine("REBOOT_REQUESTED: SOFTWARE / INTERNET_OTA");
   checkpoint();
   rebootAt = millis() + 2000;
@@ -541,11 +552,16 @@ void __attribute__((noinline)) sendTelemetry() {
   diagnosticScope.failed = code != 200;
   cJSON_free(payload);
   telemetryStatus = "HTTP_" + String(code);
+  if (code < 200 || code >= 300) {
+    char shortCode[20];snprintf(shortCode,sizeof(shortCode),"HTTP_%d",code);
+    eventRecord(EV_TB_ERROR,EV_WARN,shortCode);
+  }
   Serial.println("TELEMETRY: " + telemetryStatus);
   if (code >= 200 && code < 300) telemetryFailures = 0;
   else if (++telemetryFailures >= 3) {
     telemetryStopped = true;
     telemetryStatus = "PAUSED_AFTER_3_FAILURES_UNTIL_REBOOT";
+    eventRecord(EV_TB_PAUSED,EV_ERROR,"THREE_SEND_FAILURES",true);
     Serial.println("TELEMETRY: " + telemetryStatus);
   }
 }
@@ -569,6 +585,7 @@ void printPartitionTable() {
 void setup() {
   Serial.begin(115200);
   delay(1500);
+  eventJournalBegin(resetInfo().c_str());
   loadPeerKey();
   bool journalOK = journal.begin("botizin-v2", false);
   if (journalOK) priorAttempt = journal.getString("last", "");
@@ -584,6 +601,8 @@ void setup() {
              a->size == 0x300000 && b->size == 0x300000 &&
              data->address == 0xe000 && data->size == 0x2000 && run &&
              (run->address == a->address || run->address == b->address);
+  eventRecord(otaReady?EV_HW_OK:EV_HW_ERROR,otaReady?EV_INFO:EV_ERROR,
+              otaReady?"FLASH_PSRAM_PARTITIONS_OK":"HW_PARTITION_CHECK_FAILED",!otaReady);
   initializeDiagnosticFlash();
   sampleDiagnostics();
   Serial.println(snapshot());
@@ -597,9 +616,11 @@ void setup() {
   }
   uint32_t start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - start < 30000) delay(100);
+  eventJournalObserveWiFi();
   Serial.println(snapshot());
   server.on("/", HTTP_GET, wifiPortalRouteHome);
-  server.on("/status", HTTP_GET, []() { server.send(200, "text/plain; charset=utf-8", snapshot()); });
+  server.on("/status", HTTP_GET, []() { eventJournalHttpReceived(); server.send(200, "text/plain; charset=utf-8", snapshot()); });
+  eventJournalRegisterRoute(server);
   beginPeerOtaServer();
   wifiManagerRegisterRoutes();
   server.on("/update", HTTP_POST, []() {
@@ -619,12 +640,15 @@ void setup() {
   nextTelemetry = millis() + 20000;
   nextInternetCheck = millis() + 10000;
   server.begin();
+  eventHttpServerStarted=true;
+  eventRecord(EV_HTTP_STARTED,EV_INFO,"LISTENER_INIT_NOT_REACHABILITY");
   maintainLocalName();
   botizinMqttSetup();
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
 }
 
 void loop() {
+  eventJournalObserveWiFi();
   maintainLocalName();
   diagnosticLoopTick();
   if (!uploadActive && !uploadOK && !rebootScheduled) sampleDiagnostics();
