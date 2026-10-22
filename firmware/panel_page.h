@@ -85,6 +85,7 @@ Digite ajuda para listar comandos.</pre>
 <button id="termRun" type="submit">Consultar</button></form>
 <p class="tiny">O terminal consulta <code>/status</code> ou <code>/events</code> exclusivamente após Enter ou clique. Se o HTTP falhar, consulta indisponível; USB/MQTT seguem independentes.</p>
 </section>
+<section class="panel"><h2>BOTIZIN LAB — rosto e voz</h2><p class="muted">Experimento de interface; ainda sem serviço XiaoZhi ou IA. Não altera GPIO.</p><a href="/botizin">Abrir BOTIZIN LAB (rosto, texto e teste de voz)</a></section>
 <section class="panel" id="controls-panel">
 <h2>Central de comandos · autenticada</h2>
 <p class="muted small">Ações somente por clique, na rede local. Use a senha individual <b>BOTIZIN-S3-SETUP</b> impressa no USB, criada pela própria S3. Nenhuma senha é enviada ao GitHub.</p>
@@ -116,6 +117,7 @@ Digite ajuda para listar comandos.</pre>
 <div class="panel"><h2>Sistema</h2>
 <p class="muted small">Reinício solicitado, nunca automático pelo painel.</p>
 <button id="controlReboot" type="button">Reiniciar a S3</button>
+<button id="controlReturnCore" type="button">Retornar ao CORE 0.0.25 verificado</button>
 <p class="tiny">Após reiniciar, é necessário autenticar de novo. O OTA mantém o rollback original do Arduino.</p>
 <button id="controlLogout" type="button">Bloquear comandos</button>
 </div>
@@ -320,6 +322,11 @@ $('controlWifiForm').addEventListener('submit',async e=>{
  const result=await runControl('/control/wifi-save',{ssid,password:pass});
  $('controlWifiPassword').value='';
  if(result)clearControlSession('Wi-Fi salvo. S3 reiniciando. Autentique novamente após conectar.');
+});
+$('controlReturnCore').addEventListener('click',async()=>{
+  if(!window.confirm('Retornar ao CORE 0.0.25 em ota_0? O SHA-256 da imagem será conferido antes de reiniciar.'))return;
+  const result=await runControl('/control/return-core',{confirm:'RETURN_TO_025'});
+  if(result)clearControlSession('Retorno solicitado. Consulte o painel novamente após reiniciar.');
 });
 $('controlReboot').addEventListener('click',async()=>{
  if(!window.confirm('Reiniciar a S3 agora?'))return;
