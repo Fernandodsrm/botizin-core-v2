@@ -38,6 +38,13 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
  border-radius:8px;padding:11px 12px;font:14px Consolas,ui-monospace,monospace}
 .term-input:focus{outline:2px solid #71c49b;outline-offset:1px}
 .term-log{min-height:120px;max-height:325px}
+[hidden]{display:none!important}
+.control-input{background:#081512;border:1px solid #436856;border-radius:8px;color:#f0fff7;padding:11px 12px;font:inherit;font-size:.9rem;width:100%;max-width:370px}
+.control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.control-grid .panel{margin:0}.control-form{display:flex;flex-direction:column;gap:8px}
+.control-form label{font-size:.82rem;color:#c3dad0}
+.control-line{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+@media(max-width:720px){.control-grid{grid-template-columns:1fr}}
 @media(max-width:720px){main{padding:12px}.g{grid-template-columns:repeat(2,minmax(0,1fr))}.pair{grid-template-columns:1fr}header{align-items:flex-start}h1{font-size:1.4rem}}
 </style></head><body>
 <main>
@@ -77,6 +84,45 @@ Digite ajuda para listar comandos.</pre>
 <input id="termInput" class="term-input" type="text" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Ex.: ota" aria-label="Comando de diagnóstico"/>
 <button id="termRun" type="submit">Consultar</button></form>
 <p class="tiny">O terminal consulta <code>/status</code> ou <code>/events</code> exclusivamente após Enter ou clique. Se o HTTP falhar, consulta indisponível; USB/MQTT seguem independentes.</p>
+</section>
+<section class="panel" id="controls-panel">
+<h2>Central de comandos · autenticada</h2>
+<p class="muted small">Ações somente por clique, na rede local. Use a senha individual <b>BOTIZIN-S3-SETUP</b> impressa no USB, criada pela própria S3. Nenhuma senha é enviada ao GitHub.</p>
+<div class="control-line" id="controlLoginBox">
+<input id="controlPassword" type="password" class="control-input" maxlength="32" autocomplete="off" placeholder="Senha da configuração da S3" aria-label="Senha do painel"/>
+<button id="controlLogin" type="button">Desbloquear comandos</button>
+</div>
+<div id="controlAuthStatus" class="tiny" role="status">Bloqueado. Sessão de 10 minutos após autenticar; não fica salva no navegador.</div>
+<div id="controlActions" hidden>
+<div class="buttons">
+<button id="controlConnections" type="button">Verificar conexões</button>
+<button id="controlCheckOTA" type="button">Consultar OTA agora</button>
+<button id="controlOTAResult" type="button">Resultado da consulta OTA</button>
+<button id="controlInstall" type="button" disabled>Instalar atualização confirmada</button>
+<button id="controlCancel" type="button">Cancelar consulta OTA</button>
+</div>
+<div class="control-grid" style="margin-top:13px">
+<div class="panel">
+<h2>Trocar Wi-Fi</h2>
+<form id="controlWifiForm" class="control-form" autocomplete="off">
+<label for="controlSsid">Rede Wi-Fi 2,4 GHz</label>
+<input class="control-input" id="controlSsid" name="ssid" minlength="1" maxlength="32" required placeholder="Nome da rede" autocomplete="off"/>
+<label for="controlWifiPassword">Senha da nova rede</label>
+<input class="control-input" id="controlWifiPassword" name="password" type="password" minlength="8" maxlength="63" placeholder="Senha da rede" autocomplete="new-password"/>
+<button id="controlSaveWifi" type="submit">Salvar Wi-Fi e reiniciar</button>
+</form>
+<p class="tiny">Se a rede estiver errada, o ponto de acesso de recuperação da S3 volta a aparecer. Anote a senha individual antes de trocar a rede.</p>
+</div>
+<div class="panel"><h2>Sistema</h2>
+<p class="muted small">Reinício solicitado, nunca automático pelo painel.</p>
+<button id="controlReboot" type="button">Reiniciar a S3</button>
+<p class="tiny">Após reiniciar, é necessário autenticar de novo. O OTA mantém o rollback original do Arduino.</p>
+<button id="controlLogout" type="button">Bloquear comandos</button>
+</div>
+</div>
+<pre id="controlOutput" role="log" aria-live="polite">Comandos prontos. Somente ações iniciadas por você.</pre>
+</div>
+<div class="note">Segurança: a conexão local HTTP não usa HTTPS. Use apenas em uma rede Wi-Fi confiável, sem redirecionar portas do roteador. Comandos antigos de manutenção possuem rotas próprias e serão auditados separadamente.</div>
 </section>
 <section class="panel"><h2>Saídas alternativas quando o HTTP falhar</h2>
 <p class="small muted">Se a página já está aberta e a leitura falha, o painel indica indisponibilidade. Se nem a página abrir, ela própria não poderá avisar.</p>
@@ -187,6 +233,100 @@ $('termForm').addEventListener('submit',e=>{
  terminalCommand(cmd);
 });
 // No periodic terminal polls: network reads require a human command.
+// Protected controls: all network calls below require a deliberate click/submit.
+// Session is volatile in this browser tab; never localStorage/cookies.
+let controlSession='';
+let currentCandidate=null;
+function controlOutput(message){const e=$('controlOutput');e.textContent=message; e.scrollTop=e.scrollHeight}
+function clearControlSession(message){
+ controlSession='';currentCandidate=null;
+ $('controlActions').hidden=true;$('controlLoginBox').hidden=false;
+ $('controlInstall').disabled=true;
+ $('controlAuthStatus').textContent=message||'Sessão bloqueada.';
+}
+async function controlPost(path,fields={},authentication=true){
+ const params=new URLSearchParams(fields);
+ const headers={'Content-Type':'application/x-www-form-urlencoded'};
+ if(authentication)headers['X-Botizin-Session']=controlSession;
+ const ctrl=new AbortController(),timeout=setTimeout(()=>ctrl.abort(),13000);
+ try {
+  const r=await fetch(path,{method:'POST',headers,body:params.toString(),cache:'no-store',
+                            redirect:'error',signal:ctrl.signal});
+  const body=await r.text();
+  if(!r.ok)throw new Error('HTTP '+r.status+': '+body);
+  return body.trim();
+ } finally{clearTimeout(timeout)}
+}
+async function runControl(path,fields={}){
+ if(!controlSession){clearControlSession('Faça login novamente.');return null}
+ try{const result=await controlPost(path,fields);controlOutput(result);return result}
+ catch(e){controlOutput('ERRO: '+e.message);
+   if(String(e.message).includes('AUTH_REQUIRED_OR_EXPIRED'))clearControlSession('Sessão expirada. Autentique novamente.');
+   return null}
+}
+$('controlLogin').addEventListener('click',async()=>{
+ const btn=$('controlLogin'),password=$('controlPassword').value;
+ if(!password){$('controlAuthStatus').textContent='Digite a senha individual da S3.';return}
+ btn.disabled=true;
+ try{
+  const token=await controlPost('/control/login',{password},false);
+  if(!/^[0-9a-f]{32}$/.test(token))throw new Error('Resposta de autenticação inválida');
+  controlSession=token;$('controlPassword').value='';
+  $('controlLoginBox').hidden=true;$('controlActions').hidden=false;
+  $('controlAuthStatus').textContent='Comandos desbloqueados temporariamente. Sem consultas automáticas.';
+  controlOutput('Autenticado. Os botões funcionam sob demanda.');
+ }catch(e){$('controlAuthStatus').textContent='Não foi possível autenticar: '+e.message}
+ finally{btn.disabled=false}
+});
+$('controlLogout').addEventListener('click',async()=>{
+ if(controlSession)try{await controlPost('/control/logout')}catch(e){}
+ clearControlSession('Comandos bloqueados.');
+});
+$('controlConnections').addEventListener('click',()=>runControl('/control/connections'));
+$('controlCheckOTA').addEventListener('click',async()=>{
+ currentCandidate=null;$('controlInstall').disabled=true;
+ const res=await runControl('/control/check-ota');
+ if(res)controlOutput(res+'\nA S3 consultará o GitHub uma vez. Clique em "Resultado da consulta OTA" depois.');
+});
+$('controlOTAResult').addEventListener('click',async()=>{
+ const r=await runControl('/control/ota-result');
+ if(!r)return;
+ if(r.startsWith('AVAILABLE|')){
+  const p=r.split('|');
+  if(p.length===6 && /^[0-9a-f]{64}$/.test(p[3])){
+   currentCandidate={candidate_id:p[1],target_version:p[2],sha256:p[3],boot_id:p[4]};
+   $('controlInstall').disabled=false;
+   controlOutput('ATUALIZAÇÃO DISPONÍVEL\nVersão: '+p[2]+'\nTamanho: '+p[5]+' bytes\nSHA-256: '+p[3]+
+     '\nPara instalar, clique no botão de confirmação. Nenhuma instalação começou.');
+  }
+ }else{currentCandidate=null;$('controlInstall').disabled=true}
+});
+$('controlInstall').addEventListener('click',async()=>{
+ if(!currentCandidate)return;
+ const c=currentCandidate;
+ if(!window.confirm('Instalar firmware '+c.target_version+' e reiniciar a S3? A instalação só será iniciada após confirmar.'))return;
+ currentCandidate=null;$('controlInstall').disabled=true;
+ await runControl('/control/install-ota',c);
+});
+$('controlCancel').addEventListener('click',async()=>{
+ currentCandidate=null;$('controlInstall').disabled=true;
+ await runControl('/control/cancel-ota');
+});
+$('controlWifiForm').addEventListener('submit',async e=>{
+ e.preventDefault();
+ const ssid=$('controlSsid').value.trim(),pass=$('controlWifiPassword').value;
+ if(!ssid || (pass.length>0 && pass.length<8))return;
+ if(!window.confirm('Trocar a rede para "'+ssid+'"? A S3 vai reiniciar. Se a senha estiver errada, será necessário usar a rede de recuperação.'))return;
+ const result=await runControl('/control/wifi-save',{ssid,password:pass});
+ $('controlWifiPassword').value='';
+ if(result)clearControlSession('Wi-Fi salvo. S3 reiniciando. Autentique novamente após conectar.');
+});
+$('controlReboot').addEventListener('click',async()=>{
+ if(!window.confirm('Reiniciar a S3 agora?'))return;
+ const result=await runControl('/control/reboot');
+ if(result)clearControlSession('Reinício solicitado. A conexão será interrompida.');
+});
+// No automatic control actions, timers or polling.
 // Exactly one startup read of each resource. No interval, socket or background probes.
 loadStatus();loadEvents();
 </script>
