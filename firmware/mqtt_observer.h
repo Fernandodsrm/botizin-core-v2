@@ -5,7 +5,7 @@
 // device identifiers, IP, SSID, keys, GPIO status and OTA journal.
 #include <PubSubClient.h>
 
-static WiFiClientSecure botizinMqttTls;
+static NetworkClientSecure botizinMqttTls;
 static PubSubClient botizinMqtt(botizinMqttTls);
 static uint32_t botizinMqttNextAt = 0;
 static uint32_t botizinMqttAttempts = 0;
@@ -25,7 +25,8 @@ static void botizinMqttSetup() {
     botizinMqtt.setSocketTimeout(3);
     botizinMqtt.setBufferSize(384);
     botizinMqttTls.useBuiltinCACertBundle();
-    botizinMqttTls.setTimeout(3);
+    botizinMqttTls.setHandshakeTimeout(5);
+    botizinMqttTls.setTimeout(5000);
 }
 
 static void botizinMqttLoop() {
