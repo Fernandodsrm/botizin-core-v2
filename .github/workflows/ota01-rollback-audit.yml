@@ -1,0 +1,48 @@
+name: OTA-01 - S3 0.0.17 recovery audit (NO FLASH)
+
+on:
+  push:
+    branches: [study/ota-01-rollback-recovery]
+    paths:
+      - ".github/workflows/ota01-rollback-audit.yml"
+      - "tests/ota01_real_firmware_test.py"
+      - "tests/ota_confirmation_test.cpp"
+      - "firmware/ota_confirmation.h"
+      - "firmware/firmware.ino"
+      - "firmware/version.h"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ota-audit:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exactly the audit branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Fetch pinned Arduino 3.3.12 boot validation logic — read only
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --max-time 20 \
+            "https://raw.githubusercontent.com/espressif/arduino-esp32/3.3.12/cores/esp32/esp32-hal-misc.c" \
+            -o tests/reference-arduino-core-3.3.12-misc.c
+          grep -q 'bool verifyRollbackLater()' tests/reference-arduino-core-3.3.12-misc.c
+          grep -q 'esp_ota_mark_app_valid_cancel_rollback()' tests/reference-arduino-core-3.3.12-misc.c
+      - name: Exercise current OTA code and core policy — no ESP32 flashing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/ota01_real_firmware_test.py 2>&1 | tee /tmp/ota01-tests.log
+      - name: Store audit test transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ota01-tests-${{ github.sha }}
+          path: /tmp/ota01-tests.log
+          retention-days: 30
+          if-no-files-found: warn
