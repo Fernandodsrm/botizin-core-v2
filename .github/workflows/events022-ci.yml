@@ -1,0 +1,90 @@
+name: BOTIZIN S3 0.0.22 event journal CI NO RELEASE
+on:
+  push:
+    branches: [feature/s3-event-journal-0.0.22]
+    paths: ['firmware/**', 'tests/event_ring_test.cpp', '.github/workflows/events022-ci.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/feature/s3-event-journal-0.0.22'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Host unit tests and source safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++17 -Wall -Wextra -Werror tests/event_ring_test.cpp -o /tmp/test-events
+          /tmp/test-events
+          g++ -std=c++17 -Wall -Wextra -Werror tests/ota_confirmation_test.cpp -o /tmp/test-ota
+          /tmp/test-ota
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('firmware/firmware.ino').read_text()
+          j=Path('firmware/event_journal.h').read_text()
+          ring=Path('firmware/event_ring.h').read_text()
+          mqtt=Path('firmware/mqtt_observer.h').read_text()
+          wifi=Path('firmware/wifi_manager.h').read_text()
+          assert '"0.0.22"' in Path('firmware/version.h').read_text()
+          assert 'extern "C" bool verifyRollbackLater' not in src
+          assert 'otaBootHealthTick();' not in src
+          assert 'eventJournalBegin(resetInfo().c_str());' in src
+          assert 'eventJournalRegisterRoute(server);' in src
+          assert 'eventRecord(EV_OTA_VERIFIED' in src
+          assert 'eventRecord(EV_TB_PAUSED' in src
+          assert 'HTTP_LAST_REQUEST_AGE_S:' in j
+          assert 'if(eventWifiObserved==current)return;' in j
+          assert 'if(eventMqttObserved==current)return;' in j
+          assert 'static_assert(sizeof(EventRing)<4096' in ring
+          assert 'eventRecord(EV_WIFI_SETUP_ON' in wifi
+          assert 'http_age_s' in mqtt
+          print('EVENTS022_SOURCE_TESTS_OK')
+          PY
+      - name: Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Install core 3.3.12 and MQTT
+        shell: bash
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install 'PubSubClient@2.8'
+      - name: Compile for S3 test only
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset BOTIZIN_TB_DEVICE_TOKEN
+          python3 ci/build.py
+          python3 - <<'PY'
+          import json,pathlib
+          r=json.loads(pathlib.Path('dist/build-record.json').read_text())
+          assert r['version']=='0.0.22' and r['bytes']<=3145728
+          assert r['published'] is False and r['publishable'] is False
+          print('EVENTS022_COMPILE_OK',r['bytes'],r['sha256'])
+          PY
+      - name: Verify factory rollback hook
+        shell: bash
+        run: |
+          set -euo pipefail
+          NM=$(find "$HOME/.arduino15/packages/esp32/tools" -type f -name '*-nm' | head -1)
+          test -n "$NM"
+          "$NM" -C dist/firmware.elf > /tmp/symbols.txt
+          grep -E ' [Ww] verifyRollbackLater' /tmp/symbols.txt
+          if grep -E ' [Tt] verifyRollbackLater' /tmp/symbols.txt; then exit 1; fi
+          echo EVENTS022_FACTORY_ROLLBACK_OK
+      - name: Upload test-only package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: events022-ci-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: warn
