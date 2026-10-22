@@ -6,6 +6,7 @@ static Preferences eventPrefs;
 static bool eventPrefsAvailable=false;
 static uint32_t eventBootCount=0;
 static bool eventHttpConfirmed=false;
+static bool eventHttpServerStarted=false;
 static int8_t eventWifiObserved=-1;
 static int8_t eventMqttObserved=-1;
 static bool eventOtaCheckReported=false;
@@ -58,7 +59,7 @@ static String eventJournalStatus() {
       "EVENTS_TOTAL: "+String(botizinEvents.total)+"\n"+
       "EVENTS_OVERWRITTEN: "+String(botizinEvents.overwritten())+"\n"+
       "EVENTS_BOOT_COUNT: "+String(eventBootCount)+"\n"+
-      "HTTP_SERVER_STARTED: YES\n"+
+      "HTTP_SERVER_STARTED: "+String(eventHttpServerStarted?"YES":"NO")+"\n"+
       "HTTP_CONFIRMED_BY_REQUEST: "+String(eventHttpConfirmed?"YES":"NO")+"\n";
 }
 static String eventJournalText() {
