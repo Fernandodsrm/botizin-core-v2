@@ -24,7 +24,10 @@ if ($record.version -ne "0.0.18" -or $record.core -ne "3.3.12" -or
 }
 $bytes=(Get-Item -LiteralPath $bin).Length
 $sha=(Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($bytes -ne [long]$record.bytes -or
+if ($bytes -ne 1209136 -or
+    $sha -ne "a360836ac1d886e53ab1db90fe4046675c6904d3635815a0aab88696ff03300d" -or
+    [string]$record.source_commit -ne "cb5a9aa713bd616409d70dc3c025e48f236d5596" -or
+    $bytes -ne [long]$record.bytes -or
     $sha -ne [string]$record.sha256 -or $bytes -gt 3145728) {
   Fail "Tamanho ou SHA256 nao bate com registro de compilacao."
 }
