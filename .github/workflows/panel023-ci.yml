@@ -1,0 +1,110 @@
+name: BOTIZIN S3 0.0.23 diagnostic panel CI NO RELEASE
+on:
+  push:
+    branches: [feature/s3-diagnostic-panel-0.0.23]
+    paths: ['firmware/**', 'tests/**', '.github/workflows/panel023-ci.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/feature/s3-diagnostic-panel-0.0.23'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Host event and OTA tests + panel safety invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++17 -Wall -Wextra -Werror tests/event_ring_test.cpp -o /tmp/test-events
+          /tmp/test-events
+          g++ -std=c++17 -Wall -Wextra -Werror tests/ota_confirmation_test.cpp -o /tmp/test-ota
+          /tmp/test-ota
+          python3 - <<'PY'
+          import re
+          from html.parser import HTMLParser
+          from pathlib import Path
+          fw=Path('firmware/firmware.ino').read_text()
+          wifi=Path('firmware/wifi_manager.h').read_text()
+          header=Path('firmware/panel_page.h').read_text()
+          version=Path('firmware/version.h').read_text()
+          assert '"0.0.23"' in version
+          assert '#include "panel_page.h"' in fw
+          assert 'server.on("/", HTTP_GET, wifiPortalRouteHome)' in fw
+          assert 'server.on("/panel", HTTP_GET, wifiPortalRouteHome)' in fw
+          assert 'server.on("/status", HTTP_GET' in fw
+          assert 'eventJournalRegisterRoute(server)' in fw
+          assert 'if(wifiRequestFromSetupAP())wifiPortalPage();' in wifi
+          assert 'server.send_P(200,"text/html; charset=utf-8",kBotizinPanelHTML)' in wifi
+          assert 'extern "C" bool verifyRollbackLater' not in fw
+          assert 'otaBootHealthTick();' not in fw
+          assert 'static uint8_t buffer[4096]' in fw
+          m=re.search(r'R"BTZN\((.*?)\)BTZN"',header,re.DOTALL)
+          assert m,'Raw C++ HTML literal not found'
+          html=m.group(1)
+          class Check(HTMLParser):
+            def __init__(self):super().__init__();self.ids=set();self.buttons=0
+            def handle_starttag(self,tag,attrs):
+              d=dict(attrs)
+              if 'id' in d:self.ids.add(d['id'])
+              if tag=='button':self.buttons+=1
+          c=Check();c.feed(html)
+          assert {'state','firmware','network','ota','memory','events','refresh','eventsBtn','copy','statusTime','eventTime','overview'}<=c.ids
+          assert c.buttons==3,c.buttons
+          assert "fetch(endpoint,{cache:'no-store'" in html
+          assert "loadStatus();loadEvents();" in html
+          assert "addEventListener('click',loadStatus)" in html
+          assert "addEventListener('click',loadEvents)" in html
+          for forbidden in ('setInterval(', 'WebSocket(', 'EventSource(', 'location.reload(', "fetch('/update", "fetch('/reboot", 'eval('):
+            assert forbidden not in html,forbidden
+          assert 'HTTP INDISPONÍVEL' in html
+          assert 'HTTP_INDISPONÍVEL' not in wifi
+          assert 'R"BTZN(' not in Path('firmware/firmware.ino').read_text()
+          print('PANEL023_STATIC_UI_TESTS_OK',len(html),'bytes, three manual buttons and one startup snapshot')
+          PY
+      - name: Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Install core 3.3.12 and MQTT
+        shell: bash
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install 'PubSubClient@2.8'
+      - name: Compile actual S3 but do not publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset BOTIZIN_TB_DEVICE_TOKEN
+          python3 ci/build.py
+          python3 - <<'PY'
+          import json,pathlib
+          r=json.loads(pathlib.Path('dist/build-record.json').read_text())
+          assert r['version']=='0.0.23' and 0<r['bytes']<=3145728
+          assert r['published'] is False and r['publishable'] is False
+          print('PANEL023_S3_COMPILE_OK',r['bytes'],r['sha256'])
+          PY
+      - name: Confirm stock Arduino rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          NM=$(find "$HOME/.arduino15/packages/esp32/tools" -type f -name '*-nm' | head -1)
+          test -n "$NM"
+          "$NM" -C dist/firmware.elf > /tmp/panel023-symbols.txt
+          grep -E ' [Ww] verifyRollbackLater' /tmp/panel023-symbols.txt
+          if grep -E ' [Tt] verifyRollbackLater' /tmp/panel023-symbols.txt; then exit 1; fi
+          echo PANEL023_STOCK_ROLLBACK_OK
+      - name: Save test build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: panel023-ci-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: warn
