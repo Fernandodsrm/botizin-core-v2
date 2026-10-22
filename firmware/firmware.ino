@@ -577,9 +577,9 @@ void otaBootHealthBegin() {
 void otaBootHealthTick() {
   if (!otaBootPending || otaBootRecoveryBlocked) return;
   const bool wifiOK = WiFi.status() == WL_CONNECTED;
-  const bool clockOK = time(nullptr) >= 1700000000;
-  const bool healthyNow = otaReady && wifiOK && clockOK &&
-                          otaBootHttpStarted && botizinMqttSuccesses > 0;
+  // MQTT is still used for diagnostics, but a public broker is NOT trusted
+  // as a prerequisite for firmware acceptance.
+  const bool healthyNow = otaReady && wifiOK && otaBootHttpStarted;
   if (!healthyNow) {
     otaBootHealthContinuous = false;
   } else if (!otaBootHealthContinuous) {
@@ -589,15 +589,14 @@ void otaBootHealthTick() {
   const uint32_t healthyMs = otaBootHealthContinuous
                                  ? (uint32_t)(millis() - otaBootHealthySince) : 0;
   OtaHealthDecision action = otaHealthDecision(
-      otaBootPending, otaReady, wifiOK, clockOK,
-      otaBootHttpStarted, botizinMqttSuccesses > 0,
+      otaBootPending, otaReady, wifiOK, otaBootHttpStarted,
       (uint32_t)(millis() - otaBootStartedAt), healthyMs);
   if (action == OtaHealthDecision::WAIT) return;
   if (action == OtaHealthDecision::CONFIRM) {
     const esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
     if (err == ESP_OK) {
       otaBootPending = false;
-      otaBootHealthStatus = "VALID_CONFIRMED_AFTER_WIFI_NTP_HTTP_MQTT";
+      otaBootHealthStatus = "VALID_CONFIRMED_AFTER_WIFI_HTTP";
     } else {
       otaBootHealthStatus = "CONFIRM_ERROR_" + String((int)err);
       // Retry on a subsequent iteration; bounded deadline remains active.
