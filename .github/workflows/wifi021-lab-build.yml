@@ -1,8 +1,8 @@
-name: S3 WiFi-021 - delayed confirmation laboratory build (NO FLASH, NO PUBLISH)
+name: S3 WiFi 0.0.21 rollback hotfix — restore Arduino default (NO FLASH, NO PUBLISH)
 
 on:
   push:
-    branches: [feature/s3-wifi-manager-0.0.21]
+    branches: [fix/s3-021-arduino-default-ota-confirmation]
     paths:
       - 'firmware/**'
       - 'tests/ota02_boot_health_test.cpp'
@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   lab-only:
-    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/feature/s3-wifi-manager-0.0.21'
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/fix/s3-021-arduino-default-ota-confirmation'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Run host health policy and existing OTA candidate tests
+      - name: Run legacy policy regression and OTA candidate tests (no custom boot health used)
         run: |
           set -euo pipefail
           g++ -std=c++17 -Wall -Wextra -Werror tests/ota02_boot_health_test.cpp -o /tmp/ota02-test
@@ -42,19 +42,21 @@ jobs:
           manifest=json.loads(Path('/tmp/ota02-live-manifest.json').read_text())
           assert '#define BOTIZIN_VERSION "0.0.21"' in version
           assert manifest['version']=='0.0.17' and manifest['sha256']=='7a7c16bcb2acd885c74c7d8ad77fe15f9d0e1e55d634dfd23d1ebb7abdb6884f',manifest
-          assert 'extern "C" bool verifyRollbackLater(void) { return true; }' in src
-          assert 'esp_ota_mark_app_valid_cancel_rollback()' in src
-          assert 'esp_ota_mark_app_invalid_rollback_and_reboot()' in src
-          assert 'otaBootHealthTick();' in src
-          assert '!otaBootPending && !rebootScheduled' in src
-          assert 'if (elapsedMs >= OTA02_TIMEOUT_MS)' in policy
-          assert 'VALID_CONFIRMED_AFTER_LOCAL_WIFI_SERVICE' in src
+          # Native Arduino startup policy: NO override, NO 15s/180s deferred gate.
+          assert 'verifyRollbackLater(void)' not in src
+          assert 'verifyRollbackLater()' not in src
+          assert 'esp_ota_mark_app_valid_cancel_rollback()' not in src
+          assert 'esp_ota_mark_app_invalid_rollback_and_reboot()' not in src
+          assert 'otaBootHealthTick()' not in src and 'otaBootHealthBegin()' not in src
+          assert 'ota_boot_health.h' not in src
+          assert 'OTA_CONFIRMATION_MODE: ARDUINO_3_3_12_STARTUP_DEFAULT' in src
+          assert '!rebootScheduled && !uploadActive && !uploadOK' in src
           assert 'botizinMqttSuccesses > 0' not in src
-          assert 'localRecoveryReady && otaBootHttpStarted' in src
+          assert 'localRecoveryReady && otaBootHttpStarted' not in src
           assert 's += mqttStatusSnapshot();' in src
           assert 's += wifiManagerStatus();' in src
           assert 'wifiManagerRegisterRoutes();' in src and 'wifiManagerTick();' in src
-          assert 'const bool localRecoveryReady = wifiOK || wifiPortalOn;' in src
+          assert 'const bool localRecoveryReady = wifiOK || wifiPortalOn;' not in src
           setup=Path('firmware/wifi_manager.h').read_text()
           assert 'WiFi.begin();' in setup and 'WiFi.begin(wifiManagerSavedSsid.c_str()' in setup
           assert 'WiFi.softAP(wifiPortalName.c_str(),wifiPortalPassword.c_str()' in setup
@@ -79,7 +81,7 @@ jobs:
           arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli lib install 'PubSubClient@2.8'
-      - name: Build validation-only S3 0.0.18 with placeholder ThingsBoard token
+      - name: Build validation-only S3 0.0.21 repaired startup with placeholder ThingsBoard token
         run: |
           set -euo pipefail
           unset BOTIZIN_TB_DEVICE_TOKEN
@@ -92,16 +94,34 @@ jobs:
           assert obj['publishable'] is False and obj['device_token_compiled'] is False,obj
           print('S3_WIFI_021_LAB_COMPILE_OK',obj['bytes'],'PUBLISHABLE_FALSE')
           PY
-      - name: Verify boot-hook linkage in ELF (strong symbol, not weak)
+      - name: Verify boot-hook is Arduino weak default, NOT custom strong override
         run: |
           set -euo pipefail
           NM=$(find "$HOME/.arduino15/packages/esp32/tools" -type f -name '*-nm' | head -1)
           test -n "$NM"
           echo "Nm tool: $NM"
           "$NM" -C dist/firmware.elf > /tmp/ota02-symbols.txt
-          grep -E ' [Tt] verifyRollbackLater$' /tmp/ota02-symbols.txt
-          ! grep -E ' [Ww] verifyRollbackLater$' /tmp/ota02-symbols.txt
-          echo S3_WIFI_021_STRONG_C_LINKAGE_HOOK_OK
+          grep -E ' [Ww] verifyRollbackLater(\(\))?
+      - name: Save validation-only build and logs; never publish manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wifi021-validation-only-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: warn
+ /tmp/ota02-symbols.txt
+          ! grep -E ' [Tt] verifyRollbackLater(\(\))?
+      - name: Save validation-only build and logs; never publish manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wifi021-validation-only-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: warn
+ /tmp/ota02-symbols.txt
+          echo S3_WIFI_021_ARDUINO_WEAK_DEFAULT_HOOK_OK
       - name: Save validation-only build and logs; never publish manifest
         if: always()
         uses: actions/upload-artifact@v4
