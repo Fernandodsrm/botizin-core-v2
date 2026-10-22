@@ -1,10 +1,7 @@
 name: BOTIZIN S3 WiFi Manager 0.0.21 OTA - auto-pause if unconfirmed
 
 on:
-  push:
-    branches: [feature/s3-wifi-manager-0.0.21]
-    paths:
-      - ".github/workflows/publish-s3-021-wifi-manager.yml"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -105,7 +102,7 @@ jobs:
           python3 - <<'PY'
           import json,ssl,time,uuid
           import paho.mqtt.client as mqtt
-          state={"connected":False,"received":0,"firmware_020":False,"ota_valid_reported":False}
+          state={"connected":False,"received":0,"firmware_021":False,"ota_valid_reported":False}
           def on_connect(client,userdata,flags,reason,properties):
               if reason.is_failure:
                   print("OBSERVE_CONNECT_FAILED",str(reason),flush=True);return
@@ -119,7 +116,7 @@ jobs:
               if data.get("role")!="s3-lab-readonly":return
               state["received"]+=1
               if data.get("firmware")=="0.0.21":
-                  state["firmware_020"]=True
+                  state["firmware_021"]=True
                   state["ota_valid_reported"]=bool(data.get("ota_valid"))
               safe={k:data.get(k) for k in ("firmware","uptime_s","slot","ota_valid","ota_ready","heap_kb","attempt")}
               print("MQTT_MESSAGE_RECEIVED",json.dumps(safe),flush=True)
@@ -132,14 +129,14 @@ jobs:
           try:
               start=time.monotonic()
               while time.monotonic()-start<320:
-                  if state["firmware_020"] and state["ota_valid_reported"]:break
+                  if state["firmware_021"] and state["ota_valid_reported"]:break
                   time.sleep(1)
           finally:
               cli.loop_stop();cli.disconnect()
           print("FINAL_MQTT_OBSERVATION",json.dumps(state),flush=True)
           with open(__import__("os").environ["GITHUB_OUTPUT"],"a") as out:
-              out.write("confirmed="+("true" if state["firmware_020"] and state["ota_valid_reported"] else "false")+"\n")
-          if not state["firmware_020"]:
+              out.write("confirmed="+("true" if state["firmware_021"] and state["ota_valid_reported"] else "false")+"\n")
+          if not state["firmware_021"]:
               print("NO_DEVICE_CONFIRMATION: manifest offer published; cannot assert OTA installation.",flush=True)
           else:
               print("UNAUTHENTICATED_PUBLIC_BROKER: fresh message is not cryptographic device identity proof.",flush=True)
