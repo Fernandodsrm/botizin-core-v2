@@ -47,7 +47,7 @@ jobs:
           assert 'esp_ota_mark_app_invalid_rollback_and_reboot()' in src
           assert 'otaBootHealthTick();' in src
           assert '!otaBootPending && !rebootScheduled' in src
-          assert 'if (elapsedMs >= OTA03_TIMEOUT_MS)' in policy
+          assert 'if (elapsedMs >= OTA02_TIMEOUT_MS)' in policy
           assert 'botizinMqttSuccesses > 0' in src
           assert 's += mqttStatusSnapshot();' in src
           mqtt=Path('firmware/mqtt_observer.h').read_text()
