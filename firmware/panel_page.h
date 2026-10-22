@@ -31,6 +31,13 @@ ul{padding-left:20px;margin:10px 0 0}.state{border-radius:8px;padding:12px;backg
 .note{padding:12px;border-radius:9px;background:#1a302a;color:#c3dad0;font-size:.83rem;line-height:1.55;margin-top:12px}
 footer{padding:26px 0;font-size:.78rem;color:#849d95}
 a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
+
+.term-form{display:flex;align-items:center;gap:9px;margin:13px 0 8px;flex-wrap:wrap}
+.term-prompt{font:700 1.1rem Consolas,monospace;color:#8ff1bb}
+.term-input{flex:1;min-width:160px;background:#081512;border:1px solid #436856;color:#e7fff3;
+ border-radius:8px;padding:11px 12px;font:14px Consolas,ui-monospace,monospace}
+.term-input:focus{outline:2px solid #71c49b;outline-offset:1px}
+.term-log{min-height:120px;max-height:325px}
 @media(max-width:720px){main{padding:12px}.g{grid-template-columns:repeat(2,minmax(0,1fr))}.pair{grid-template-columns:1fr}header{align-items:flex-start}h1{font-size:1.4rem}}
 </style></head><body>
 <main>
@@ -60,6 +67,17 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <div class="tiny" id="eventTime"></div>
 </div>
 </section>
+<section class="panel" id="terminal-panel">
+<h2>Terminal de diagnóstico · somente leitura</h2>
+<p class="muted small">Comandos permitidos: <code>ajuda</code>, <code>status</code>, <code>eventos</code>, <code>boot</code>, <code>wifi</code>, <code>http</code>, <code>ota</code>, <code>memoria</code>, <code>mqtt</code>, <code>thingsboard</code>, <code>limpar</code>. Nenhum PowerShell é executado.</p>
+<pre class="term-log" id="termOutput" role="log" aria-live="polite">BOTIZIN Console v1 | Somente consulta manual.
+Digite ajuda para listar comandos.</pre>
+<form class="term-form" id="termForm" autocomplete="off">
+<label for="termInput" class="term-prompt">&gt;</label>
+<input id="termInput" class="term-input" type="text" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Ex.: ota" aria-label="Comando de diagnóstico"/>
+<button id="termRun" type="submit">Consultar</button></form>
+<p class="tiny">O terminal consulta <code>/status</code> ou <code>/events</code> exclusivamente após Enter ou clique. Se o HTTP falhar, consulta indisponível; USB/MQTT seguem independentes.</p>
+</section>
 <section class="panel"><h2>Saídas alternativas quando o HTTP falhar</h2>
 <p class="small muted">Se a página já está aberta e a leitura falha, o painel indica indisponibilidade. Se nem a página abrir, ela própria não poderá avisar.</p>
 <ul class="small">
@@ -67,7 +85,7 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <li><b>MQTT existente</b> — resumo enviado pela S3 no ciclo habitual de ~90 segundos quando houver internet; o campo <code>http_age_s</code> só indica quando ela respondeu pela última vez, não é um teste externo de disponibilidade.</li>
 <li><b>Último evento crítico</b> — guardado na NVS e recuperado no próximo boot, sem gravações contínuas.</li>
 </ul>
-<div class="note">Terminal e botões de comando ficarão para as etapas seguintes. Não há PowerShell remoto nem comandos de gravação nesta tela.</div>
+<div class="note">Este terminal apenas lê diagnósticos. Botões que alteram Wi-Fi, OTA ou reiniciam ficam reservados para a próxima etapa, com autenticação.</div>
 </section>
 <footer>BOTIZIN 1.0 • Diagnóstico primeiro, comandos depois • Nenhum refresh automático</footer>
 </main>
@@ -126,6 +144,49 @@ async function loadEvents(){
 $('refresh').addEventListener('click',loadStatus);
 $('eventsBtn').addEventListener('click',loadEvents);
 $('copy').addEventListener('click',async()=>{if(!statusLoaded)return;try{await navigator.clipboard.writeText(latestStatus);$('statusTime').textContent='Diagnóstico copiado.'}catch(e){$('statusTime').textContent='Cópia não permitida neste navegador. Use /status.'}});
+// Command allowlist runs INSIDE browser. No eval, shell, hardware writes or control endpoints.
+const allowed=['ajuda','status','eventos','boot','wifi','http','ota','memoria','mqtt','thingsboard','limpar'];
+const termLog=$('termOutput');
+function termWrite(line){
+ termLog.textContent+='\n'+line;
+ if(termLog.textContent.length>14000)termLog.textContent=termLog.textContent.slice(-12500);
+ termLog.scrollTop=termLog.scrollHeight;
+}
+function termFields(d,fields){return fields.map(([label,key])=>label+': '+get(d,key)).join('\n')}
+const views={
+ boot:[['Firmware','BOTIZIN_VERSION'],['Reinício','RESET_REASON'],['Uptime (s)','UPTIME_SECONDS'],['Boot ID','BOOT_ID'],['Boot count','EVENTS_BOOT_COUNT']],
+ wifi:[['Conexão STA','WIFI'],['IP','IP'],['Nome local','LOCAL_NAME'],['Configuração AP','WIFI_SETUP'],['Servidor HTTP iniciado','HTTP_SERVER_STARTED']],
+ http:[['Servidor iniciado','HTTP_SERVER_STARTED'],['HTTP já respondeu','HTTP_CONFIRMED_BY_REQUEST'],['Total requisições','HTTP_REQUESTS_SINCE_BOOT'],['Última resposta (s atrás)','HTTP_LAST_REQUEST_AGE_S'],['Endereço local','LOCAL_NAME']],
+ ota:[['Versão do manifesto','INTERNET_OTA'],['Estado firmware','RUNNING_OTA_STATE'],['Rodando','RUNNING_PARTITION'],['Próxima gravação','NEXT_UPDATE_PARTITION'],['Confirmação','OTA_CONFIRMATION_MODE'],['OTA disponível','OTA'],['Manual','OTA_MANUAL_STATUS']],
+ memoria:[['Heap livre (bytes)','DIAG_FREE'],['Heap mínimo (bytes)','DIAG_MIN'],['Maior bloco (bytes)','DIAG_LARGEST'],['PSRAM livre (bytes)','DIAG_PSRAM'],['Espaço OTA livre (bytes)','DIAG_OTA_FREE']],
+ mqtt:[['Última publicação','MQTT_LAST'],['Tentativas','MQTT_ATTEMPTS'],['Sucessos','MQTT_SUCCESSES']],
+ thingsboard:[['Telemetria','TELEMETRY'],['Maior tempo de envio (us)','DIAG_TB_MAX_US']]
+};
+async function terminalCommand(command){
+ const cmd=command.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+ if(!cmd)return;
+ termWrite('> '+cmd);
+ if(!allowed.includes(cmd)){termWrite('Comando não permitido. Use ajuda.');return}
+ if(cmd==='ajuda'){termWrite(allowed.join('  ·  ')+'\nOs comandos só leem dados; nada é executado no Windows ou na ESP32.');return}
+ if(cmd==='limpar'){termLog.textContent='BOTIZIN Console v1 | Histórico local limpo.';return}
+ const submit=$('termRun');submit.disabled=true;
+ try{
+   if(cmd==='eventos'){termWrite(await read('/events'));return}
+   const response=await read('/status');
+   if(cmd==='status'){termWrite(response.trim());return}
+   const d=parseStatus(response);
+   if(cmd==='boot')d.BOTIZIN_VERSION=response.split(/\r?\n/)[0].replace('BOTIZIN CORE ','');
+   termWrite(termFields(d,views[cmd]));
+ }catch(err){
+   termWrite('ERRO: HTTP indisponível ('+err.message+'). Sem diagnóstico nesta rede. Verifique USB ou MQTT.');
+ }finally{submit.disabled=false}
+}
+$('termForm').addEventListener('submit',e=>{
+ e.preventDefault();
+ const input=$('termInput'),cmd=input.value;input.value='';
+ terminalCommand(cmd);
+});
+// No periodic terminal polls: network reads require a human command.
 // Exactly one startup read of each resource. No interval, socket or background probes.
 loadStatus();loadEvents();
 </script>
