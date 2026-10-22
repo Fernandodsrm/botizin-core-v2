@@ -1,0 +1,159 @@
+name: BOTIZIN S3 0.0.25 diagnostic panel CI NO RELEASE
+on:
+  push:
+    branches: [feature/s3-authenticated-controls-0.0.25]
+    paths: ['firmware/**', 'tests/**', '.github/workflows/controls025-ci.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/feature/s3-authenticated-controls-0.0.25'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test panel controls, session auth, peer headers, JS syntax, event ring and no polling
+        shell: bash
+        run: |
+          set -euo pipefail
+          g++ -std=c++17 -Wall -Wextra -Werror tests/event_ring_test.cpp -o /tmp/test-events
+          /tmp/test-events
+          g++ -std=c++17 -Wall -Wextra -Werror tests/ota_confirmation_test.cpp -o /tmp/test-ota
+          /tmp/test-ota
+          python3 - <<'PY'
+          import re
+          from html.parser import HTMLParser
+          from pathlib import Path
+          fw=Path('firmware/firmware.ino').read_text()
+          wifi=Path('firmware/wifi_manager.h').read_text()
+          header=Path('firmware/panel_page.h').read_text()
+          version=Path('firmware/version.h').read_text()
+          assert '"0.0.25"' in version
+          assert '#include "panel_page.h"' in fw
+          assert 'server.on("/", HTTP_GET, wifiPortalRouteHome)' in fw
+          assert 'server.on("/panel", HTTP_GET, wifiPortalRouteHome)' in fw
+          assert 'server.on("/status", HTTP_GET' in fw
+          assert 'eventJournalRegisterRoute(server)' in fw
+          assert 'if(wifiRequestFromSetupAP())wifiPortalPage();' in wifi
+          assert 'server.send_P(200,"text/html; charset=utf-8",kBotizinPanelHTML)' in wifi
+          assert 'extern "C" bool verifyRollbackLater' not in fw
+          assert 'otaBootHealthTick();' not in fw
+          assert 'static uint8_t buffer[4096]' in fw
+          m=re.search(r'R"BTZN\((.*?)\)BTZN"',header,re.DOTALL)
+          assert m,'Raw C++ HTML literal not found'
+          html=m.group(1)
+          class Check(HTMLParser):
+            def __init__(self):super().__init__();self.ids=set();self.buttons=0
+            def handle_starttag(self,tag,attrs):
+              d=dict(attrs)
+              if 'id' in d:self.ids.add(d['id'])
+              if tag=='button':self.buttons+=1
+          c=Check();c.feed(html)
+          assert {'state','firmware','network','ota','memory','events','refresh','eventsBtn','copy','statusTime','eventTime','overview'}<=c.ids
+          assert c.buttons==13,c.buttons
+          assert "fetch(endpoint,{cache:'no-store'" in html
+          assert "loadStatus();loadEvents();" in html
+          assert '<form class="term-form" id="termForm"' in html
+          assert "if(!allowed.includes(cmd))" in html
+          assert "termWrite(await read('/events'))" in html
+          assert "const response=await read('/status')" in html
+          assert "No periodic terminal polls" in html
+          assert "'status','eventos','boot','wifi','http','ota','memoria','mqtt','thingsboard','limpar'" in html
+          assert "termLog.textContent" in html and "innerHTML" not in html
+          assert "terminalCommand(cmd)" in html
+          control=Path('firmware/control_routes.h').read_text()
+          assert 'static bool controlOnStaInterface()' in control
+          assert 'server.client().localIP()==WiFi.localIP()' in control
+          assert 'controlSessionIP=server.client().remoteIP()' in control
+          assert 'controlSessionUntil=millis()+600000UL' in control
+          assert 'controlBlockedUntil=millis()+90000' in control
+          assert 'controlConstantEqual' in control
+          assert 'if(!controlRequireAuth())return;' in control
+          assert 'confirmOta(' in control and 'queueOtaCheck()' in control
+          assert 'wifiManagerStoreCredentials(ssid,pass)' in control
+          assert 'wifiRestartAfter=millis()+2600UL' in control
+          assert 'controlRegisterRoutes();' in fw
+          assert 'server.collectHeaders(headers,3);' in control
+          assert '"X-Botizin-Nonce","X-Botizin-MAC","X-Botizin-Session"' in control
+          assert 'server.on("/control/login",HTTP_POST,controlLogin)' in control
+          assert 'server.on("/control/install-ota",HTTP_POST,controlInstallOTA)' in control
+          assert 'server.on("/control/reboot",HTTP_POST,controlReboot)' in control
+          assert 'server.on("/control/wifi-save",HTTP_POST,controlSaveWiFi)' in control
+          assert 'server.on("/control/connections",HTTP_POST,controlConnectivity)' in control
+          assert 'static bool wifiManagerStoreCredentials(' in wifi
+          assert 'controlSession=' in control and 'WiFi.softAPIP()' in control
+          assert 'controlSession' not in Path('firmware/mqtt_observer.h').read_text()
+          assert 'controlSession' not in Path('firmware/event_journal.h').read_text()
+          assert 'let controlSession=' in html
+          assert "localStorage" not in re.search(r'<script>(.*?)</script>',html,re.DOTALL).group(1)
+          assert "fetch('/control" not in html
+          assert "window.confirm(" in html
+          assert "controlWifiForm" in c.ids and "controlReboot" in c.ids and "controlLogin" in c.ids
+          assert "controlOTAResult" in c.ids and "controlInstall" in c.ids
+          assert "controlActions" in c.ids and "controlLogout" in c.ids
+          assert "if(!window.confirm(" in html
+          assert "runControl('/control/install-ota',c)" in html
+          assert "runControl('/control/wifi-save',{ssid,password:pass})" in html
+          assert "controlSession" in html
+
+          assert "addEventListener('click',loadStatus)" in html
+          assert "addEventListener('click',loadEvents)" in html
+          for forbidden in ('setInterval(', 'WebSocket(', 'EventSource(', 'location.reload(', "fetch('/update", "fetch('/reboot", 'eval('):
+            assert forbidden not in html,forbidden
+          assert 'HTTP INDISPONÍVEL' in html
+          assert 'HTTP_INDISPONÍVEL' not in wifi
+          assert 'R"BTZN(' not in Path('firmware/firmware.ino').read_text()
+          print('CONTROLS025_STATIC_UI_TESTS_OK',len(html),'bytes, thirteen buttons, nine gated and one startup snapshot')
+          from pathlib import Path
+          import re
+          script=re.search(r'<script>(.*?)</script>',html,re.DOTALL).group(1)
+          Path('/tmp/botizin-panel.js').write_text(script)
+          PY
+          node --check /tmp/botizin-panel.js
+          echo CONTROLS025_JAVASCRIPT_SYNTAX_OK
+      - name: Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Install core 3.3.12 and MQTT
+        shell: bash
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install 'PubSubClient@2.8'
+      - name: Compile actual S3 but do not publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset BOTIZIN_TB_DEVICE_TOKEN
+          python3 ci/build.py
+          python3 - <<'PY'
+          import json,pathlib
+          r=json.loads(pathlib.Path('dist/build-record.json').read_text())
+          assert r['version']=='0.0.25' and 0<r['bytes']<=3145728
+          assert r['published'] is False and r['publishable'] is False
+          print('CONTROLS025_S3_COMPILE_OK',r['bytes'],r['sha256'])
+          PY
+      - name: Confirm stock Arduino rollback
+        shell: bash
+        run: |
+          set -euo pipefail
+          NM=$(find "$HOME/.arduino15/packages/esp32/tools" -type f -name '*-nm' | head -1)
+          test -n "$NM"
+          "$NM" -C dist/firmware.elf > /tmp/controls025-symbols.txt
+          grep -E ' [Ww] verifyRollbackLater' /tmp/controls025-symbols.txt
+          if grep -E ' [Tt] verifyRollbackLater' /tmp/controls025-symbols.txt; then exit 1; fi
+          echo CONTROLS025_STOCK_ROLLBACK_OK
+      - name: Save test build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: controls025-ci-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: warn
