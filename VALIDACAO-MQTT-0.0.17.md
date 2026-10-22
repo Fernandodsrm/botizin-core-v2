@@ -43,3 +43,22 @@
 - **Resultado físico:** NÃO VERIFICADO. Não sabemos se a S3 está executando 0.0.16, 0.0.17 ou outro firmware, está online no Wi-Fi ou teve falha no OTA/MQTT. O teste não distingue essas hipóteses.
 - **Importante:** manifesto 0.0.17 permanece ofertado enquanto esta entrada é escrita. Isso significa que o download pode ocorrer futuramente se uma S3 elegível voltar à internet. Para suspender essa oferta, é preciso fazer nova alteração consciente de manifesto para a versão 0.0.16, sem apagar o binário da 0.0.17. Não confundir volta do manifesto com rollback de placa já atualizada.
 - A verificação independente final requer leitura real de `/status` na rede local, serial (COM) ou um canal seguro de telemetria operacional. GitHub não acessa automaticamente COM do Windows ou Wi-Fi residencial.
+
+## Segunda consulta — sinal MQTT fresco recebido, 21/10/2026 23h43 BRT
+
+**Execução GitHub Actions:** https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/39712807513
+
+- Observador MQTT read-only conectado em `broker.emqx.io:8883`: `BROKER_CONNECTED_LISTENING`.
+- **2026-10-22 02:43:17 UTC** (2026-10-21 23:43:17 BRT): `FRESH_TOPIC_REPORT`, **não retido**, com:
+  - `firmware: 0.0.17`
+  - `uptime_s: 5892` (~1h38min)
+  - `slot: ota_1`
+  - `ota_valid: true`
+  - `ota_ready: true`
+  - `heap_kb: 242`
+  - `attempt: 66`
+- Resultado da execução: `broker_connected: true`; `fresh_count: 1`; `retained_count: 0`.
+- **Interpretação:** forte evidência de firmware BOTIZIN S3 0.0.17 rodando e publicando telemetria após OTA, já que o pacote 0.0.17 passou na compilação e a mensagem tem o esquema esperado.
+- **Limite crítico:** o tópico está em **broker público e não autenticado**. Ter recebido uma mensagem recente com campos consistentes não prova criptograficamente que veio da S3 física, nem que a credencial/OTA opera ponta a ponta após novo teste. Antes de uso como monitor confiável, migrar para broker privado com autenticação e correlacionar boot_id/slot/hash com outro canal.
+- O observador **não publicou nenhum comando MQTT**, não acionou OTA, não alterou manifestos ou firmware. Foi apenas uma segunda consulta do canal já ofertado.
+- Com a evidência nova, o bloqueio anterior `nenhuma mensagem` está superado; o próximo trabalho é profissionalizar identidade/autenticação e histórico, não presumir falha do MQTT.
