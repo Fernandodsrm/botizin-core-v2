@@ -541,6 +541,7 @@ void __attribute__((noinline)) sendTelemetry() {
 
 #include "ping_rpc.h"
 #include "peer_ota_server.h"
+#include "mqtt_observer.h"
 
 void printPartitionTable() {
   Serial.println("PARTITION_TABLE:");
@@ -603,6 +604,7 @@ void setup() {
   nextInternetCheck = millis() + 10000;
   server.begin();
   maintainLocalName();
+  botizinMqttSetup();
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
 }
 
@@ -637,5 +639,6 @@ void loop() {
     nextPingPoll = millis() + 15000;
     pollPing();
   }
+  botizinMqttLoop();
   delay(2);
 }
