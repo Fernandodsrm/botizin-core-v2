@@ -569,6 +569,7 @@ void __attribute__((noinline)) sendTelemetry() {
 #include "ping_rpc.h"
 #include "peer_ota_server.h"
 #include "mqtt_observer.h"
+#include "panel_page.h"
 #include "wifi_manager.h"
 
 void printPartitionTable() {
@@ -619,6 +620,7 @@ void setup() {
   eventJournalObserveWiFi();
   Serial.println(snapshot());
   server.on("/", HTTP_GET, wifiPortalRouteHome);
+  server.on("/panel", HTTP_GET, wifiPortalRouteHome);
   server.on("/status", HTTP_GET, []() { eventJournalHttpReceived(); server.send(200, "text/plain; charset=utf-8", snapshot()); });
   eventJournalRegisterRoute(server);
   beginPeerOtaServer();
