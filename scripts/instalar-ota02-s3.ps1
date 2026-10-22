@@ -31,7 +31,8 @@ if ($bytes -ne [long]$record.bytes -or
 Write-Host ("Pacote 0.0.18: "+$bytes+" bytes; SHA256 "+$sha) -ForegroundColor Green
 Write-Host "IMPORTANTE: pacote de LAB com token ThingsBoard de teste (nao funcional)."
 
-$prod=Invoke-RestMethod -Uri "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/manifest.json" -TimeoutSec 15
+$prodText=(Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/manifest.json" -TimeoutSec 15).Content
+$prod=$prodText | ConvertFrom-Json
 if ($prod.version -ne "0.0.17" -or
     $prod.sha256 -ne "7a7c16bcb2acd885c74c7d8ad77fe15f9d0e1e55d634dfd23d1ebb7abdb6884f") {
   Fail "Manifesto da producao mudou. Pare e revise."
