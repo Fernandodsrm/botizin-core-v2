@@ -49,3 +49,15 @@
 **Preparar teste físico controlado por Wi-Fi local**: antes de qualquer upload, consultar o `/status` da S3 (versão 0.0.17, app1, `VALID`, `OTA READY`), confirmar 0.0.17 preservada no manifesto; compilar candidata autorizada com credenciais apropriadas (o build atual é VALIDATION_ONLY); transferir via canal local de atualização para app0; conferir progresso e reboot; comprovar a transição `PENDING_VERIFY` → `VALID` após saúde, depois conduzir um teste separado de falha que exija retorno a app1. Não ofertar versão deliberadamente falha no manifesto público. Se houver dúvida sobre disponibilidade do firmware fallback, testar somente a candidata saudável e não provocar falha.
 
 **Arquivos alterados exclusivamente na branch experimental:** `firmware/firmware.ino`, `firmware/version.h`, `firmware/ota_boot_health.h`, `tests/ota02_boot_health_test.cpp`, `.github/workflows/ota02-lab-build.yml` e este relatório.
+
+## Evidência física posterior — 22/10/2026 às 04h04 BRT
+
+Captura do `/status` local entregue pelo usuário:
+- A placa respondia `BOTIZIN CORE V0.0.17` no IP local `192.168.0.18`, `app1/ota_1`, imagem `VALID`, `OTA: READY`; uptime **22 segundos**, `RESET_REASON: BROWNOUT (9)`.
+- `LAST_PERSISTED_OTA_ATTEMPT` mostrava origem 0.0.17, destino app0/ota_0, versão 0.0.18, **1.209.136 bytes**, SHA verificado dos bytes e da Flash `a360836ac1d886e53ab1db90fe4046675c6904d3635815a0aab88696ff03300d`, `Update.end: TRUE`, `DESTINATION_OTA_STATE: NEW`, `OTA_WRITE_VERIFIED: YES` e reinício solicitado.
+- Ao mesmo tempo, `INTERNET_OTA: DOWNLOADING 0.0.18` e `CURRENT_OTA_ATTEMPT` informavam uma NOVA tentativa de instalar a mesma imagem. Isso demonstra **reoferta/reinstalação**, mas não diferencia com certeza rollback, reinício por queda de tensão ou combinação das duas causas.
+- Observações remotas subsequentes da fase inicial receberam somente um estado MQTT 0.0.17 e depois zero mensagens; **não houve prova de execução física da 0.0.18**.
+- Para evitar ciclo, em seguida o manifesto `main/manifest.json` foi **restaurado para 0.0.17**, mantendo os binários 0.0.18 e 0.0.19 armazenados em `main/releases/`. O manifesto antigo de versão 0.0.17 é detectado como "não mais novo" no código experimental 0.0.18, sem forçar downgrade.
+- Um observador MQTT em execução foi lançado em GitHub Actions para tentar diferenciar estados posteriores, mas as mensagens de broker público não autenticado são indício, não atestado criptográfico.
+
+**Diagnóstico em aberto:** não afirmar que rollback inteligente já foi validado. Necessário observar `OTA_BOOT_HEALTH` da 0.0.18 ou obter logs seriais durante a inicialização para comprovar a transição `PENDING_VERIFY -> VALID` ou `PENDING_VERIFY -> ABORTED`; investigar brownout e depender menos de broker público para confirmação da imagem.
