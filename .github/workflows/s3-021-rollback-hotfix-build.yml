@@ -94,39 +94,20 @@ jobs:
           assert obj['publishable'] is False and obj['device_token_compiled'] is False,obj
           print('S3_WIFI_021_LAB_COMPILE_OK',obj['bytes'],'PUBLISHABLE_FALSE')
           PY
-      - name: Verify boot-hook is Arduino weak default, NOT custom strong override
+      - name: Verify weak Arduino default boot hook in linked ELF
         run: |
           set -euo pipefail
           NM=$(find "$HOME/.arduino15/packages/esp32/tools" -type f -name '*-nm' | head -1)
           test -n "$NM"
-          echo "Nm tool: $NM"
-          "$NM" -C dist/firmware.elf > /tmp/ota02-symbols.txt
-          grep -E ' [Ww] verifyRollbackLater(\(\))?
-      - name: Save validation-only build and logs; never publish manifest
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wifi021-validation-only-${{ github.sha }}
-          path: dist/
-          retention-days: 7
-          if-no-files-found: warn
- /tmp/ota02-symbols.txt
-          ! grep -E ' [Tt] verifyRollbackLater(\(\))?
-      - name: Save validation-only build and logs; never publish manifest
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: wifi021-validation-only-${{ github.sha }}
-          path: dist/
-          retention-days: 7
-          if-no-files-found: warn
- /tmp/ota02-symbols.txt
+          "$NM" -C dist/firmware.elf > /tmp/ota021-symbols.txt
+          grep -E ' [Ww] verifyRollbackLater' /tmp/ota021-symbols.txt
+          if grep -E ' [Tt] verifyRollbackLater' /tmp/ota021-symbols.txt; then exit 1; fi
           echo S3_WIFI_021_ARDUINO_WEAK_DEFAULT_HOOK_OK
       - name: Save validation-only build and logs; never publish manifest
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: wifi021-validation-only-${{ github.sha }}
+          name: wifi021-factory-rollback-fix-${{ github.sha }}
           path: dist/
           retention-days: 7
           if-no-files-found: warn
