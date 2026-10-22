@@ -1,0 +1,78 @@
+name: BOTIZIN LAB 0.0.26 S3 — compile only, never publish
+on:
+  push:
+    branches: ['lab/s3-botizin-voice-0.0.26']
+    paths:
+      - 'firmware/**'
+      - 'lab/**'
+      - '.github/workflows/lab-s3-026-compile-only.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile-and-inspect:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Arduino core and MQTT
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install 'PubSubClient@2.8'
+      - name: Source safety gates
+        run: |
+          set -euo pipefail
+          grep -Fx '#define BOTIZIN_VERSION "0.0.26"' firmware/version.h
+          grep -Fx '#define BOTIZIN_LAB_MODE 1' firmware/version.h
+          grep -F 'if (BOTIZIN_LAB_MODE) { otaReady=false;' firmware/firmware.ino
+          grep -F 'if (BOTIZIN_LAB_MODE) { responseCode=403; return; }' firmware/firmware.ino
+          grep -F 'CORE_025_FLASH_SHA_MISMATCH' firmware/lab_safety.h
+          grep -F 'controlRequireAuth()' firmware/lab_safety.h
+          test ! -e firmware/secrets.h
+          test ! -e firmware/telemetry_config.h
+      - name: Build non-publishable firmware
+        env:
+          BOTIZIN_TB_DEVICE_TOKEN: ''
+        run: |
+          set -euo pipefail
+          python3 ci/build.py
+          python3 - <<'PY'
+          import hashlib,json,pathlib
+          r=json.loads(pathlib.Path('dist/build-record.json').read_text())
+          p=pathlib.Path('dist/firmware.bin').read_bytes()
+          assert r['version']=='0.0.26'
+          assert not r['publishable'] and not r['device_token_compiled']
+          assert len(p)==r['bytes'] and 0<len(p)<3145728
+          assert hashlib.sha256(p).hexdigest()==r['sha256']
+          assert b'CORE_025_FLASH_SHA_MISMATCH' in p
+          assert b'BOTIZIN LAB' in p
+          assert b'BOTIZIN CORE V' in p
+          print('LAB_026_COMPILED_NO_OTA_PUBLICATION',r['bytes'],r['sha256'])
+          PY
+      - name: Verify native rollback remains weak
+        run: |
+          set -euo pipefail
+          NM=$(find "$HOME/.arduino15/packages/esp32/tools" -type f -name '*-nm' | head -1)
+          test -n "$NM"
+          "$NM" -C dist/firmware.elf > /tmp/lab-symbols.txt
+          grep -E ' [Ww] verifyRollbackLater' /tmp/lab-symbols.txt
+          if grep -E ' [Tt] verifyRollbackLater' /tmp/lab-symbols.txt; then exit 1; fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s3-lab-026-compile
+          path: |
+            dist/build-record.json
+            dist/compile.log
+            dist/firmware.bin.sha256
+            dist/firmware.elf
+          if-no-files-found: warn
+          retention-days: 7
