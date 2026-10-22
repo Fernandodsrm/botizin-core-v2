@@ -134,8 +134,8 @@ static void controlReboot() {
 }
 static void controlRegisterRoutes() {
   // Header collected only for protected routes, not returned by /status or /events.
-  const char *headers[]={"X-Botizin-Session"};
-  server.collectHeaders(headers,1);
+  const char *headers[]={"X-Botizin-Nonce","X-Botizin-MAC","X-Botizin-Session"};
+  server.collectHeaders(headers,3);
   server.on("/control/login",HTTP_POST,controlLogin);
   server.on("/control/logout",HTTP_POST,controlLogout);
   server.on("/control/check-ota",HTTP_POST,controlCheckOTA);
