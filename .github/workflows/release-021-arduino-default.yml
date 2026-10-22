@@ -1,0 +1,156 @@
+name: BOTIZIN S3 0.0.21 Hotfix - Build and OTA Release
+on:
+  push:
+    branches: [fix/s3-021-arduino-default-ota-confirmation]
+    paths: ['.github/workflows/release-021-arduino-default.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build-and-release:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/fix/s3-021-arduino-default-ota-confirmation'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact fixed source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify native rollback source and prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('firmware/firmware.ino').read_text()
+          assert 'extern "C" bool verifyRollbackLater' not in s
+          assert 'otaBootHealthTick();' not in s
+          assert 'esp_ota_mark_app_valid_cancel_rollback' not in s
+          assert 'OTA_CONFIRMATION_MODE: ARDUINO_3_3_12_STARTUP_DEFAULT' in s
+          assert '#define BOTIZIN_VERSION "0.0.21"' in Path('firmware/version.h').read_text()
+          assert 'wifiManagerTick();' in s
+          print('HOTFIX_SOURCE_CHECK_OK')
+          PY
+      - name: Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Core and MQTT dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install 'PubSubClient@2.8'
+      - name: Build production image from fixed source; require existing ThingsBoard device secret
+        env:
+          BOTIZIN_TB_DEVICE_TOKEN: ${{ secrets.BOTIZIN_TB_DEVICE_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$BOTIZIN_TB_DEVICE_TOKEN" ]; then
+            echo 'RELEASE_STOPPED: BOTIZIN_TB_DEVICE_TOKEN is not configured. No update published.'
+            exit 1
+          fi
+          python3 ci/build.py
+          python3 - <<'PY'
+          import json,pathlib,os
+          r=json.loads(pathlib.Path('dist/build-record.json').read_text())
+          assert r['version']=='0.0.21' and r['core']=='3.3.12'
+          assert r['publishable'] is True and r['device_token_compiled'] is True
+          assert r['source_commit']==os.environ['GITHUB_SHA']
+          assert 0 < r['bytes'] <= 3145728
+          print('HOTFIX_PROD_BUILD_OK',r['bytes'],r['sha256'])
+          PY
+      - name: Prove Arduino weak default rollback hook in linked ELF
+        shell: bash
+        run: |
+          set -euo pipefail
+          NM=$(find "$HOME/.arduino15/packages/esp32/tools" -type f -name '*-nm' | head -1)
+          test -n "$NM"
+          "$NM" -C dist/firmware.elf > /tmp/symbols.txt
+          grep -E ' [Ww] verifyRollbackLater' /tmp/symbols.txt
+          if grep -E ' [Tt] verifyRollbackLater' /tmp/symbols.txt; then exit 1; fi
+          echo 'HOTFIX_ARDUINO_WEAK_HOOK_OK'
+      - name: Construct immutable hotfix release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,pathlib
+          p=pathlib.Path('dist/manifest.json')
+          x=json.loads(p.read_text())
+          x['url']='https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.21-arduino-default/firmware.bin'
+          assert x['version']=='0.0.21'
+          p.write_text(json.dumps(x,indent=2)+'\n')
+          print('HOTFIX_RELEASE_MANIFEST_PREPARED',x['url'])
+          PY
+      - name: Checkout main to separate directory
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: prod
+          persist-credentials: true
+      - name: Stage immutable fixed binary; keep previous 0.0.21 untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e prod/releases/0.0.21-arduino-default/firmware.bin
+          python3 - <<'PY'
+          import json,pathlib,hashlib
+          root=pathlib.Path('prod')
+          main=json.loads((root/'manifest.json').read_text())
+          assert main['version']=='0.0.17' and main['sha256']=='7a7c16bcb2acd885c74c7d8ad77fe15f9d0e1e55d634dfd23d1ebb7abdb6884f',main
+          new=json.loads(pathlib.Path('dist/manifest.json').read_text())
+          data=pathlib.Path('dist/firmware.bin').read_bytes()
+          assert new['sha256']==hashlib.sha256(data).hexdigest() and new['size']==len(data)
+          assert (root/'releases/0.0.21/firmware.bin').exists(), 'original 0.0.21 archive absent'
+          PY
+          mkdir -p prod/releases/0.0.21-arduino-default
+          cp dist/firmware.bin prod/releases/0.0.21-arduino-default/firmware.bin
+          cp dist/manifest.json prod/releases/0.0.21-arduino-default/manifest.json
+          git -C prod config user.name 'botizin-release-bot'
+          git -C prod config user.email 'botizin-release-bot@users.noreply.github.com'
+          git -C prod add releases/0.0.21-arduino-default
+          git -C prod commit -m 'release(s3): immutable OTA 0.0.21 with factory Arduino boot confirmation'
+          git -C prod push origin HEAD:main
+          echo 'HOTFIX_BINARY_STAGED_ONLY'
+      - name: Verify public GitHub Raw bytes are exact
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 6 --retry-all-errors --retry-delay 2 --max-time 30 \
+            -o "$RUNNER_TEMP/remote-hotfix.bin" \
+            'https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.21-arduino-default/firmware.bin'
+          cmp -s dist/firmware.bin "$RUNNER_TEMP/remote-hotfix.bin"
+          echo 'HOTFIX_PUBLIC_BINARY_VERIFIED'
+      - name: Activate repaired OTA offer
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C prod fetch origin main
+          git -C prod reset --hard origin/main
+          python3 - <<'PY'
+          import json,pathlib
+          root=pathlib.Path('prod')
+          current=json.loads((root/'manifest.json').read_text())
+          new=json.loads(pathlib.Path('dist/manifest.json').read_text())
+          assert current['version']=='0.0.17' and current['sha256']=='7a7c16bcb2acd885c74c7d8ad77fe15f9d0e1e55d634dfd23d1ebb7abdb6884f'
+          assert new['version']=='0.0.21' and '0.0.21-arduino-default' in new['url']
+          (root/'manifest.json').write_text(json.dumps(new,indent=2)+'\n')
+          PY
+          git -C prod add manifest.json
+          git -C prod commit -m 'ota(s3): offer repaired Wi-Fi Manager 0.0.21 with native boot verification'
+          git -C prod push origin HEAD:main
+          echo 'HOTFIX_0_0_21_OTA_OFFER_ACTIVE'
+      - name: Upload build record (no device secrets)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-hotfix-021-production-build-${{ github.sha }}
+          path: |
+            dist/build-record.json
+            dist/firmware.bin.sha256
+            dist/manifest.json
+          retention-days: 7
+          if-no-files-found: warn
