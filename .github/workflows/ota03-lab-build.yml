@@ -1,0 +1,99 @@
+name: OTA-03 - delayed confirmation laboratory build (NO FLASH, NO PUBLISH)
+
+on:
+  push:
+    branches: [study/ota-03-mqtt-status-0.0.19]
+    paths:
+      - 'firmware/**'
+      - 'tests/ota02_boot_health_test.cpp'
+      - '.github/workflows/ota03-lab-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lab-only:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/study/ota-03-mqtt-status-0.0.19'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout laboratory branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run host health policy and existing OTA candidate tests
+        run: |
+          set -euo pipefail
+          g++ -std=c++17 -Wall -Wextra -Werror tests/ota02_boot_health_test.cpp -o /tmp/ota02-test
+          /tmp/ota02-test
+          g++ -std=c++17 -Wall -Wextra -Werror tests/ota_confirmation_test.cpp -o /tmp/ota-confirm-test
+          /tmp/ota-confirm-test
+      - name: Confirm lab-only source invariants and independent LIVE production offer
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --max-time 15 https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/manifest.json -o /tmp/ota02-live-manifest.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          src=Path('firmware/firmware.ino').read_text()
+          policy=Path('firmware/ota_boot_health.h').read_text()
+          version=Path('firmware/version.h').read_text()
+          manifest=json.loads(Path('/tmp/ota02-live-manifest.json').read_text())
+          assert '#define BOTIZIN_VERSION "0.0.19"' in version
+          assert manifest['version']=='0.0.18' and manifest['sha256']=='a360836ac1d886e53ab1db90fe4046675c6904d3635815a0aab88696ff03300d',manifest
+          assert 'extern "C" bool verifyRollbackLater(void) { return true; }' in src
+          assert 'esp_ota_mark_app_valid_cancel_rollback()' in src
+          assert 'esp_ota_mark_app_invalid_rollback_and_reboot()' in src
+          assert 'otaBootHealthTick();' in src
+          assert '!otaBootPending && !rebootScheduled' in src
+          assert 'if (elapsedMs >= OTA03_TIMEOUT_MS)' in policy
+          assert 'botizinMqttSuccesses > 0' in src
+          assert 's += mqttStatusSnapshot();' in src
+          mqtt=Path('firmware/mqtt_observer.h').read_text()
+          assert 'MQTT_LAST: ' in mqtt and 'MQTT_SUCCESSES: ' in mqtt
+          assert 'a->address == 0x10000 && b->address == 0x310000' in src
+          assert 'a->size == 0x300000 && b->size == 0x300000' in src
+          print('OTA03_SOURCE_AND_MANIFEST_PASS')
+          PY
+      - name: Arduino CLI 1.5.1
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Install exact S3 core and PubSubClient
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install 'PubSubClient@2.8'
+      - name: Build validation-only S3 0.0.18 with placeholder ThingsBoard token
+        run: |
+          set -euo pipefail
+          unset BOTIZIN_TB_DEVICE_TOKEN
+          python3 ci/build.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          obj=json.loads(Path('dist/build-record.json').read_text())
+          assert obj['version']=='0.0.19' and obj['bytes']<=3145728,obj
+          assert obj['publishable'] is False and obj['device_token_compiled'] is False,obj
+          print('OTA03_LAB_COMPILE_OK',obj['bytes'],'PUBLISHABLE_FALSE')
+          PY
+      - name: Verify boot-hook linkage in ELF (strong symbol, not weak)
+        run: |
+          set -euo pipefail
+          NM=$(find "$HOME/.arduino15/packages/esp32/tools" -type f -name '*-nm' | head -1)
+          test -n "$NM"
+          echo "Nm tool: $NM"
+          "$NM" -C dist/firmware.elf > /tmp/ota02-symbols.txt
+          grep -E ' [Tt] verifyRollbackLater$' /tmp/ota02-symbols.txt
+          ! grep -E ' [Ww] verifyRollbackLater$' /tmp/ota02-symbols.txt
+          echo OTA03_STRONG_C_LINKAGE_HOOK_OK
+      - name: Save validation-only build and logs; never publish manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ota03-validation-only-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: warn
