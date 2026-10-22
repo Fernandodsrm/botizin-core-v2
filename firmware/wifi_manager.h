@@ -156,6 +156,9 @@ static bool wifiManagerInit() {
   wifiManagerSavedSsid=wifiManagerPrefs.getString("ssid","");
   wifiManagerSavedPassword=wifiManagerPrefs.getString("pass","");
   wifiManagerReady=true;
+  // Show locally over USB: the device has no screen and no public password.
+  Serial.println("WIFI_SETUP_SSID_USB_ONLY: "+wifiPortalName);
+  Serial.println("WIFI_SETUP_PASSWORD_USB_ONLY: "+wifiPortalPassword);
   return true;
 }
 static void wifiManagerConnectKnown() {
