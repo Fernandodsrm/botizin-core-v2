@@ -33,3 +33,13 @@
 - Configuração futura de broker PRIVADO para operação permanente. NÃO usar canal público para executar comandos, senhas, OTA ou informações pessoais.
 
 **Risco aceito:** se o firmware falhar, manter cópia binária no GitHub não possibilita reversão remota sem canal de controle; USB/esptool poderá ser necessário quando usuário estiver na bancada.
+
+## Resultado da janela inicial de observação — 2026-10-21, depois da oferta
+
+- O workflow [39703234006](https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/39703234006) terminou **success** em todos os passos de publicação e monitoramento.
+- `S3_0_0_17_PACKAGE_PUBLISHED_NOT_ACTIVE`, `REMOTE_RELEASE_BYTES_VERIFIED` e `S3_0_0_17_OFFER_ACTIVE_NO_DEVICE_CONFIRMATION` comprovam o estado do servidor GitHub, **não** da ESP32 física.
+- Observador conectou ao broker: `OBSERVER_MQTT_CONNECTED`.
+- Durante aproximadamente 190 segundos de escuta após a ativação, recebeu **zero mensagens**: `FINAL_MQTT_OBSERVATION {\"connected\": true, \"received\": 0, \"firmware_017\": false, \"ota_valid_reported\": false}`.
+- **Resultado físico:** NÃO VERIFICADO. Não sabemos se a S3 está executando 0.0.16, 0.0.17 ou outro firmware, está online no Wi-Fi ou teve falha no OTA/MQTT. O teste não distingue essas hipóteses.
+- **Importante:** manifesto 0.0.17 permanece ofertado enquanto esta entrada é escrita. Isso significa que o download pode ocorrer futuramente se uma S3 elegível voltar à internet. Para suspender essa oferta, é preciso fazer nova alteração consciente de manifesto para a versão 0.0.16, sem apagar o binário da 0.0.17. Não confundir volta do manifesto com rollback de placa já atualizada.
+- A verificação independente final requer leitura real de `/status` na rede local, serial (COM) ou um canal seguro de telemetria operacional. GitHub não acessa automaticamente COM do Windows ou Wi-Fi residencial.
