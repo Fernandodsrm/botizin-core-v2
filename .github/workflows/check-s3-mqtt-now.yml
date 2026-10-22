@@ -1,0 +1,73 @@
+name: S3 MQTT 0.0.17 - one-time read-only verification
+
+on:
+  push:
+    branches: [s3-mqtt-readonly-0.0.17]
+    paths: [".github/workflows/check-s3-mqtt-now.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/s3-mqtt-readonly-0.0.17'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Install observer
+        run: python3 -m pip install --quiet paho-mqtt==2.1.0
+      - name: Listen to S3 state only; do not publish or command
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import ssl, json, time, uuid
+          import paho.mqtt.client as mqtt
+          data={"broker_connected":False,"fresh_reports":[],"retained_reports":0}
+          topic="fernando-lab/botizin-lab-s3-mqtt-readonly-20261021/state"
+          def on_connect(client, userdata, flags, reason_code, properties):
+              if reason_code.is_failure:
+                  print("BROKER_CONNECTION_FAILED", str(reason_code),flush=True)
+                  return
+              data["broker_connected"]=True
+              client.subscribe(topic,qos=0)
+              print("BROKER_CONNECTED_LISTENING",flush=True)
+          def on_message(client, userdata, msg):
+              if msg.topic!=topic:return
+              if msg.retain:
+                  data["retained_reports"]+=1
+                  return
+              try:
+                  payload=json.loads(msg.payload.decode("utf8"))
+              except (ValueError,UnicodeDecodeError):
+                  print("INVALID_JSON_MESSAGE",flush=True)
+                  return
+              if payload.get("role")!="s3-lab-readonly":return
+              details={k:payload.get(k) for k in ("firmware","uptime_s","slot","ota_valid","ota_ready","heap_kb","attempt")}
+              data["fresh_reports"].append(details)
+              print("FRESH_TOPIC_REPORT",json.dumps(details),flush=True)
+          c=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2,client_id="botizin-readonly-"+uuid.uuid4().hex[:10])
+          c.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+          c.on_connect=on_connect
+          c.on_message=on_message
+          try:
+              c.connect("broker.emqx.io",8883,keepalive=30)
+              c.loop_start()
+              start=time.monotonic()
+              while time.monotonic()-start<118 and not data["fresh_reports"]:
+                  time.sleep(1)
+          except Exception as e:
+              print("OBSERVE_CONNECTION_ERROR",type(e).__name__,str(e)[:120],flush=True)
+          finally:
+              try:c.loop_stop()
+              except Exception:pass
+              try:c.disconnect()
+              except Exception:pass
+          print("RESULT",json.dumps({
+              "broker_connected":data["broker_connected"],
+              "fresh_count":len(data["fresh_reports"]),
+              "retained_count":data["retained_reports"],
+              "fresh_reports":data["fresh_reports"][:2],
+              "authenticated_device_identity":False,
+              "interpretation":"Fresh traffic seen on public topic; device identity is unverified" if data["fresh_reports"] else "No MQTT message observed; physical firmware version unknown"
+          }),flush=True)
+          PY
