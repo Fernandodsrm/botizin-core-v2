@@ -571,6 +571,7 @@ void __attribute__((noinline)) sendTelemetry() {
 #include "mqtt_observer.h"
 #include "panel_page.h"
 #include "wifi_manager.h"
+#include "control_routes.h"
 
 void printPartitionTable() {
   Serial.println("PARTITION_TABLE:");
@@ -625,6 +626,7 @@ void setup() {
   eventJournalRegisterRoute(server);
   beginPeerOtaServer();
   wifiManagerRegisterRoutes();
+  controlRegisterRoutes();
   server.on("/update", HTTP_POST, []() {
     if (peerOtaBusy) { server.send(409, "text/plain", "S3 internet OTA busy"); return; }
     if (uploadActive) failUpload("request ended before file completion");
