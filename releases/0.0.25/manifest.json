@@ -1,0 +1,7 @@
+{
+  "board": "esp32s3-n16r8",
+  "version": "0.0.25",
+  "size": 1259872,
+  "sha256": "bc68a1c45c43f4b0e63d40767521b50290a664725568cd0e6acfae24c37e049a",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.25/firmware.bin"
+}
