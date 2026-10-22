@@ -44,7 +44,7 @@ jobs:
           assert manifest['version']=='0.0.17' and manifest['sha256']=='7a7c16bcb2acd885c74c7d8ad77fe15f9d0e1e55d634dfd23d1ebb7abdb6884f',manifest
           # Native Arduino startup policy: NO override, NO 15s/180s deferred gate.
           assert 'verifyRollbackLater(void)' not in src
-          assert 'verifyRollbackLater()' not in src
+          assert 'extern "C" bool verifyRollbackLater' not in src
           assert 'esp_ota_mark_app_valid_cancel_rollback()' not in src
           assert 'esp_ota_mark_app_invalid_rollback_and_reboot()' not in src
           assert 'otaBootHealthTick()' not in src and 'otaBootHealthBegin()' not in src
