@@ -50,6 +50,8 @@ bool internetStopped = false;
 uint32_t nextInternetCheck = 0;
 int responseCode = 400;
 String telemetryStatus = "WAITING";
+// MQTT counters are declared in mqtt_observer.h after the core OTA functions.
+static String mqttStatusSnapshot();
 uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
 bool telemetryStopped = false;
@@ -168,6 +170,7 @@ String snapshot() {
   s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
+  s += mqttStatusSnapshot();
   s += diagnosticText();
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
   if (attempt.length()) s += "\nCURRENT_OTA_ATTEMPT:\n" + attempt;
