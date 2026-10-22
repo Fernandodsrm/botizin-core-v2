@@ -1,0 +1,90 @@
+name: Build S3 0.0.17 MQTT publish-only (NO RELEASE)
+
+on:
+  push:
+    branches: [s3-mqtt-readonly-0.0.17]
+    paths:
+      - "firmware/**"
+      - "ci/**"
+      - ".github/workflows/build-s3-mqtt-probe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/s3-mqtt-readonly-0.0.17'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Arduino CLI 1.5.1
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Install exact core and MQTT library
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install "PubSubClient@2.8"
+      - name: Verify existing partition invariants and MQTT receive-only boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('firmware/firmware.ino').read_text()
+          mqtt=Path('firmware/mqtt_observer.h').read_text()
+          assert '#include "mqtt_observer.h"' in src
+          assert 'botizinMqttLoop();' in src
+          assert 'a->address == 0x10000 && b->address == 0x310000' in src
+          assert 'a->size == 0x300000 && b->size == 0x300000' in src
+          assert 'nextInternetCheck = millis() + 60000' in src
+          assert 'botizinMqtt.publish(' in mqtt
+          assert 'botizinMqtt.subscribe(' not in mqtt
+          assert 'OTA_CHECK' not in mqtt
+          assert 'mqtt_observer.h' in src
+          assert '"0.0.17"' in Path('firmware/version.h').read_text()
+          print('SOURCE_AND_PARTITION_INVARIANTS_PASS')
+          PY
+      - name: Existing OTA tests
+        run: |
+          set -euo pipefail
+          g++ -std=c++17 -Wall -Wextra -Werror tests/ota_confirmation_test.cpp -o /tmp/ota-confirm-test
+          /tmp/ota-confirm-test
+      - name: Broker TLS connectivity test (NO messages)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import socket, ssl
+          ctx=ssl.create_default_context()
+          with socket.create_connection(("broker.emqx.io",8883),timeout=8) as s:
+              with ctx.wrap_socket(s,server_hostname="broker.emqx.io") as tls:
+                  print("BROKER_TLS_OK",tls.version())
+          PY
+      - name: Build firmware app (do not activate)
+        env:
+          BOTIZIN_TB_DEVICE_TOKEN: ${{ secrets.BOTIZIN_TB_DEVICE_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 ci/build.py
+          python3 - <<'PY'
+          import json, pathlib
+          d=json.loads(pathlib.Path("dist/build-record.json").read_text())
+          assert d["version"]=="0.0.17" and d["bytes"]<=3145728, d
+          assert d["published"] is False, d
+          print("S3_MQTT_BUILD_OK",d["bytes"],"PUBLISHABLE",d["publishable"])
+          PY
+      - name: Upload internal research build
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-mqtt-readonly-test-${{ github.sha }}
+          path: dist/
+          retention-days: 1
+          if-no-files-found: warn
