@@ -1,7 +1,7 @@
 {
   "board": "esp32s3-n16r8",
-  "version": "0.0.21",
-  "size": 1224864,
-  "sha256": "486ea4740e598b6917d7207a45f12beb1d7d645b4caec71cc8ddc727244c73c2",
-  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.21/firmware.bin"
+  "version": "0.0.17",
+  "size": 1207616,
+  "sha256": "7a7c16bcb2acd885c74c7d8ad77fe15f9d0e1e55d634dfd23d1ebb7abdb6884f",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.17/firmware.bin"
 }
