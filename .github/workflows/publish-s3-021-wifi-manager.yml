@@ -1,0 +1,170 @@
+name: BOTIZIN S3 WiFi Manager 0.0.21 OTA - auto-pause if unconfirmed
+
+on:
+  push:
+    branches: [feature/s3-wifi-manager-0.0.21]
+    paths:
+      - ".github/workflows/publish-s3-021-wifi-manager.yml"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release-and-observe:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/feature/s3-wifi-manager-0.0.21'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check release 0.0.21 is from verified successful CI
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          status=$(gh run view 39744400091 --json conclusion --jq '.conclusion')
+          test "$status" = success
+          mkdir -p "$RUNNER_TEMP/s3-verified"
+          gh run download 39744400091 -n wifi021-validation-only-4c97f814c0c8426357a5e5af395e71444502a7bd -D "$RUNNER_TEMP/s3-verified"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          base=pathlib.Path(os.environ["RUNNER_TEMP"])/"s3-verified"
+          rec=json.loads((base/"build-record.json").read_text())
+          manifest=json.loads((base/"manifest.json").read_text())
+          image=(base/"firmware.bin").read_bytes()
+          sha=hashlib.sha256(image).hexdigest()
+          assert rec["source_commit"]=="4c97f814c0c8426357a5e5af395e71444502a7bd", rec["source_commit"]
+          assert rec["version"]=="0.0.21" and rec["published"] is False
+          assert rec["publishable"] is False and rec["device_token_compiled"] is False
+          assert len(image)==1224864 and len(image)<3145728 and image[0]==0xE9
+          assert manifest["version"]=="0.0.21" and manifest["board"]=="esp32s3-n16r8"
+          assert manifest["size"]==len(image)==rec["bytes"]
+          assert manifest["sha256"]==sha==rec["sha256"]=="486ea4740e598b6917d7207a45f12beb1d7d645b4caec71cc8ddc727244c73c2"
+          assert manifest["url"]=="https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.21/firmware.bin"
+          print("VERIFIED_CI_PACKAGE",len(image),sha,flush=True)
+          PY
+
+      - name: Checkout production main without changing its other sources
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: prod
+          persist-credentials: true
+
+      - name: Publish IMMUTABLE firmware package first (no activation yet)
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C prod config user.name "botizin-release-bot"
+          git -C prod config user.email "botizin-release-bot@users.noreply.github.com"
+          test ! -e prod/releases/0.0.21/firmware.bin
+          mkdir -p prod/releases/0.0.21
+          cp "$RUNNER_TEMP/s3-verified/firmware.bin" prod/releases/0.0.21/firmware.bin
+          cp "$RUNNER_TEMP/s3-verified/manifest.json" prod/releases/0.0.21/manifest.json
+          git -C prod add releases/0.0.21/firmware.bin releases/0.0.21/manifest.json
+          git -C prod commit -m "release: stage verified S3 0.0.21 MQTT-only image without activation"
+          git -C prod push origin HEAD:main
+          echo "S3_0_0_21_PACKAGE_PUBLISHED_NOT_ACTIVE"
+
+      - name: Ensure public firmware bytes match verified package before activating
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 6 --retry-all-errors --retry-delay 2 --max-time 20 \
+            -o "$RUNNER_TEMP/remote-s3-017.bin" \
+            "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.21/firmware.bin"
+          cmp -s "$RUNNER_TEMP/remote-s3-017.bin" "$RUNNER_TEMP/s3-verified/firmware.bin"
+          echo "REMOTE_RELEASE_BYTES_VERIFIED"
+
+      - name: Activate S3 0.0.21 OFFER by manifest (may auto-install on online S3)
+        id: activate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, pathlib, os
+          prod=pathlib.Path("prod")
+          old=json.loads((prod/"manifest.json").read_text())
+          assert old["version"]=="0.0.17" and old["board"]=="esp32s3-n16r8",old
+          assert old["sha256"]=="7a7c16bcb2acd885c74c7d8ad77fe15f9d0e1e55d634dfd23d1ebb7abdb6884f"
+          new=json.loads((pathlib.Path(os.environ["RUNNER_TEMP"])/"s3-verified"/"manifest.json").read_text())
+          (prod/"manifest.json").write_text(json.dumps(new,indent=2)+"\n")
+          PY
+          git -C prod add manifest.json
+          git -C prod commit -m "ota(s3): authorized offer 0.0.21 MQTT test retaining 0.0.17 binary"
+          git -C prod push origin HEAD:main
+          echo "S3_0_0_21_OFFER_ACTIVE_NO_DEVICE_CONFIRMATION"
+
+      - name: Listen for new S3 MQTT messages (NO commands)
+        id: observe
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet "paho-mqtt==2.1.0"
+          python3 - <<'PY'
+          import json,ssl,time,uuid
+          import paho.mqtt.client as mqtt
+          state={"connected":False,"received":0,"firmware_020":False,"ota_valid_reported":False}
+          def on_connect(client,userdata,flags,reason,properties):
+              if reason.is_failure:
+                  print("OBSERVE_CONNECT_FAILED",str(reason),flush=True);return
+              state["connected"]=True
+              client.subscribe("fernando-lab/botizin-lab-s3-mqtt-readonly-20261021/state",qos=0)
+              print("OBSERVER_MQTT_CONNECTED",flush=True)
+          def on_message(client,userdata,msg):
+              if msg.retain: return
+              try: data=json.loads(msg.payload.decode("utf-8"))
+              except (ValueError,UnicodeDecodeError):return
+              if data.get("role")!="s3-lab-readonly":return
+              state["received"]+=1
+              if data.get("firmware")=="0.0.21":
+                  state["firmware_020"]=True
+                  state["ota_valid_reported"]=bool(data.get("ota_valid"))
+              safe={k:data.get(k) for k in ("firmware","uptime_s","slot","ota_valid","ota_ready","heap_kb","attempt")}
+              print("MQTT_MESSAGE_RECEIVED",json.dumps(safe),flush=True)
+          cli=mqtt.Client(mqtt.CallbackAPIVersion.VERSION2,client_id="botizin-ci-observe-"+uuid.uuid4().hex[:8])
+          cli.tls_set(cert_reqs=ssl.CERT_REQUIRED)
+          cli.on_connect=on_connect
+          cli.on_message=on_message
+          cli.connect("broker.emqx.io",8883,30)
+          cli.loop_start()
+          try:
+              start=time.monotonic()
+              while time.monotonic()-start<320:
+                  if state["firmware_020"] and state["ota_valid_reported"]:break
+                  time.sleep(1)
+          finally:
+              cli.loop_stop();cli.disconnect()
+          print("FINAL_MQTT_OBSERVATION",json.dumps(state),flush=True)
+          with open(__import__("os").environ["GITHUB_OUTPUT"],"a") as out:
+              out.write("confirmed="+("true" if state["firmware_020"] and state["ota_valid_reported"] else "false")+"\n")
+          if not state["firmware_020"]:
+              print("NO_DEVICE_CONFIRMATION: manifest offer published; cannot assert OTA installation.",flush=True)
+          else:
+              print("UNAUTHENTICATED_PUBLIC_BROKER: fresh message is not cryptographic device identity proof.",flush=True)
+          PY
+
+      - name: AUTO-PAUSE offer if 0.0.21 not confirmed through MQTT
+        if: always() && steps.activate.conclusion == 'success' && steps.observe.outputs.confirmed != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C prod fetch origin main
+          git -C prod reset --hard origin/main
+          python3 - <<'PY'
+          import json,pathlib
+          p=pathlib.Path("prod")
+          current=json.loads((p/"manifest.json").read_text())
+          # Protect against overwriting a newer human-authorized offer.
+          assert current["version"]=="0.0.21" and current["sha256"]=="486ea4740e598b6917d7207a45f12beb1d7d645b4caec71cc8ddc727244c73c2",current
+          previous=json.loads((p/"releases/0.0.17/manifest.json").read_text())
+          assert previous["version"]=="0.0.17"
+          (p/"manifest.json").write_text(json.dumps(previous,indent=2)+"\n")
+          PY
+          git -C prod config user.name "botizin-release-bot"
+          git -C prod config user.email "botizin-release-bot@users.noreply.github.com"
+          git -C prod add manifest.json
+          git -C prod commit -m "ota(s3): pause 0.0.21 reoffer; device MQTT confirmation not seen"
+          git -C prod push origin HEAD:main
+          echo "OTA_0_0_21_OFFER_PAUSED_NO_MQTT_CONFIRMATION"
