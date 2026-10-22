@@ -80,7 +80,19 @@ jobs:
           NM=$(find "$HOME/.arduino15/packages/esp32/tools" -type f -name '*-nm' | head -1)
           test -n "$NM"
           echo "Nm tool: $NM"
-          "$NM" -C dist/firmware.elf | tee /tmp/ota02-symbols.txt | grep -E ' [Tt] verifyRollbackLater$'
+          "$NM" -C dist/firmware.elf > /tmp/ota02-symbols.txt
+          grep -E ' [Tt] verifyRollbackLater
+          ! grep -E ' [Ww] verifyRollbackLater$' /tmp/ota02-symbols.txt
+          echo OTA02_STRONG_C_LINKAGE_HOOK_OK
+      - name: Save validation-only build and logs; never publish manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ota02-validation-only-${{ github.sha }}
+          path: dist/
+          retention-days: 7
+          if-no-files-found: warn
+ /tmp/ota02-symbols.txt
           ! grep -E ' [Ww] verifyRollbackLater$' /tmp/ota02-symbols.txt
           echo OTA02_STRONG_C_LINKAGE_HOOK_OK
       - name: Save validation-only build and logs; never publish manifest
