@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sleep 900
+          sleep 540
           git fetch origin main
           git reset --hard origin/main
           python3 - <<'PY'
