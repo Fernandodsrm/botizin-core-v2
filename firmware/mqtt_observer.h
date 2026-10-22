@@ -80,6 +80,7 @@ static void botizinMqttLoop() {
         botizinMqttLast = "CONNECT_FAILED";
     }
     botizinMqttTls.stop();
+    eventJournalMqttResult(botizinMqttLast=="PUBLISHED");
     Serial.printf("MQTT_READONLY: %s attempts=%lu successes=%lu\n",
                   botizinMqttLast.c_str(),
                   (unsigned long)botizinMqttAttempts,
