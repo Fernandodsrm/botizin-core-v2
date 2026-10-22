@@ -46,6 +46,22 @@ static void wifiPortalPage() {
     server.send(403,"text/plain","Wi-Fi configuration is available only from setup access point.");
     return;
   }
+  String networks;
+  // Scan on request, not continuously. Escape SSIDs to avoid HTML injection.
+  const int count=WiFi.scanNetworks(false,true);
+  if(count>0) {
+    networks="<label for=\"nearby\">Redes encontradas</label>"
+             "<select id=\"nearby\" onchange=\"document.getElementById('ssid').value=this.value\" "
+             "style=\"width:100%;padding:12px;font-size:16px\">"
+             "<option value=\"\">Escolha uma rede...</option>";
+    for(int n=0;n<count && n<25;n++) {
+      String ssid=wifiHtmlEscape(WiFi.SSID(n));
+      if(ssid.length()==0)continue;
+      networks+="<option value=\""+ssid+"\">"+ssid+"</option>";
+    }
+    networks+="</select>";
+  }
+  WiFi.scanDelete();
   String body=R"HTML(<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BOTIZIN - Configurar Wi-Fi</title><style>
@@ -67,6 +83,8 @@ e a senha. Seus dados ficam na propria placa, nao no GitHub.</p>
 <p><small>Depois de salvar a S3 reinicia, tenta o Wi-Fi e desliga esta rede
 temporaria. Se a senha estiver errada, o modo de configuracao reaparece.</small></p>
 </main></body></html>)HTML";
+  body.replace("<form action=\"/wifi/save\" method=\"post\">",
+               "<form action=\"/wifi/save\" method=\"post\">"+networks);
   server.sendHeader("Cache-Control","no-store");
   server.send(200,"text/html; charset=utf-8",body);
 }
