@@ -159,7 +159,9 @@ String snapshot() {
   s += "WIFI: " + String(WiFi.status() == WL_CONNECTED ? "OK" : "DISCONNECTED") + "\n";
   s += "OTA: " + String(otaReady ? "READY" : "BLOCKED: hardware/partition mismatch") + "\n";
   s += "INTERNET_OTA: " + internetStatus + "\n";
-  s += "OTA_AUTOMATIC_ENABLED: YES\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
+  s += "OTA_AUTOMATIC_ENABLED: " + String(BOTIZIN_LAB_MODE?"NO_LAB_PROTECTED":"YES") + "\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
+  s += "LAB_MODE: " + String(BOTIZIN_LAB_MODE?"YES":"NO") + "\n";
+  s += "LAB_OTA_FLASH_WRITES: " + String(BOTIZIN_LAB_MODE?"DISABLED":"STANDARD") + "\n";
   s += "PEER_PAIRED: " + String(peerKey.length() == 64 ? "YES" : "NO") + "\n";
   s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
@@ -221,6 +223,8 @@ void failUpload(const String &reason) {
 }
 
 void beginUpload(const String &length, const String &sha) {
+    // LAB may only boot the pre-existing verified CORE; never write its slot.
+    if (BOTIZIN_LAB_MODE) { responseCode=403; return; }
     uploadOK = false;
     responseCode = 400;
     attempt = "";
@@ -307,6 +311,7 @@ void finishUpload() {
   }
 
 void handleUpload() {
+  if (BOTIZIN_LAB_MODE) return;
   if (peerOtaBusy) return;
   HTTPUpload &u = server.upload();
   if (u.status == UPLOAD_FILE_START) beginUpload(server.arg("size"), server.arg("sha256"));
@@ -572,6 +577,8 @@ void __attribute__((noinline)) sendTelemetry() {
 #include "panel_page.h"
 #include "wifi_manager.h"
 #include "control_routes.h"
+#include "botizin_lab_page.h"
+#include "lab_safety.h"
 
 void printPartitionTable() {
   Serial.println("PARTITION_TABLE:");
@@ -605,6 +612,9 @@ void setup() {
              (run->address == a->address || run->address == b->address);
   eventRecord(otaReady?EV_HW_OK:EV_HW_ERROR,otaReady?EV_INFO:EV_ERROR,
               otaReady?"FLASH_PSRAM_PARTITIONS_OK":"HW_PARTITION_CHECK_FAILED",!otaReady);
+  // The experimental image can never call Update.begin or overwrite ota_0.
+  // Restoring ota_0 uses ONLY the SHA-gated labReturnToCore() selection.
+  if (BOTIZIN_LAB_MODE) { otaReady=false; internetStatus="LAB_PROTECTED_NO_OTA_WRITES"; }
   initializeDiagnosticFlash();
   sampleDiagnostics();
   Serial.println(snapshot());
@@ -627,12 +637,15 @@ void setup() {
   beginPeerOtaServer();
   wifiManagerRegisterRoutes();
   controlRegisterRoutes();
+  if (BOTIZIN_LAB_MODE) labRegisterRoutes();
   server.on("/update", HTTP_POST, []() {
+    if (BOTIZIN_LAB_MODE) { server.send(403,"text/plain","LAB_OTA_WRITE_DISABLED"); return; }
     if (peerOtaBusy) { server.send(409, "text/plain", "S3 internet OTA busy"); return; }
     if (uploadActive) failUpload("request ended before file completion");
     server.send(responseCode, "text/plain; charset=utf-8", attempt.length() ? attempt : "No firmware uploaded\n");
   }, handleUpload);
   server.on("/reboot", HTTP_POST, []() {
+    if (BOTIZIN_LAB_MODE) { server.send(403,"text/plain","LAB_REBOOT_VIA_AUTHENTICATED_PANEL_ONLY"); return; }
     if (peerOtaBusy || !uploadOK) { server.send(409, "text/plain", "No verified OTA pending; STOP\n"); return; }
     logLine("REBOOT_REQUESTED: SOFTWARE"); checkpoint();
     server.send(200, "text/plain", "Reboot in 2 seconds\n");
@@ -647,7 +660,7 @@ void setup() {
   eventHttpServerStarted=true;
   eventRecord(EV_HTTP_STARTED,EV_INFO,"LISTENER_INIT_NOT_REACHABILITY");
   maintainLocalName();
-  botizinMqttSetup();
+  if (!BOTIZIN_LAB_MODE) botizinMqttSetup();
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
 }
 
@@ -669,21 +682,21 @@ void loop() {
     if (manualOtaStatus == "CHECKING") manualOtaStatus = internetStatus;
     nextTelemetry = millis();
   }
-  if (!rebootScheduled && !uploadActive && !uploadOK && !internetStopped &&
+  if (!BOTIZIN_LAB_MODE && !rebootScheduled && !uploadActive && !uploadOK && !internetStopped &&
       (int32_t)(millis() - nextInternetCheck) >= 0) {
     nextInternetCheck = millis() + 60000;
     if (!manualWindowActive()) { clearOtaCandidate(); peerOtaBusy = true; checkInternetOTA(false); peerOtaBusy = false; }
   }
-  if (!rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
+  if (!BOTIZIN_LAB_MODE && !rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
       (int32_t)(millis() - nextTelemetry) >= 0) {
     nextTelemetry = millis() + 60000;
     sendTelemetry();
   }
-  if (!rebootScheduled && !uploadActive && !uploadOK && !pingStopped &&
+  if (!BOTIZIN_LAB_MODE && !rebootScheduled && !uploadActive && !uploadOK && !pingStopped &&
       (int32_t)(millis() - nextPingPoll) >= 0) {
     nextPingPoll = millis() + 15000;
     pollPing();
   }
-  botizinMqttLoop();
+  if (!BOTIZIN_LAB_MODE) botizinMqttLoop();
   delay(2);
 }
