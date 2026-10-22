@@ -17,23 +17,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: true
-      - name: Download the exact successful CI artifact and verify firmware
+      - name: Verify already-published firmware in the public repository
         shell: bash
-        env:
-          ARTIFACT_ZIP_URL: 'https://sdmntprbrazilsouth.oaiusercontent.com/files/00000000-f130-820e-a5d5-21ff92b54d18/raw?se=2026-10-22T23%3A15%3A19Z&sp=r&sv=2026-02-06&sr=b&scid=6901d8f6-0f10-53ff-9146-fc089c89fe83&skoid=fbc53507-c13f-4907-b4dd-0e03c91f5ad8&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-22T09%3A39%3A33Z&ske=2026-10-23T09%3A39%3A33Z&sks=b&skv=2026-02-06&sig=mzt2lFssDux8flnlYBJU2d3KmQ6O%2BeC6RxAqfccIMus%3D'
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 --connect-timeout 12 --max-time 110 "$ARTIFACT_ZIP_URL" --output /tmp/xiaozhi-lab.zip
-          unzip -p /tmp/xiaozhi-lab.zip build/xiaozhi.bin > /tmp/xiaozhi-lab.bin
-          test "$(stat -c %s /tmp/xiaozhi-lab.bin)" -eq 1942976
-          printf '%s  %s\n' 'c4a83a5a41de7b84c9afd088c0d81decec2563f406506d88ec2873cfe7f658c4' /tmp/xiaozhi-lab.bin | sha256sum -c -
-          echo "VERIFIED: XiaoZhi native 1,942,976 bytes; OTA_1 only"
+          test "$(stat -c %s releases/0.0.26/firmware.bin)" -eq 1942976
+          echo 'c4a83a5a41de7b84c9afd088c0d81decec2563f406506d88ec2873cfe7f658c4  releases/0.0.26/firmware.bin' | sha256sum -c -
+          echo 'EXISTING XIAOZHI IMAGE VERIFIED'
       - name: Publish firmware and temporarily point the automatic OTA manifest
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p releases/0.0.26
-          cp /tmp/xiaozhi-lab.bin releases/0.0.26/firmware.bin
           python3 - <<'PY'
           import json,pathlib
           p=pathlib.Path('manifest.json')
@@ -44,7 +39,7 @@ jobs:
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add releases/0.0.26/firmware.bin manifest.json
+          git add manifest.json
           git commit -m 'release(lab): publish verified XiaoZhi 0.0.26 for one OTA trial'
           git push origin HEAD:main
       - name: Disable automatic reinstallation after the trial window
