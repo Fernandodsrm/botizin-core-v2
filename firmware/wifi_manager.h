@@ -138,6 +138,7 @@ static void wifiPortalStart() {
     return;
   }
   wifiPortalOn=true;
+  eventRecord(EV_WIFI_SETUP_ON,EV_WARN,"LOCAL_AP_RECOVERY");
   wifiPortalDnsOn=wifiPortalDns.start(53,"*",WiFi.softAPIP());
   Serial.println("WIFI_SETUP: ACTIVE");
   Serial.println("WIFI_SETUP_SSID: "+wifiPortalName);
@@ -148,6 +149,7 @@ static void wifiPortalStop() {
   if(!wifiPortalOn)return;
   if(wifiPortalDnsOn){wifiPortalDns.stop();wifiPortalDnsOn=false;}
   wifiPortalOn=false;
+  eventRecord(EV_WIFI_SETUP_OFF,EV_INFO,"STA_RECONNECTED");
   WiFi.softAPdisconnect(true);
   WiFi.mode(WIFI_STA);
   Serial.println("WIFI_SETUP: OFF_CONNECTED");
