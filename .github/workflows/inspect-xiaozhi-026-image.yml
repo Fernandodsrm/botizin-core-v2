@@ -1,0 +1,43 @@
+name: Inspect XiaoZhi 0.0.26 OTA image - read only
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/inspect-xiaozhi-026-image.yml'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare SHA, format and ESP32 image headers (no flashing)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, struct
+          cases=[
+            ('CORE_025','releases/0.0.25/firmware.bin',1259872,'bc68a1c45c43f4b0e63d40767521b50290a664725568cd0e6acfae24c37e049a'),
+            ('XIAOZHI_026','releases/0.0.26/firmware.bin',1942976,'c4a83a5a41de7b84c9afd088c0d81decec2563f406506d88ec2873cfe7f658c4')]
+          for name,path,expected_size,expected_hash in cases:
+            data=Path(path).read_bytes()
+            sha=hashlib.sha256(data).hexdigest()
+            print(f'{name} size={len(data)} expected={expected_size} sha256={sha} sha_expected={expected_hash}')
+            print(f'{name} first_32_bytes={data[:32].hex()} magic=0x{data[0]:02x} segments={data[1]} flash_mode=0x{data[2]:02x} flash_freq_size=0x{data[3]:02x} entry=0x{struct.unpack_from("<I",data,4)[0]:08x} chip_id={struct.unpack_from("<H",data,12)[0]}')
+            assert len(data)==expected_size and sha==expected_hash, name+' expected size/hash mismatch'
+            assert data[:2]!=b'PK', name+' is ZIP and cannot be used as app OTA'
+            assert data[:4]!=bytes.fromhex('e9 00 00 00'), name+' suspicious empty image'
+            assert data[0]==0xe9, name+' missing ESP32 firmware image magic E9'
+            assert 1<=data[1]<=16, name+' ESP32 firmware segment count unreasonable'
+          print('RESULT: BOTH RELEASES ARE RAW ESP32 APP FIRMWARE IMAGES; NOT ZIP')
+          PY
+      - name: esptool structural validation (offline inspection)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet esptool==4.9.0
+          python3 -m esptool image_info releases/0.0.25/firmware.bin
+          python3 -m esptool image_info releases/0.0.26/firmware.bin
