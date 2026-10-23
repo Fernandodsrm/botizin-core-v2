@@ -117,7 +117,31 @@ try {
             }
         }catch{}
     }
-    if($found){Say 'SUCESSO PARCIAL: XiaoZhi responde no browser. Voz e IA precisam de teste funcional.'}
+    if($found){
+        Say 'SUCESSO: XiaoZhi 0.0.27 responde. Abrindo navegador local de teste de microfone.'
+        $apps=@(
+            'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe',
+            'C:\Program Files\Microsoft\Edge\Application\msedge.exe',
+            'C:\Program Files\Google\Chrome\Application\chrome.exe',
+            'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe'
+        )
+        $browser=$apps|Where-Object{Test-Path $_}|Select-Object -First 1
+        if($browser){
+            $profile=if(Test-Path 'D:\'){'D:\BOTIZIN-Browser-Mic-LAB'}else{(Join-Path $env:TEMP 'BOTIZIN-Browser-Mic-LAB')}
+            New-Item -ItemType Directory -Force -Path $profile|Out-Null
+            $args=@(
+                ('--user-data-dir="'+$profile+'"'),
+                '--unsafely-treat-insecure-origin-as-secure=http://192.168.0.18',
+                '--no-first-run',
+                '--new-window',
+                'http://192.168.0.18/botizin'
+            )
+            Start-Process -FilePath $browser -ArgumentList $args
+            Say 'NAVEGADOR ABERTO: Clique Conversar com XiaoZhi e permita o microfone. Uso APENAS para teste.'
+        } else {
+            Say 'Sem Edge/Chrome detectado. Nao foi possivel abrir o microfone de desenvolvimento.'
+        }
+    }
     else {Say 'ATENCAO: /botizin nao respondeu em 80 segundos. Verificar as linhas COM4 antes de repetir.'}
 } catch {
     Say ('ERRO: '+$_.Exception.Message)
