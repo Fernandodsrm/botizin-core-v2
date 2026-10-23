@@ -73,6 +73,8 @@ try {
     if($manifest.version -ne '0.0.28' -or $manifest.board -ne 'esp32s3-n16r8') {throw 'STOP: manifesto incorreto'}
     $size=[int]$manifest.size
     $sha=[string]$manifest.sha256
+    # Pinned independently to the rebuilt private seven-part image (LAB 0.0.28 release).
+    if($size -ne 1946480 -or $sha -ne '108cf2a33bc357bc924495378f9c06fe7f36fc238ac2e29b696a37c7d90dc149') {throw 'STOP: manifesto mudou ou aponta para firmware diferente da LAB 0.0.28 aprovada'}
     if($size -lt 1000000 -or $size -gt 3145728 -or $sha -notmatch '^[0-9a-f]{64}$' -or $manifest.url -ne $fwUrl) {throw 'STOP: manifesto de 0.0.28 invalido'}
     Say ('LAB 0.0.28 CONFIRMADA: bytes='+$size+' SHA='+$sha)
     Say 'Baixando firmware na RAM do notebook, sem gravar em Downloads...'
