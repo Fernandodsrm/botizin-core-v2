@@ -37,7 +37,7 @@ function Await-Poll($task,[int]$limit) {
     }
     Poll-Serial
     if(!$task.IsCompleted) { throw 'Timeout esperando resposta; NENHUM reboot adicional sera solicitado.' }
-    return $task.GetAwaiter().GetResult()
+    return ,($task.GetAwaiter().GetResult())
 }
 function Flat([string]$s) {return ($s -replace '[\r\n]+',' | ')}
 try {
