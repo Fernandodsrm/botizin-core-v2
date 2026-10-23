@@ -13,6 +13,8 @@ $client=$null
 $payload=$null
 $pending=''
 $serialLines=0
+$captureBoot=$false
+$capturedBootLines=0
 function Say([string]$v) { Write-Host ((Get-Date -Format 'HH:mm:ss.fff')+' '+$v) }
 function Poll-Serial {
     if($null -eq $script:serial -or !$script:serial.IsOpen) { return }
@@ -24,7 +26,8 @@ function Poll-Serial {
             $script:pending=$script:pending.Substring($n+1)
             if($line -match '(?i)PASSWORD|WIFI_SETUP_SSID_USB_ONLY|TOKEN|API_KEY|SECRET|authorization:') {$line='[REDACTED_CREDENTIAL_LINE]'}
             $script:serialLines++
-            if($line -match '(?i)OTA|UPDATE|DOWNLOAD|SHA|WRITE|RESET_REASON|INT_WDT|TASK_WDT|GURU MEDITATION|PANIC|FAIL|BOOT_PARTITION|REBOOT|[Ee]rror|HTTP_SERVER') { Say ('COM4: '+$line) }
+            if($script:captureBoot -and $script:capturedBootLines -lt 240) { $script:capturedBootLines++; Say ('BOOT_RAW: '+$line) }
+            elseif($line -match '(?i)OTA|UPDATE|DOWNLOAD|SHA|WRITE|RESET_REASON|INT_WDT|TASK_WDT|GURU MEDITATION|PANIC|FAIL|BOOT_PARTITION|REBOOT|[Ee]rror|HTTP_SERVER') { Say ('COM4: '+$line) }
         }
         if($script:pending.Length -gt 8192) {$script:pending=''}
     } catch { Say ('COM4_READ_ERROR: '+$_.Exception.Message) }
@@ -83,6 +86,8 @@ try {
         throw 'PARADO: nao ha confirmacao de gravacao. NAO reiniciar e enviar as linhas de erro.'
     }
     Say 'SHA e FLASH confirmados pela S3. Solicitando reboot do firmware ja verificado.'
+    $script:captureBoot=$true
+    Say 'Captura serial COMPLETA ativada para os primeiros 240 logs de inicializacao.'
     $empty=[System.Net.Http.ByteArrayContent]::new([byte[]]@())
     $restart=Await-Poll ($client.PostAsync($base+'/reboot',$empty)) 15
     Say ('REBOOT HTTP='+[int]$restart.StatusCode)
