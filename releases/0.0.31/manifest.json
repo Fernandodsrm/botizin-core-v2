@@ -1,0 +1,10 @@
+{
+  "board": "esp32s3-n16r8",
+  "channel": "lab",
+  "version": "0.0.31",
+  "size": 1951168,
+  "sha256": "adffd5c3208c6a9701670f204b884c764b1688c8c8169e89f3bbec0fe354e26f",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.31/firmware.bin",
+  "ota_partition_bytes": 3145728,
+  "notes": "Experimental LAB WebSocket FD registration fix. Does not change automatic production manifest 0.0.25. Do not confirm until audio works."
+}
