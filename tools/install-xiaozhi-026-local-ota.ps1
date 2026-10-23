@@ -16,7 +16,7 @@ $serial = $null
 $client = $null
 $form = $null
 $pending = ''
-function Flat([string]$str) { return $str.Replace([char]13,' ').Replace([char]10,' | ') }
+function Flat([string]$str) { return $str.Replace([string][char]13,' ').Replace([string][char]10,' | ') }
 function Note([string]$str) {
     $line = (Get-Date -Format 'HH:mm:ss.fff') + ' ' + $str
     Write-Host $line
