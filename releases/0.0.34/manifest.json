@@ -1,0 +1,12 @@
+{
+  "board": "esp32s3-n16r8",
+  "channel": "lab",
+  "version": "0.0.34",
+  "size": 1961184,
+  "sha256": "bdb2dfa20e605eac4593684fca97c158eb18272abce0a2d6ea77a4244b3e4f1c",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.34/firmware.bin",
+  "ota_partition_bytes": 3145728,
+  "source_commit": "20069192dec51ac38ac95306b7f8273ed1d5c33a",
+  "build_run": 40271046161,
+  "notes": "Browser voice auto-start, reload intent, mobile lifecycle recovery and bounded HTTP diagnostics. Persistent LAB; CORE 0.0.25 preserved. Compiled and host-tested; physical validation pending."
+}
