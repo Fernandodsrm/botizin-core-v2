@@ -1,0 +1,12 @@
+{
+  "board": "esp32s3-n16r8",
+  "channel": "lab",
+  "version": "0.0.35",
+  "size": 1966192,
+  "sha256": "d0122460f5ed019d5f6714ae11f36ba934b0170f6cafb70cc586193c6ceeaf0e",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.35/firmware.bin",
+  "ota_partition_bytes": 3145728,
+  "source_commit": "e2a997de4e3e5656aeb1d15b1027e5ed641ae46f",
+  "build_run": 40274308566,
+  "notes": "Voice panel with actual session indicators, playback-driven face, collapsible diagnostics and settings. Existing session controls preserved; CORE 0.0.25 preserved. Compiled and host-tested; physical UI validation pending."
+}
