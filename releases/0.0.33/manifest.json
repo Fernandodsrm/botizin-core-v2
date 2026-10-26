@@ -1,0 +1,12 @@
+{
+  "board": "esp32s3-n16r8",
+  "channel": "lab",
+  "version": "0.0.33",
+  "size": 1957152,
+  "sha256": "1deb7fb85ac675ef302e3e31c6278422a895be39517b8c84c5dc0d4d5c0bc3f0",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.33/firmware.bin",
+  "ota_partition_bytes": 3145728,
+  "source_commit": "aaa8871128c07e71cfee7f6c422c332c1d9fed33",
+  "build_run": 40265701089,
+  "notes": "Experimental browser session recovery, heartbeat, AudioContext resume and bounded audio buffering. Persistent LAB; CORE 0.0.25 preserved. Compiled and host-tested; physical validation pending."
+}
