@@ -1,0 +1,12 @@
+{
+  "version": "0.0.39",
+  "channel": "lab",
+  "board": "esp32s3-n16r8",
+  "size": 1982640,
+  "sha256": "5464749682e9fcf4a41612d10c11a9f5d39a38e3d36cf54c062aec91064c0f01",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.39/firmware.bin",
+  "source_commit": "17a729427dfe996c93760a381e7e05ed63f9c179",
+  "build_run": 40296721252,
+  "status": "physical_test_pending",
+  "notes": "Browser PCM is encoded directly to Opus while the ESP-SR AFE remains active only for speech/silence detection."
+}
