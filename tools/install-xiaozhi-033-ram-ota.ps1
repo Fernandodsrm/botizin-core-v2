@@ -1,6 +1,6 @@
 # BOTIZIN XiaoZhi 0.0.33 -- OTA local, download in RAM (no disk needed).
 # Windows PowerShell 5.1+ / ESP32-S3 CORE 0.0.25; mDNS with known-IP fallback.
-param([string]$DeviceUrl='http://botizin-s3.local', [string]$FallbackUrl='http://192.168.0.7', [switch]$MonitorSerial)
+param([string]$DeviceUrl='http://botizin-s3.local', [string]$FallbackUrl='http://192.168.0.7', [switch]$MonitorSerial, [ValidateRange(15,180)][int]$StatusTimeoutSeconds=75)
 # Preserves ota_0, writes ota_1; reboot only when SHA and post-flash verification succeed.
 $ErrorActionPreference='Stop'
 [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
@@ -64,11 +64,16 @@ try {
     $handler.UseProxy=$false
     $client=[System.Net.Http.HttpClient]::new($handler)
     $client.Timeout=[TimeSpan]::FromSeconds(240)
-    try { $before=Await-Poll ($client.GetStringAsync($base+'/status')) 15 }
+    Say ('Consultando '+$base+'/status; prazo='+$StatusTimeoutSeconds+' segundos.')
+    try { $before=Await-Poll ($client.GetStringAsync($base+'/status')) $StatusTimeoutSeconds }
     catch {
-        Say 'Nome botizin-s3.local indisponivel; tentando IP local conhecido.'
-$base=$FallbackUrl.TrimEnd('/')
-        $before=Await-Poll ($client.GetStringAsync($base+'/status')) 15
+        # Cancel the abandoned read before starting another request.
+        $client.CancelPendingRequests()
+        $fallback=$FallbackUrl.TrimEnd('/')
+        if($base -eq $fallback){throw}
+        Say ('Consulta inicial falhou; tentando '+$fallback+'/status.')
+        $base=$fallback
+        $before=Await-Poll ($client.GetStringAsync($base+'/status')) $StatusTimeoutSeconds
     }
     Say ('STATUS ANTES: '+(Flat $before))
     if($before -notmatch 'BOTIZIN CORE V0[.]0[.]25'){throw 'PARADO: placa nao esta no CORE 0.0.25. Se uma LAB estiver ativa, primeiro retorne ao CORE pelo endpoint /lab/return-core com sua senha local. NENHUM firmware foi gravado.'}
