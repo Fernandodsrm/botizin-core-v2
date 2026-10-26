@@ -1,0 +1,11 @@
+{
+  "board": "esp32s3-n16r8",
+  "channel": "lab",
+  "version": "0.0.36",
+  "size": 1979344,
+  "sha256": "4da85d801bae41065516ad631592b216f10de99a8bfa98f2f5face2b7231e22e",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.36/firmware.bin",
+  "source_commit": "a14fc358d1d6b07cbfa358e24e71e094264dfb28",
+  "build_run": 40283909894,
+  "notes": "Authenticated asynchronous S3 to A22 HTTP command. CORE 0.0.25 preserved. Physical validation pending."
+}
