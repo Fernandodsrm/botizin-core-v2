@@ -1,0 +1,12 @@
+{
+  "version": "0.0.38",
+  "channel": "lab",
+  "board": "esp32s3-n16r8",
+  "size": 1982112,
+  "sha256": "41113ecd74ecdc0ae2fd1c625a9cfaec002f73a742a3a4753c97bedd810d8de8",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.38/firmware.bin",
+  "source_commit": "63c9fd53989fc6d6e0e5b3075fcd791e297c4864",
+  "build_run": 40292743369,
+  "status": "physical_test_pending",
+  "notes": "Smoother 20 ms browser audio pacing, filtered 16 kHz microphone resampling, larger speaker jitter buffer and direct ChatGPT voice tool intent."
+}
