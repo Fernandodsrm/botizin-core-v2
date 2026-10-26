@@ -1,0 +1,10 @@
+{
+  "board": "esp32s3-n16r8",
+  "channel": "lab",
+  "version": "0.0.32",
+  "size": 1950960,
+  "sha256": "eb68eacdb00733d1ec2073de4ecf1f9b48363bc33c52eb692aed5869c3afcbe0",
+  "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.32/firmware.bin",
+  "ota_partition_bytes": 3145728,
+  "notes": "Persistent LAB; 20-minute automatic return removed. CORE 0.0.25 remains in ota_0; manual recovery available."
+}
