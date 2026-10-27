@@ -2,7 +2,7 @@ name: Build BOTIZIN ESP32-WROOM in cloud
 
 on:
   push:
-    branches: [live-led-0.0.36]
+    branches: [teste-live-0.0.37]
     paths:
       - 'wroom/**'
       - 'ci/build_wroom.py'
