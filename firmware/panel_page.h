@@ -5,7 +5,7 @@
 static const char kBotizinPanelHTML[] PROGMEM = R"BTZN(<!doctype html>
 <html lang="pt-BR"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="dark"><title>BOTIZIN | Diagnóstico</title>
+<meta name="color-scheme" content="dark"><title>BOTIZIN | Central da S3</title>
 <style>
 :root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#e4f2ed;background:#0d1918}
 *{box-sizing:border-box}body{margin:0}main{max-width:1060px;margin:0 auto;padding:18px}
@@ -46,11 +46,12 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 .control-line{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 @media(max-width:720px){.control-grid{grid-template-columns:1fr}}
 @media(max-width:720px){main{padding:12px}.g{grid-template-columns:repeat(2,minmax(0,1fr))}.pair{grid-template-columns:1fr}header{align-items:flex-start}h1{font-size:1.4rem}}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}.tabs button[aria-selected="true"]{background:#91fac9;color:#08261c}.link-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.lamp{display:inline-block;width:10px;height:10px;border-radius:50%;background:#7b8b85;margin-right:7px}.lamp.ok{background:#65e8a6}.lamp.warn{background:#e5b35c}.lamp.bad{background:#ef8c81}.link-card{padding:16px;background:#102d27;border:1px solid #315046;border-radius:12px}.link-card h3{margin:0 0 12px;font-size:1rem}.link-card p{font-size:.85rem}.tabs button:focus-visible{outline:3px solid #91fac9}details summary{cursor:pointer;padding:8px;font-weight:650}
 </style></head><body>
 <main>
-<header><div><div class="logo">FERNANDO LAB</div><h1>BOTIZIN / Central de diagnóstico</h1></div>
+<header><div><div class="logo">FERNANDO LAB</div><h1>BOTIZIN / Central da S3</h1></div>
 <div class="flag">PAINEL LOCAL · SEM POLLING</div></header>
-<p class="description">Leitura apenas quando você abre a página ou aperta um botão. Este painel não instala firmware nem envia comandos à placa.</p>
+<p class="description">Sua bancada em um só lugar. Consulte conexões, acompanhe eventos e acesse os controles da S3.</p>
 <div class="state" id="state" role="status" aria-live="polite">Nenhum diagnóstico recebido.</div>
 <div class="g" id="metrics">
 <div class="metric"><div class="k">Firmware / slot</div><div class="v" id="firmware">—</div></div>
@@ -58,7 +59,32 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <div class="metric"><div class="k">OTA / rollback</div><div class="v" id="ota">—</div></div>
 <div class="metric"><div class="k">RAM disponível</div><div class="v" id="memory">—</div></div>
 </div>
-<section class="pair">
+
+<nav class="tabs" role="tablist" aria-label="Áreas do painel">
+<button role="tab" id="tab-home" aria-controls="page-home" aria-selected="true" data-page="home">Visão geral</button>
+<button role="tab" id="tab-links" aria-controls="page-links" aria-selected="false" data-page="links">Conexões</button>
+<button role="tab" id="tab-events" aria-controls="page-events" aria-selected="false" data-page="events">Eventos</button>
+<button role="tab" id="tab-settings" aria-controls="page-settings" aria-selected="false" data-page="settings">Configurações</button>
+<button role="tab" id="tab-diag" aria-controls="page-diag" aria-selected="false" data-page="diag">Diagnóstico</button>
+</nav>
+<div id="page-home" role="tabpanel" aria-labelledby="tab-home"></div>
+<div id="page-links" role="tabpanel" aria-labelledby="tab-links" hidden>
+<section class="panel"><h2>Quem se comunica com quem</h2>
+<p class="small muted">Indicadores da última consulta à S3. Verde indica um resultado registrado, não uma conexão continuamente monitorada.</p>
+<div class="link-grid">
+<div class="link-card"><h3>S3 → Wi-Fi</h3><p id="link-wifi">Não verificada</p></div>
+<div class="link-card"><h3>Navegador → S3</h3><p id="link-http">Não verificada</p></div>
+<div class="link-card"><h3>S3 → MQTT</h3><p id="link-mqtt">Não verificada</p></div>
+<div class="link-card"><h3>S3 ↔ WROOM</h3><p id="link-peer">Não verificada</p><a href="http://botizin-wroom.local/status" target="_blank" rel="noopener">Abrir status da WROOM</a></div>
+<div class="link-card"><h3>GPT → ponte → S3</h3><p>Não verificada por este painel. Teste disponível na conversa pelo plugin.</p></div>
+<div class="link-card"><h3>Ponte → A22</h3><p>Integração pendente. Nenhum comando disponível.</p></div>
+</div><p class="tiny" id="links-time">Nenhuma leitura.</p>
+<button type="button" id="links-refresh">Atualizar conexões da S3</button>
+</section></div>
+<div id="page-events" role="tabpanel" aria-labelledby="tab-events" hidden></div>
+<div id="page-settings" role="tabpanel" aria-labelledby="tab-settings" hidden></div>
+<div id="page-diag" role="tabpanel" aria-labelledby="tab-diag" hidden></div>
+<section class="pair" id="summary-panels">
 <div class="panel"><h2>Visão geral</h2>
 <p class="muted small">Snapshot solicitado, não uma medição permanente.</p>
 <div id="overview">Aguardando primeira leitura.</div>
@@ -66,7 +92,7 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <button id="copy" type="button" disabled>Copiar diagnóstico</button></div>
 <div class="tiny" id="statusTime"></div>
 </div>
-<div class="panel"><h2>Eventos e falhas</h2>
+<div class="panel" id="events-panel"><h2>Eventos e falhas</h2>
 <p class="muted small">Últimos 64 eventos na RAM, somente sob demanda.</p>
 <div class="buttons"><button id="eventsBtn" type="button">Ler eventos agora</button>
 <a class="action" href="/events" target="_blank" rel="noopener">Abrir texto</a></div>
@@ -124,20 +150,39 @@ Digite ajuda para listar comandos.</pre>
 </div>
 <div class="note">Segurança: a conexão local HTTP não usa HTTPS. Use apenas em uma rede Wi-Fi confiável, sem redirecionar portas do roteador. Comandos antigos de manutenção possuem rotas próprias e serão auditados separadamente.</div>
 </section>
-<section class="panel"><h2>Saídas alternativas quando o HTTP falhar</h2>
+<section class="panel" id="recovery-panel"><h2>Saídas alternativas quando o HTTP falhar</h2>
 <p class="small muted">Se a página já está aberta e a leitura falha, o painel indica indisponibilidade. Se nem a página abrir, ela própria não poderá avisar.</p>
 <ul class="small">
 <li><b>USB serial</b> — eventos <code>EVT|...</code> a 115200 baud, mesmo sem Wi-Fi, se a placa estiver ligada.</li>
 <li><b>MQTT existente</b> — resumo enviado pela S3 no ciclo habitual de ~90 segundos quando houver internet; o campo <code>http_age_s</code> só indica quando ela respondeu pela última vez, não é um teste externo de disponibilidade.</li>
 <li><b>Último evento crítico</b> — guardado na NVS e recuperado no próximo boot, sem gravações contínuas.</li>
 </ul>
-<div class="note">Este terminal apenas lê diagnósticos. Botões que alteram Wi-Fi, OTA ou reiniciam ficam reservados para a próxima etapa, com autenticação.</div>
+<div class="note">O terminal lê diagnósticos. Os controles de Wi-Fi, OTA e reinício ficam na aba Configurações e exigem autenticação.</div>
 </section>
-<footer>BOTIZIN 1.0 • Diagnóstico primeiro, comandos depois • Nenhum refresh automático</footer>
+<footer>BOTIZIN • Central local da S3 • Dados atualizados sob demanda</footer>
 </main>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
+
+// Layout changes preserve the existing control handlers and authentication.
+$('page-home').append($('summary-panels'));
+$('page-events').append($('events-panel'));
+$('summary-panels').style.gridTemplateColumns='1fr';
+$('page-settings').append($('controls-panel'));
+$('page-diag').append($('terminal-panel'),$('recovery-panel'));
+document.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>{
+ document.querySelectorAll('[data-page]').forEach(b=>{
+  const active=b===button;b.setAttribute('aria-selected',String(active));
+  $('page-'+b.dataset.page).hidden=!active;
+ });
+}));
+function linkState(id,label,kind){
+ const el=$(id),dot=document.createElement('span');
+ dot.className='lamp '+kind;dot.setAttribute('aria-hidden','true');
+ el.replaceChildren(dot,document.createTextNode(label));
+}
+$('links-refresh').addEventListener('click',loadStatus);
 let latestStatus='';
 let statusLoaded=false;
 const get=(obj,key)=>obj[key]||'—';
@@ -150,6 +195,12 @@ async function read(endpoint){
 }
 function renderStatus(txt){
  latestStatus=txt;statusLoaded=true;$('copy').disabled=false;
+ const links=parseStatus(txt);
+ linkState('link-wifi',links.WIFI==='OK'?'Wi-Fi conectado nesta leitura':'Wi-Fi: '+get(links,'WIFI'),links.WIFI==='OK'?'ok':'warn');
+ linkState('link-http','S3 respondeu a esta consulta','ok');
+ linkState('link-mqtt','Último resultado: '+get(links,'MQTT_LAST'),links.MQTT_LAST==='PUBLISHED'?'ok':'warn');
+ linkState('link-peer',links.PEER_PAIRED==='YES'?'Pareamento salvo; comunicação atual não testada':'Pareamento: '+get(links,'PEER_PAIRED'),'warn');
+ $('links-time').textContent='Leitura: '+new Date().toLocaleTimeString('pt-BR');
  const d=parseStatus(txt),first=txt.split(/\r?\n/)[0].replace('BOTIZIN CORE ','');
  const wifi=get(d,'WIFI'),server=get(d,'HTTP_SERVER_STARTED'),confirmed=get(d,'HTTP_CONFIRMED_BY_REQUEST');
  const state=get(d,'RUNNING_OTA_STATE');
@@ -178,7 +229,7 @@ function renderStatus(txt){
 async function loadStatus(){
  const btn=$('refresh');btn.disabled=true;setState('Consultando S3 uma única vez…','warn');
  try{renderStatus(await read('/status'))}
- catch(e){setState('HTTP INDISPONÍVEL nesta tentativa ('+e.message+'). Dados antigos podem estar desatualizados. Consulte USB ou MQTT.','bad')}
+ catch(e){linkState('link-http','Falha na última consulta','bad');setState('HTTP INDISPONÍVEL nesta tentativa ('+e.message+'). Dados antigos podem estar desatualizados. Consulte USB ou MQTT.','bad')}
  finally{btn.disabled=false}
 }
 async function loadEvents(){
