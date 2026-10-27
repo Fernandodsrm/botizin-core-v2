@@ -1,0 +1,64 @@
+name: Publish verified WROOM 0.0.37
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-wroom-037.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '12709992012'
+          run-id: '40450232650'
+          github-token: ${{ github.token }}
+          path: verified-package
+      - name: Verify exact artifact and publish WROOM files only
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, json, hashlib, struct, shutil
+          root = pathlib.Path("verified-package")
+          manifests = list(root.rglob("0.0.37/manifest.json"))
+          assert len(manifests) == 1, manifests
+          folder = manifests[0].parent
+          m = json.loads(manifests[0].read_text())
+          record = json.loads((folder/"build-record.json").read_text())
+          binary = (folder/"firmware.ino.bin").read_bytes()
+          assert record["source_commit"] == "c0d9735b227a34833a215fdae38eb0c1bd58e8c5"
+          assert record["partitions_verified"] is True
+          assert record["credentials_compiled"] is False
+          assert m["version"] == "0.0.37" and m["board"] == "esp32-wroom-4mb"
+          assert 0 < len(binary) <= 1310720
+          assert len(binary) == m["size"] == record["bytes"]
+          assert hashlib.sha256(binary).hexdigest() == m["sha256"] == record["sha256"]
+          assert binary[0] == 0xe9 and struct.unpack_from("<H",binary,12)[0] == 0
+          assert b"LIVE_TEST: TESTE LIVE 37" in binary
+          assert m["url"] == "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.37/firmware.bin"
+          old = json.loads(pathlib.Path("wroom/manifest.json").read_text())
+          assert old["version"] in ("0.0.36", "0.0.37")
+          target = pathlib.Path("wroom/releases/0.0.37")
+          target.mkdir(parents=True, exist_ok=True)
+          (target/"firmware.bin").write_bytes(binary)
+          shutil.copy2(folder/"manifest.json",target/"manifest.json")
+          record["published"] = True
+          record["build_run_id"] = 40450232650
+          (target/"build-record.json").write_text(json.dumps(record,indent=2)+"\n")
+          shutil.copy2(folder/"manifest.json","wroom/manifest.json")
+          print(json.dumps(m,indent=2))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add wroom/releases/0.0.37 wroom/manifest.json
+          git diff --cached --stat
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish verified WROOM 0.0.37 OTA test package"
+            git push origin HEAD:main
+          fi
