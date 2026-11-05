@@ -1,0 +1,68 @@
+name: Publish verified WROOM 0.0.38 LED OTA
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-wroom-038.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '13403248062'
+          run-id: '42003908000'
+          github-token: ${{ github.token }}
+          path: verified-package
+      - name: Verify source, binary, layout and sha256; publish 0.0.38 only
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, json, hashlib, struct, shutil
+          folder_list = list(pathlib.Path('verified-package').rglob('0.0.38/manifest.json'))
+          assert len(folder_list) == 1, folder_list
+          folder = folder_list[0].parent
+          manifest = json.loads((folder/'manifest.json').read_text())
+          record = json.loads((folder/'build-record.json').read_text())
+          binary = (folder/'firmware.ino.bin').read_bytes()
+          expected_commit = 'bea8f4172b01f5bcdc2896bf40c6e8f48ab42549'
+          expected_url = 'https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.38/firmware.bin'
+          assert record['source_commit'] == expected_commit
+          assert record['partitions_verified'] is True
+          assert record['credentials_compiled'] is False
+          assert manifest['board'] == 'esp32-wroom-4mb' and manifest['version'] == '0.0.38'
+          assert manifest['url'] == expected_url
+          assert record['version'] == '0.0.38'
+          assert 0 < len(binary) <= 1310720
+          assert len(binary) == manifest['size'] == record['bytes']
+          assert hashlib.sha256(binary).hexdigest() == manifest['sha256'] == record['sha256']
+          assert binary[0] == 0xe9 and struct.unpack_from('<H', binary, 12)[0] == 0
+          assert b'BOTIZIN WROOM V' in binary and b'0.0.38' in binary
+          assert b'/led' in binary and b'LED_STATE: ON' in binary
+          assert b'TESTE LIVE 38' in binary
+          old = json.loads(pathlib.Path('wroom/manifest.json').read_text())
+          assert old['version'] in ('0.0.37', '0.0.38'), old
+          target = pathlib.Path('wroom/releases/0.0.38')
+          target.mkdir(parents=True, exist_ok=True)
+          (target/'firmware.bin').write_bytes(binary)
+          shutil.copy2(folder/'manifest.json', target/'manifest.json')
+          record['published'] = True
+          record['build_run_id'] = 42003908000
+          (target/'build-record.json').write_text(json.dumps(record,indent=2)+'\n')
+          shutil.copy2(folder/'manifest.json','wroom/manifest.json')
+          print(json.dumps(manifest,indent=2))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add wroom/releases/0.0.38 wroom/manifest.json
+          git diff --cached --stat
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish verified WROOM 0.0.38 LAN LED OTA package"
+            git push origin HEAD:main
+          fi
