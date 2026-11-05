@@ -221,7 +221,7 @@ def reiniciar_mcp():
 def validar(candidato):
     import runpy
     funcoes=runpy.run_path(str(candidato))
-    if set(tools_and_nodes(candidato.read_text(encoding="utf-8"))!=TOOLS):
+    if set(tools_and_nodes(candidato.read_text(encoding="utf-8"))) != TOOLS:
         raise ValueError("Ferramentas registradas invalidas")
     if not all(callable(funcoes[n]) for n in TOOLS):
         raise ValueError("Ferramenta nao executavel")
