@@ -138,7 +138,7 @@ String resetInfo() {
 String snapshot() {
   const esp_partition_t *run = esp_ota_get_running_partition();
   String s = "BOTIZIN WROOM V" + String(BOTIZIN_VERSION) + "\n";
-  s += "LIVE_TEST: TESTE LIVE 37\n";
+  s += "LIVE_TEST: TESTE LIVE 38\n";
   s += "LED_GPIO: 26\nLED_STATE: " + String(remoteLedOn ? "ON" : "OFF") + "\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
   s += "LOCAL_NAME: " BOTIZIN_LOCAL_NAME ".local\n";
@@ -622,6 +622,21 @@ void setup() {
   Serial.println(snapshot());
   server.on("/", HTTP_GET, []() { server.send(200, "text/plain; charset=utf-8", snapshot()); });
   server.on("/status", HTTP_GET, []() { server.send(200, "text/plain; charset=utf-8", snapshot()); });
+  // LAN-only momentary LED control. Never expose port 80 to the Internet.
+  server.on("/led", HTTP_POST, []() {
+    IPAddress peer=server.client().remoteIP(), local=WiFi.localIP(), mask=WiFi.subnetMask();
+    bool sameSubnet=true;
+    for(int i=0;i<4;i++) if((peer[i]&mask[i])!=(local[i]&mask[i])) sameSubnet=false;
+    if(!sameSubnet || WiFi.status()!=WL_CONNECTED) {
+      server.send(403,"text/plain","LAN only"); return;
+    }
+    String enabled=server.arg("enabled");
+    if(enabled!="1" && enabled!="0") {
+      server.send(400,"text/plain","Use POST /led?enabled=1 or enabled=0"); return;
+    }
+    setRemoteLed(enabled=="1");
+    server.send(200,"text/plain",remoteLedOn?"LED_STATE: ON; AUTO_OFF_SECONDS: 30":"LED_STATE: OFF");
+  });
   server.on("/update", HTTP_POST, []() {
     if (uploadActive) failUpload("request ended before file completion");
     server.send(responseCode, "text/plain; charset=utf-8", attempt.length() ? attempt : "No firmware uploaded\n");
