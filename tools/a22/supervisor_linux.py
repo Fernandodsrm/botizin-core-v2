@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """BOTIZIN Linux watchdog: preserves existing MCP and tunnel processes."""
-import fcntl, os, socket, subprocess, time
+import fcntl, os, socket, subprocess, time, signal, urllib.request, urllib.error
 from pathlib import Path
 ROOT=Path("/root/botizin-mcp")
 BIN=ROOT/".venv/bin/python"
@@ -16,6 +16,14 @@ def port(n):
     try:
         with socket.create_connection(("127.0.0.1", n),timeout=1):return True
     except OSError:return False
+def tunnel_ready():
+    """Only HTTP 200 on /readyz means ready. A listening port can be HTTP 503."""
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:18080/readyz", timeout=3) as response:
+            return response.status == 200
+    except (OSError, urllib.error.URLError, urllib.error.HTTPError):
+        return False
+
 def start_mcp():
     if not BIN.is_file() or not SERVER.is_file():
         note("MCP: Python ou servidor.py ausente");return None
@@ -47,14 +55,43 @@ def main():
     try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
     except BlockingIOError:return
     note("Supervisor Linux ativo")
-    mcp=None;tunnel=None;last_mcp=0;last_tunnel=0
+    mcp=None;tunnel=None;last_mcp=0;last_tunnel=0;unready_since=None
     while True:
         now=time.monotonic()
         if not port(8765) and now-last_mcp>30:
             if mcp is None or mcp.poll() is not None:mcp=start_mcp()
             last_mcp=now
-        if not port(18080) and now-last_tunnel>30:
-            if tunnel is None or tunnel.poll() is not None:tunnel=start_tunnel()
-            last_tunnel=now
+        if tunnel_ready():
+            unready_since=None
+        elif not port(8765):
+            # Wait for the MCP server before starting the tunnel.
+            unready_since=None
+        else:
+            if unready_since is None:
+                unready_since=now
+            if now-unready_since>=45 and now-last_tunnel>=45:
+                if tunnel is not None and tunnel.poll() is None:
+                    # Only terminate the tunnel process launched by this supervisor.
+                    note("TUNEL: unhealthy for 45s; restarting supervised PID "+str(tunnel.pid))
+                    tunnel.terminate()
+                    try:
+                        tunnel.wait(timeout=8)
+                    except subprocess.TimeoutExpired:
+                        note("TUNEL: graceful shutdown timeout; waiting before retry")
+                        last_tunnel=now
+                        time.sleep(12)
+                        continue
+                    tunnel=None
+                    # Let the health port become free before the next attempt.
+                    time.sleep(3)
+                elif tunnel is None and port(18080):
+                    # Another process owns the port. Do not kill an unknown process.
+                    note("TUNEL: port 18080 occupied by another client returning non-200; manual check needed")
+                    last_tunnel=now
+                    time.sleep(12)
+                    continue
+                tunnel=start_tunnel()
+                last_tunnel=now
+                unready_since=now
         time.sleep(12)
 if __name__=="__main__":main()
