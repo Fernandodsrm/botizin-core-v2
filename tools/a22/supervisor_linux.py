@@ -31,7 +31,7 @@ def known_tunnel_pids():
         if not proc.name.isdigit():
             continue
         try:
-            args=(proc/"cmdline").read_bytes().split(b"\\0")
+            args=(proc/"cmdline").read_bytes().split(bytes([0]))
             args=[a.decode("utf-8","replace") for a in args if a]
         except OSError:
             continue
