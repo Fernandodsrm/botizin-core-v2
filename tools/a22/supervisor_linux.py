@@ -1,132 +1,221 @@
 #!/usr/bin/env python3
-"""BOTIZIN Linux watchdog: preserves existing MCP and tunnel processes."""
-import fcntl, os, socket, subprocess, time, signal, urllib.request, urllib.error
+"""BOTIZIN Linux supervisor v2. Ordered, idempotent, health-based recovery."""
+import fcntl
+import json
+import os
 from pathlib import Path
+import signal
+import socket
+import subprocess
+import tempfile
+import time
+import urllib.error
+import urllib.request
+
 ROOT=Path("/root/botizin-mcp")
-BIN=ROOT/".venv/bin/python"
+PYTHON=ROOT/".venv/bin/python"
 SERVER=ROOT/"servidor.py"
 TUNNEL=Path("/root/botizin-tunnel/tunnel-client")
 PROFILE=Path("/root/.config/tunnel-client/botizin-a22.yaml")
 KEY=Path("/root/.botizin-control-plane-key")
+MAPPER=ROOT/"botizin-mapa.py"
 LOG=ROOT/"supervisor.log"
+STATE=ROOT/"supervisor-status.json"
+PERIOD=12
+UNREADY_GRACE=90   # ignore short startup, Wi-Fi blips and router reboots
+RETRY_COOLDOWN=120 # no restart storms when the network is unavailable
+MAP_INTERVAL=180
 
 def note(msg):
-    with LOG.open("a") as f: f.write(time.strftime("%Y-%m-%d %H:%M:%S ")+msg+"\n")
-def port(n):
+    with LOG.open("a",encoding="utf-8") as f:
+        f.write(time.strftime("%Y-%m-%d %H:%M:%S ")+msg+"\n")
+
+def listening(port):
     try:
-        with socket.create_connection(("127.0.0.1", n),timeout=1):return True
-    except OSError:return False
-def tunnel_ready():
-    """Only HTTP 200 on /readyz means ready. A listening port can be HTTP 503."""
-    try:
-        with urllib.request.urlopen("http://127.0.0.1:18080/readyz", timeout=3) as response:
-            return response.status == 200
-    except (OSError, urllib.error.URLError, urllib.error.HTTPError):
+        with socket.create_connection(("127.0.0.1",port),timeout=1):
+            return True
+    except OSError:
         return False
 
-def known_tunnel_pids():
-    """Find only the exact BOTIZIN tunnel executable and profile."""
-    found=[]
+def tunnel_http():
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:18080/readyz",timeout=3) as r:
+            return r.status
+    except urllib.error.HTTPError as exc:
+        return exc.code
+    except (OSError,urllib.error.URLError,ValueError):
+        return 0
+
+def running_commands():
     for proc in Path("/proc").iterdir():
         if not proc.name.isdigit():
             continue
         try:
-            args=(proc/"cmdline").read_bytes().split(bytes([0]))
-            args=[a.decode("utf-8","replace") for a in args if a]
-        except OSError:
+            state=(proc/"stat").read_text().split(") ",1)[1][0]
+            if state=="Z":continue
+            args=[x.decode("utf-8","replace") for x in
+                  (proc/"cmdline").read_bytes().split(bytes([0])) if x]
+            if args:yield int(proc.name),args
+        except (OSError,IndexError,ValueError):
             continue
-        if not args or args[0] != str(TUNNEL) or len(args) < 4:
-            continue
-        if "run" in args and "--profile" in args:
-            i=args.index("--profile")
-            if i+1 < len(args) and args[i+1] == "botizin-a22":
-                found.append(int(proc.name))
+
+def pids(kind):
+    found=[]
+    for pid,args in running_commands():
+        if kind=="mcp":
+            if args[0]==str(PYTHON) and str(SERVER) in args[1:]:
+                found.append(pid)
+        elif kind=="tunnel":
+            if args[0]!=str(TUNNEL) or "run" not in args or "--profile" not in args:
+                continue
+            index=args.index("--profile")
+            if index+1<len(args) and args[index+1]=="botizin-a22":
+                found.append(pid)
     return found
 
 def start_mcp():
-    if not BIN.is_file() or not SERVER.is_file():
-        note("MCP: Python ou servidor.py ausente");return None
-    with (ROOT/"mcp-boot.log").open("ab") as f:
-        p=subprocess.Popen([str(BIN),str(SERVER)],cwd=ROOT,stdin=subprocess.DEVNULL,
-                           stdout=f,stderr=subprocess.STDOUT,start_new_session=True)
-    note("MCP: inicializacao, PID "+str(p.pid))
-    return p
+    if not PYTHON.is_file() or not SERVER.is_file():
+        note("MCP: missing existing Python or servidor.py; no installation attempted")
+        return
+    with (ROOT/"mcp-boot.log").open("ab") as log:
+        proc=subprocess.Popen([str(PYTHON),str(SERVER)],cwd=ROOT,
+            stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+    note("MCP: starting PID "+str(proc.pid))
+
 def start_tunnel():
     if not TUNNEL.is_file() or not PROFILE.is_file():
-        note("TUNEL: executavel ou perfil ausente");return None
-    try:key=KEY.read_text().strip()
+        note("TUNNEL: missing executable or profile; no installation attempted")
+        return
+    try:key=KEY.read_text(encoding="utf-8").strip()
     except OSError:
-        note("TUNEL: chave privada nao cadastrada");return None
+        note("TUNNEL: private key file absent; cannot auto-start")
+        return
     if not key.startswith("sk-") or len(key)<30:
-        note("TUNEL: formato de chave invalido");return None
+        note("TUNNEL: invalid private key format; refusing startup")
+        return
     env=os.environ.copy()
     env["CONTROL_PLANE_API_KEY"]=key
-    with Path("/root/botizin-tunnel/tunnel-boot.log").open("ab") as f:
-        p=subprocess.Popen([str(TUNNEL),"run","--profile","botizin-a22",
-                             "--health.listen-addr","127.0.0.1:18080"],
-                           cwd=TUNNEL.parent,env=env,stdin=subprocess.DEVNULL,
-                           stdout=f,stderr=subprocess.STDOUT,start_new_session=True)
+    with (TUNNEL.parent/"tunnel-boot.log").open("ab") as log:
+        proc=subprocess.Popen([str(TUNNEL),"run","--profile","botizin-a22",
+              "--health.listen-addr","127.0.0.1:18080"],
+              cwd=TUNNEL.parent,env=env,stdin=subprocess.DEVNULL,
+              stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
     del key,env
-    note("TUNEL: inicializacao, PID "+str(p.pid))
-    return p
+    note("TUNNEL: starting PID "+str(proc.pid))
+
+def terminate_verified(kind, pid):
+    # Recheck identity immediately before sending a signal.
+    if pid not in pids(kind):
+        note(kind.upper()+": PID disappeared before safe stop")
+        return False
+    try:
+        os.kill(pid,signal.SIGTERM)
+    except OSError:
+        note(kind.upper()+": failed to signal verified PID "+str(pid))
+        return False
+    for _ in range(12):
+        time.sleep(0.5)
+        if pid not in pids(kind):
+            note(kind.upper()+": stopped verified PID "+str(pid))
+            return True
+    note(kind.upper()+": PID did not terminate gracefully; no SIGKILL attempted")
+    return False
+
+def write_state(mcp,tunnel,last_mcp,last_tunnel,network):
+    record={"schema":2,"timestamp":time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+            "startup_order":["Android/VPN","Termux/SSH","Linux/MCP","tunnel","ESP32 discovery"],
+            "mcp":{"port_8765":mcp,"pids":pids("mcp"),"last_recovery_age_s":int(time.monotonic()-last_mcp) if last_mcp else None},
+            "tunnel":{"ready_http":tunnel,"pids":pids("tunnel"),"last_recovery_age_s":int(time.monotonic()-last_tunnel) if last_tunnel else None},
+            "network_map":str(MAPPER),"network_mapping_running":network}
+    temp=None
+    try:
+        with tempfile.NamedTemporaryFile("w",dir=STATE.parent,prefix=".supervisor-",delete=False) as out:
+            temp=out.name
+            os.chmod(temp,0o600)
+            json.dump(record,out,indent=2,ensure_ascii=False)
+            out.write("\n")
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(temp,STATE)
+    finally:
+        if temp and os.path.exists(temp):os.unlink(temp)
+
 def main():
-    lock=Path("/root/.botizin-supervisor.lock").open("w")
-    try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-    except BlockingIOError:return
-    note("Supervisor Linux ativo")
-    mcp=None;tunnel=None;last_mcp=0;last_tunnel=0;unready_since=None
-    while True:
-        now=time.monotonic()
-        if not port(8765) and now-last_mcp>30:
-            if mcp is None or mcp.poll() is not None:mcp=start_mcp()
-            last_mcp=now
-        if tunnel_ready():
-            unready_since=None
-        elif not port(8765):
-            # Wait for the MCP server before starting the tunnel.
-            unready_since=None
-        else:
-            if unready_since is None:
-                unready_since=now
-            if now-unready_since>=45 and now-last_tunnel>=45:
-                if tunnel is not None and tunnel.poll() is None:
-                    # Only terminate the tunnel process launched by this supervisor.
-                    note("TUNEL: unhealthy for 45s; restarting supervised PID "+str(tunnel.pid))
-                    tunnel.terminate()
-                    try:
-                        tunnel.wait(timeout=8)
-                    except subprocess.TimeoutExpired:
-                        note("TUNEL: graceful shutdown timeout; waiting before retry")
+    with Path("/root/.botizin-supervisor.lock").open("w") as lock:
+        try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError:return
+        note("BOTIZIN v2 supervisor active. No firmware or credentials changed.")
+        last_mcp=0
+        last_tunnel=0
+        mcp_missing_since=None
+        tunnel_bad_since=None
+        map_proc=None
+        last_map=0
+        last_state=0
+        previous=(None,None)
+        while True:
+            now=time.monotonic()
+            mcp=listening(8765)
+            mcp_pids=pids("mcp")
+            health=tunnel_http()
+            if (mcp,health)!=previous:
+                note(f"STATUS: MCP={'UP' if mcp else 'DOWN'}; TUNNEL HTTP={health}")
+                previous=(mcp,health)
+
+            # 1. Do not start a second MCP if one already exists.
+            if mcp:
+                mcp_missing_since=None
+            else:
+                if mcp_missing_since is None:mcp_missing_since=now
+                if now-last_mcp>RETRY_COOLDOWN:
+                    if len(mcp_pids)==0:
+                        start_mcp()
+                        last_mcp=now
+                    elif len(mcp_pids)==1 and now-mcp_missing_since>UNREADY_GRACE:
+                        if terminate_verified("mcp",mcp_pids[0]):
+                            start_mcp()
+                        last_mcp=now
+                    elif len(mcp_pids)>1:
+                        note("MCP: multiple verified processes; no unsafe restart")
+                        last_mcp=now
+
+            # 2. No tunnel until MCP listens. 503 != healthy.
+            if not mcp:
+                tunnel_bad_since=None
+            elif health==200:
+                tunnel_bad_since=None
+            else:
+                if tunnel_bad_since is None:tunnel_bad_since=now
+                if now-tunnel_bad_since>UNREADY_GRACE and now-last_tunnel>RETRY_COOLDOWN:
+                    found=pids("tunnel")
+                    if len(found)==1:
+                        if terminate_verified("tunnel",found[0]):
+                            time.sleep(2)
+                            if not listening(18080):
+                                start_tunnel()
                         last_tunnel=now
-                        time.sleep(12)
-                        continue
-                    tunnel=None
-                    # Let the health port become free before the next attempt.
-                    time.sleep(3)
-                elif tunnel is None and port(18080):
-                    matches=known_tunnel_pids()
-                    if len(matches) == 1:
-                        note("TUNEL: stale verified BOTIZIN process returning non-200; terminating PID "+str(matches[0]))
-                        os.kill(matches[0], signal.SIGTERM)
-                        time.sleep(4)
-                        if port(18080):
-                            note("TUNEL: health port still occupied; refusing duplicate startup")
-                            last_tunnel=now
-                            time.sleep(12)
-                            continue
+                    elif len(found)==0 and not listening(18080):
+                        start_tunnel()
+                        last_tunnel=now
                     else:
-                        note("TUNEL: health port occupied and known clients="+str(len(matches))+"; no unsafe kill")
+                        note("TUNNEL: ambiguous process/occupied port; no unsafe restart")
                         last_tunnel=now
-                        time.sleep(12)
-                        continue
-                elif tunnel is None and known_tunnel_pids():
-                    # Existing client is still starting; avoid duplicate instances.
-                    note("TUNEL: existing client detected; waiting for readiness")
-                    last_tunnel=now
-                    time.sleep(12)
-                    continue
-                tunnel=start_tunnel()
-                last_tunnel=now
-                unready_since=now
-        time.sleep(12)
+                    tunnel_bad_since=now
+
+            # 3. Discovery is read-only and never blocks startup of MCP/tunnel.
+            if mcp and health==200 and MAPPER.is_file() and now-last_map>MAP_INTERVAL:
+                if map_proc is None or map_proc.poll() is not None:
+                    with (ROOT/"mapa.log").open("ab") as out:
+                        map_proc=subprocess.Popen(["/usr/bin/python3",str(MAPPER)],
+                            cwd=ROOT,stdin=subprocess.DEVNULL,
+                            stdout=out,stderr=subprocess.STDOUT,start_new_session=True)
+                    last_map=now
+
+            if now-last_state>30:
+                try:write_state(mcp,health,last_mcp,last_tunnel,
+                                map_proc is not None and map_proc.poll() is None)
+                except OSError as e:note("STATE: unable to write status: "+type(e).__name__)
+                last_state=now
+            time.sleep(PERIOD)
+
 if __name__=="__main__":main()
