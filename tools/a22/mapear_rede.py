@@ -100,6 +100,18 @@ def discover():
             "subnet":str(NETWORK),"dispositivos":mapped}
 
 def main():
+    global NETWORK
+    gateway=default_gateway()
+    if gateway:
+        try:
+            address=ipaddress.ip_address(gateway)
+            # Discover the current LAN's /24, not a Tailscale or public IP range.
+            if address.is_private and not address.is_loopback and (
+                gateway.startswith("192.168.") or gateway.startswith("10.") or gateway.startswith("172.")
+            ):
+                NETWORK=ipaddress.ip_network(f"{gateway}/24",strict=False)
+        except ValueError:
+            pass
     result=discover()
     STATE.parent.mkdir(parents=True,exist_ok=True)
     handle=tempfile.NamedTemporaryFile("w",dir=STATE.parent,prefix=".botizin-map-",delete=False)
