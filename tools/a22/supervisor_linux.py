@@ -24,6 +24,25 @@ def tunnel_ready():
     except (OSError, urllib.error.URLError, urllib.error.HTTPError):
         return False
 
+def known_tunnel_pids():
+    """Find only the exact BOTIZIN tunnel executable and profile."""
+    found=[]
+    for proc in Path("/proc").iterdir():
+        if not proc.name.isdigit():
+            continue
+        try:
+            args=(proc/"cmdline").read_bytes().split(b"\\0")
+            args=[a.decode("utf-8","replace") for a in args if a]
+        except OSError:
+            continue
+        if not args or args[0] != str(TUNNEL) or len(args) < 4:
+            continue
+        if "run" in args and "--profile" in args:
+            i=args.index("--profile")
+            if i+1 < len(args) and args[i+1] == "botizin-a22":
+                found.append(int(proc.name))
+    return found
+
 def start_mcp():
     if not BIN.is_file() or not SERVER.is_file():
         note("MCP: Python ou servidor.py ausente");return None
@@ -85,8 +104,24 @@ def main():
                     # Let the health port become free before the next attempt.
                     time.sleep(3)
                 elif tunnel is None and port(18080):
-                    # Another process owns the port. Do not kill an unknown process.
-                    note("TUNEL: port 18080 occupied by another client returning non-200; manual check needed")
+                    matches=known_tunnel_pids()
+                    if len(matches) == 1:
+                        note("TUNEL: stale verified BOTIZIN process returning non-200; terminating PID "+str(matches[0]))
+                        os.kill(matches[0], signal.SIGTERM)
+                        time.sleep(4)
+                        if port(18080):
+                            note("TUNEL: health port still occupied; refusing duplicate startup")
+                            last_tunnel=now
+                            time.sleep(12)
+                            continue
+                    else:
+                        note("TUNEL: health port occupied and known clients="+str(len(matches))+"; no unsafe kill")
+                        last_tunnel=now
+                        time.sleep(12)
+                        continue
+                elif tunnel is None and known_tunnel_pids():
+                    # Existing client is still starting; avoid duplicate instances.
+                    note("TUNEL: existing client detected; waiting for readiness")
                     last_tunnel=now
                     time.sleep(12)
                     continue
