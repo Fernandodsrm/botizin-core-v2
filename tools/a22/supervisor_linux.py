@@ -186,7 +186,12 @@ def main():
                 tunnel_bad_since=None
             else:
                 if tunnel_bad_since is None:tunnel_bad_since=now
-                if now-tunnel_bad_since>UNREADY_GRACE and now-last_tunnel>RETRY_COOLDOWN:
+                # Fast cold start: if nothing is listening, no need to wait 90 seconds.
+                if not pids("tunnel") and not listening(18080) and now-last_tunnel>20:
+                    start_tunnel()
+                    last_tunnel=now
+                    tunnel_bad_since=now
+                elif now-tunnel_bad_since>UNREADY_GRACE and now-last_tunnel>RETRY_COOLDOWN:
                     found=pids("tunnel")
                     if len(found)==1:
                         if terminate_verified("tunnel",found[0]):
