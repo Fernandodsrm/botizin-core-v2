@@ -18,4 +18,5 @@ jobs:
           python3 -m py_compile tools/a22/supervisor_linux.py tools/a22/supervisor_termux.py tools/a22/mapear_rede.py tools/a22/install_wroom_led_mcp.py
           bash -n tools/a22/instalar_autorecuperacao.sh
           bash -n tools/a22/atualizar_supervisor_v2.sh
+          bash -n tools/a22/ativar_led_no_chatgpt.sh
           python3 tools/a22/test_supervisors.py
