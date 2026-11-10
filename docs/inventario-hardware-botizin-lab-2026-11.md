@@ -71,6 +71,26 @@ Esta lista evita duplicar compras e distingue equipamentos demonstrados, montage
 4. **Diagnóstico do motor potente:** obter foto de etiqueta do motor, placa de gatilho, tipo de cabo e bateria; não assumir compatibilidade com bateria 21 V.
 5. **Câmeras/reaproveitamento:** identificar protocolo da câmera IP, placa da câmera quatro fios, e circuito das máquinas antigas.
 
+## Lote 5 — Caixas organizadoras de componentes (fotos adicionais)
+Observação: quantidades são visuais/aproximadas; valores elétricos, códigos impressos e condição de cada componente exigem conferência.
+| Item | Quantidade identificável | Observação |
+| --- | --- | --- |
+| Resistores axiais azuis em tiras | dezenas | Presentes; **valores em ohms ainda desconhecidos**. Medir com multímetro antes de usar em LEDs |
+| Capacitores eletrolíticos radiais | vários | Cilindros pretos e cinzas; confirmar capacitância, tensão e polaridade pelo corpo |
+| Capacitores cerâmicos de disco | dezenas | Alaranjados; valores não legíveis nas fotos |
+| Diodos axiais | vários | Cilindros pretos com faixa; identificar código e sentido de polarização |
+| Componentes de três pinos (encapsulamento TO-92 ou semelhante) | vários | Possíveis transistores ou outros semicondutores; **não assumir pinagem** |
+| LEDs adicionais | dezenas | Vermelho, verde, amarelo, azul e transparente |
+| Motores TT sobressalentes | 4 visíveis aproximadamente | Além dos dois instalados no carrinho; confirmar contagem na caixa |
+| Braços/hastes de servo e pequenos acessórios | vários | Alavancas plásticas e fixadores |
+| Jumpers rígidos para protoboard | muitos | Azul, vermelho, branco, verde e outras cores |
+| Cabos com terminais e fios de prototipagem | diversos | Dupont ou compatíveis, curtos e longos; verificar tipo de ponta |
+| Abraçadeiras plásticas | diversas | Organização de cabos |
+| Parafusos, porcas, espaçadores e pequenas ferragens | vários | Com divisórias de armazenamento |
+| Conectores rápidos de alavanca laranja | vários | Para emenda de fios; não presumir corrente/tensão permitida sem identificação |
+
+**Atualização importante:** existem resistores no estoque físico, mas os resistores em série nos LEDs da bancada **ainda não foram confirmados como instalados**. O teste deve usar um resistor por LED e verificar valor e alimentação; não ligar LEDs diretamente a 3,3 V, 5 V ou GPIO.
+
 ## 7. Alertas
 - Furadeira aberta com fios e conector aparentando plugue de tomada: **não conectar à rede fora da carcaça ou com terminais acessíveis**.
 - Bateria de ferramenta e bateria Ni-Cd são sistemas diferentes. Não ligar carregadores/placas aleatórias em baterias sem identificação.
