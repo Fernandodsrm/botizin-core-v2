@@ -97,3 +97,21 @@ Observação: quantidades são visuais/aproximadas; valores elétricos, códigos
 - Placa ATX pode fornecer correntes altas mesmo em 5 V e 12 V. Conferir polaridade e tensão antes de conectar ESP32 e periféricos.
 - Driver L298N para motores TT, não para motor potente de furadeira sem dimensionamento específico.
 - Este documento é inventário descritivo, não esquema elétrico nem registro de testes concluídos.
+
+
+## Atualização da alocação e encomendas — 11/11/2026
+**Origem:** decisão verbal do proprietário e fotos de anúncios; não comprova entrega física nem modelo final recebido. Para funções e prioridades, usar a [VISÃO MESTRE](BOTIZIN-VISAO-MESTRE-2026-11-11.md). Esta atualização complementa o inventário anterior sem apagar o histórico.
+
+| Novo item relatado | Quantidade | Estado | Destino definido |
+| --- | ---: | --- | --- |
+| ESP32-C3 SuperMini com OLED, versões de anúncio azul e roxo | 2 | Encomendadas, aguardando identificação física e teste | Duas unidades iguais, par de comunicação sem internet com displays |
+| NodeMCU ESP8266 com OLED 0,96", anúncio com variantes USB-C/micro-USB | 1 | Encomendada, aguardando identificação física e teste | Terminal portátil IR + diagnóstico local Wi-Fi de dispositivos próprios |
+| Nova ESP32-S3 | **0 confirmadas neste lote** | Hipótese inicial corrigida pelo anúncio | Não reservar nova S3; a S3 atual permanece central |
+
+**Total após chegada, se os itens forem entregues como anunciado:** cinco controladores físicos: 1 S3 N16R8, 1 WROOM-32, 2 ESP32-C3 com telas e 1 ESP8266 com OLED. Não confundir ESP8266 com S3. Variantes da ESP8266 mostradas na fotografia podem ter conectores USB diferentes; confirmar impressão e flash reais.
+
+**Prioridades de alocação:** WROOM = BOTIZIN bancada/OTA-base e módulos; S3 + A22 = central e integração; C3 A/B = par de comunicação; ESP8266 = utilitário portátil. Carrinho 2WD e mini robô continuam sem controlador dedicado até que a solução preserve o par de C3 e a WROOM de bancada.
+
+**Pendências materiais essenciais:** conferir GPIOs ocupados pelo OLED e botões nas placas recebidas; disponibilidade de transmissor IR, drivers e resistores; estado de power banks e corrente; alimentação de servos/motores; reparo/entrada PS4 para carrinho; pinagem dos conectores; consumo e tamanho da carcaça portátil. Não presumir que a presença de USB-C implica bateria, carregador ou flash grande.
+
+**Limite técnico:** ESP8266 é mais antigo e não oferece Bluetooth; C3 tem BLE, não Bluetooth Clássico. O PS4 não deverá ser atribuído automaticamente a nenhuma das duas C3.
