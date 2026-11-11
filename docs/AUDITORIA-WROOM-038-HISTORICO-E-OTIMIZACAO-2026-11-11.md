@@ -115,3 +115,33 @@ Na base .38, `saveReturnAnchor()` registra versão, endereço e hash da partiç�
 - [Teste Live OTA .35](https://github.com/Fernandodsrm/botizin-core-v2/blob/main/validation/live-ota-0.0.35-procedure.md).
 - [S3 LAB de voz .39](https://github.com/Fernandodsrm/botizin-core-v2/blob/main/releases/0.0.39/manifest.json).
 - [Visão Mestre atualizada](BOTIZIN-VISAO-MESTRE-2026-11-11.md).
+
+
+## 8. RESULTADOS MEDIDOS — PERFIL A/B DE FLASH (11/11/2026)
+**Status:** GitHub Actions [run 43080783130](https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43080783130) concluído com sucesso. Código isolado: [tools/wroom_profile/profile.py](../tools/wroom_profile/profile.py); workflow [profile-wroom-size.yml](../.github/workflows/profile-wroom-size.yml). Nenhum flash/OTA/manifesto ativo foi alterado; o fluxo CI faz apenas builds e publica logs/relatórios, **não publica .bin de instalação**.
+
+| Experimento | Comprimento firmware.bin | Economia relativa à base | Margem livre no slot 1.310.720 |
+|---|---:|---:|---:|
+| Base original 0.0.38 (fonte do commit de build, versão injetada) | **1.288.144 B** | 0 B | 22.576 B |
+| Desabilitar `sendTelemetry()` e `pollPing()` (ThingsBoard) | 1.272.656 B | **15.488 B** | 38.064 B |
+| Desabilitar somente responder mDNS (nome .local) | 1.250.864 B | **37.280 B** | 59.856 B |
+| Desabilitar ThingsBoard + download HTTPS GitHub (check/instalação OTA via GitHub, atualização de catálogo) | **1.072.112 B** | **216.032 B** | **238.608 B** |
+
+**Separação causal:** diferença entre 2º e 4º experimento = 200.544 B, atribuível ao **grupo adicional de caminhos HTTPS GitHub / catálogo / download e ao código compartilhado que o linker elimina**, não a uma função individual. A redução total é ~16,77% do firmware anterior e gera >10x de margem livre. O experimento sem mDNS foi feito separadamente, portanto NÃO somar 37.280 + 216.032 como economia real sem outro build. **Não há evidência de um único recurso que ocupe 50% do binário**.
+
+O compilador reproduziu **o tamanho exato** (1.288.144 B) do pacote .38, e o compilador relatou 1.287.988 bytes de sketch e 59.856 bytes de variáveis estáticas. O SHA-256 do build experimental original é diferente do pacote publicado (tempos/caminhos/metadados de build podem mudar); logo **não afirmar reprodução bit a bit**. Todas as comparações A/B foram realizadas na mesma sessão e ambiente de compilação, com fonte da .38 fixa `bea8f417...`, Arduino-ESP32 3.3.12, Adafruit BusIO 1.17.4, GFX 1.12.6, SSD1306 2.5.17. A variante sem nuvem relatou 54.204 B de variáveis estáticas (redução de 5.652 B), mas **picos de RAM em uso ainda não foram medidos fisicamente**.
+
+**Limitação dos experimentos:** perfis sem ThingsBoard/GitHub substituem rotinas por stubs, e o catálogo deixa de atualizar pela nuvem. Eles **não são firmware funcional de produção** e não podem ser gravados como estão. Não existe hoje backend A22 implementado para substituir integralmente consulta ao catálogo, autenticação de ordem, download e upload local seguro. A economia de 216 KB é uma oportunidade experimental, não entrega pronta.
+
+**Conclusão prática atualizada: NÃO reparticionar agora.** Slots 1,25 MiB permanecem, com potencial de margem 238,6 KB se o A22 absorver as funções removidas. Reparticionar SPIFFS exigiria USB, backup, adaptação de módulos com endereços fixos e risco adicional sem necessidade demonstrada. Testar localmente a arquitetura enxuta primeiro e reconsiderar partições apenas se módulos futuros não couberem.
+
+## 9. Divisão de responsabilidades acordada após medição
+- **A22 (orquestrador/supervisor):** obter manifesto/catálogo do GitHub, validar autenticidade/fonte e SHA, baixar binários, oferecer catálogo para WROOM via rede local, guardar logs e diagnósticos, identificar boards por IP e status, acompanhar desconexões, reiniciar apenas serviços locais quando autorizado/seguro, originar ações de OTA sob confirmação do usuário. Reaproveitar supervisor 2.1, NÃO criar um segundo 'sistema operacional' novo.
+- **S3 (central de integração):** distribuir estados/comandos e coordenar comunicação com outras placas, seguindo interfaces mínimas; manter firmware estável até haver motivo justificado para troca.
+- **WROOM (terminal e atuador):** conexão Wi-Fi e autorrecuperação local, OLED/rosto/botões, catálogo apresentado na tela, GPIO/servo/IR do módulo ativo, pequeno servidor/status local, receiver OTA na app de módulo, verificação SHA e **autenticidade da origem**, seleção da partição de destino e retorno robusto. Não pode depender da nuvem para exibir rosto/menu/segurança básica.
+- **mDNS:** opcional. Remover responder .local economizou 37.280 B em compilação separada. Avaliar descoberta por A22 usando IP, mDNS de pares, cache e identificação do status com cuidado para DHCP/rede trocada. Não remover antes de provar descoberta confiável e reconexão.
+- **Falha remota:** A22 não tem como reiniciar uma ESP32 totalmente inacessível pelo Wi-Fi sem watchdog local ou hardware auxiliar de energia. Não fazer reboot cego da S3/WROOM para 'restaurar' conectividade; descobrir causa e informar.
+
+**Segurança para o backend de OTA:** o firmware atual tem `POST /update` e verificação SHA; o hash protege integridade somente quando a origem esperada é confiável. Para que A22 assuma download e envio, exigir identidade/autorização de quem solicita a atualização e validar a origem/hash na placa (assinatura ou mecanismo autenticado), limites de versão/hardware, confirmação, rollback e backup. Não considerar 'rede local' como autenticação suficiente. Implementar em branch isolada e validar antes da primeira gravação.
+
+**Próxima prova de produto:** build da WROOM 0.0.40 enxuta (sem publicação), testes OTA0 BOTIZIN / OTA1 módulo de LED / voltar BOTIZIN. Não mexer no A22 nem nas partições antes de existir teste/aceite específico.
