@@ -19,4 +19,7 @@ jobs:
           bash -n tools/a22/instalar_autorecuperacao.sh
           bash -n tools/a22/atualizar_supervisor_v2.sh
           bash -n tools/a22/ativar_led_no_chatgpt.sh
+          python3 -m py_compile tools/a22/diagnostico_supervisor.py tools/a22/instalar_diagnostico_mcp.py
+          bash -n tools/a22/instalar_supervisor_diagnostico_v21.sh
           python3 tools/a22/test_supervisors.py
+          python3 tools/a22/test_diagnostico_supervisor.py
