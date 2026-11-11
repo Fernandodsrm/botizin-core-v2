@@ -19,12 +19,14 @@ TUNNEL=Path("/root/botizin-tunnel/tunnel-client")
 PROFILE=Path("/root/.config/tunnel-client/botizin-a22.yaml")
 KEY=Path("/root/.botizin-control-plane-key")
 MAPPER=ROOT/"botizin-mapa.py"
+DIAGNOSTIC=ROOT/"diagnostico_supervisor.py"
 LOG=ROOT/"supervisor.log"
 STATE=ROOT/"supervisor-status.json"
 PERIOD=12
 UNREADY_GRACE=90   # ignore short startup, Wi-Fi blips and router reboots
 RETRY_COOLDOWN=120 # no restart storms when the network is unavailable
 MAP_INTERVAL=180
+DIAG_INTERVAL=90  # background read-only snapshot; must not block recovery
 
 def note(msg):
     with LOG.open("a",encoding="utf-8") as f:
@@ -151,6 +153,8 @@ def main():
         tunnel_bad_since=None
         map_proc=None
         last_map=0
+        diag_proc=None
+        last_diag=0
         last_state=0
         previous=(None,None)
         while True:
@@ -215,6 +219,16 @@ def main():
                             cwd=ROOT,stdin=subprocess.DEVNULL,
                             stdout=out,stderr=subprocess.STDOUT,start_new_session=True)
                     last_map=now
+
+            # 4. Generate bounded diagnostic snapshot without blocking recovery.
+            # No action on ESP32/MacroDroid/Termux; only local read-only queries.
+            if DIAGNOSTIC.is_file() and now-last_diag>DIAG_INTERVAL:
+                if diag_proc is None or diag_proc.poll() is not None:
+                    with (ROOT/"diagnostico-boot.log").open("ab") as out:
+                        diag_proc=subprocess.Popen(["/usr/bin/python3",str(DIAGNOSTIC)],
+                            cwd=ROOT,stdin=subprocess.DEVNULL,
+                            stdout=out,stderr=subprocess.STDOUT,start_new_session=True)
+                    last_diag=now
 
             if now-last_state>30:
                 try:write_state(mcp,health,last_mcp,last_tunnel,
