@@ -65,7 +65,7 @@ def pids(kind):
     found=[]
     for pid,args in running_commands():
         if kind=="mcp":
-            if args[0]==str(PYTHON) and str(SERVER) in args[1:]:
+            if args[0] in (str(PYTHON),str(PYTHON)+"3") and (str(SERVER) in args[1:] or "servidor.py" in args[1:]):
                 found.append(pid)
         elif kind=="tunnel":
             if args[0]!=str(TUNNEL) or "run" not in args or "--profile" not in args:
