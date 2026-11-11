@@ -59,12 +59,28 @@ for p in Path("/proc").iterdir():
     try:
         cmd=[a.decode("utf-8","replace") for a in (p/"cmdline").read_bytes().split(bytes([0])) if a]
         if not cmd:continue
-        if cmd[0] in (mcp,mcp+"3") and srv in cmd[1:]:found["mcp"].append(int(p.name))
+        if cmd[0] in (mcp,mcp+"3") and (srv in cmd[1:] or "servidor.py" in cmd[1:]):found["mcp"].append(int(p.name))
         if (cmd[0].endswith("/python3") or cmd[0]=="python3") and supervisor in cmd[1:]:
             found["supervisor"].append(int(p.name))
     except (OSError,ValueError):pass
 if len(found["mcp"])>1 or len(found["supervisor"])>1:
     raise SystemExit("STOP: processos duplicados. Nada sera sinalizado: "+str(found))
+# A responding MCP under an unknown command line must never be left running
+# while we claim to have reloaded its new tool.
+if not found["mcp"]:
+    try:
+        import socket
+        with socket.create_connection(("127.0.0.1",8765),timeout=1):
+            raise SystemExit("STOP: porta MCP aberta mas PID nao identificado; nao reiniciado.")
+    except OSError:
+        pass
+if not found["supervisor"]:
+    try:
+        import socket
+        with socket.create_connection(("127.0.0.1",18080),timeout=1):
+            raise SystemExit("STOP: supervisor nao identificado; reinicio automatico incerto.")
+    except OSError:
+        pass
 for kind in ("supervisor","mcp"):
     for pid in found[kind]:
         os.kill(pid,signal.SIGTERM)
