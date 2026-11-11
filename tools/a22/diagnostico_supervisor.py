@@ -97,7 +97,7 @@ def sanitized_events():
         r"(STATUS: MCP=(?:UP|DOWN); TUNNEL HTTP=(?:0|200|503|[1-5]\d\d)"
         r"|MCP: (?:starting PID \d+|stopped verified PID \d+)"
         r"|TUNNEL: (?:starting PID \d+|stopped verified PID \d+)"
-        r"|BOTIZIN v2 supervisor active\..*)$"
+        r"|BOTIZIN v2 supervisor active\. No firmware or credentials changed\.)$"
     )
     try:
         # bounded read; use the tail of the file only; no application logs.
@@ -141,7 +141,8 @@ def board_summary():
         out[kind] = {"estado": state,
                      "ultimo_ip": ip if isinstance(ip, str) and len(ip) <= 45 else None,
                      "versao": str(item.get("firmware", ""))[:55] if online else None,
-                     "wifi": str(item.get("wifi", ""))[:20] if online else None}
+                     "wifi": str(item.get("wifi", ""))[:20] if online else None,
+                     "led_estado": str(item.get("led_state", ""))[:12] if online and kind == "wroom" else None}
     return out
 
 
