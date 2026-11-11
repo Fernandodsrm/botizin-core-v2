@@ -61,7 +61,7 @@ def transform(source):
         raise ValueError("Status A22 return format unexpectedly changed")
     lines = source.splitlines(keepends=True)
     line = lines[ret.lineno - 1]
-    if line.strip() != "return {":
+    if not line.strip().startswith("return {"):
         raise ValueError("Status A22 return indentation unexpected")
     indent = line[:len(line)-len(line.lstrip())]
     if indent != "    ":
