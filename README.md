@@ -6,6 +6,8 @@
 
 **[INVENTÁRIO — peças físicas, estado e chegada de placas](docs/inventario-hardware-botizin-lab-2026-11.md)**
 
+**[AUDITORIA TÉCNICA DA WROOM 0.0.38 — tamanho, fontes exatas, SPIFFS e histórico 0–38](docs/AUDITORIA-WROOM-038-HISTORICO-E-OTIMIZACAO-2026-11-11.md)**
+
 ## Onde estamos realmente
 - **ESP32-S3:** CORE 0.0.25, OTA/Wi-Fi, comunicação e diagnósticos confirmados. A voz XiaoZhi foi testada pelo proprietário no notebook com LAB; o CORE de produção atual não é a LAB de voz.
 - **ESP32-WROOM:** 0.0.38, OLED com rosto BOTIZIN, menu/catálogo e LED GPIO26 controlado pelo ChatGPT; partições de app apertadas. Ainda não existe launcher enxuto OTA0↔OTA1 consolidado.
