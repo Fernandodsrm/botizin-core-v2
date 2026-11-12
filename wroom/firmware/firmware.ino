@@ -160,10 +160,10 @@ String snapshot() {
 #endif
   s += "WIFI: " + String(WiFi.status() == WL_CONNECTED ? "OK" : "DISCONNECTED") + "\n";
   s += "OTA: " + String(otaReady ? "READY" : "BLOCKED: hardware/partition mismatch") + "\n";
-  s += "INTERNET_OTA: " + internetStatus + "\n";
+  s += "MODULE_DELIVERY: " + manualOtaStatus + "\n";
   s += "OTA_AUTOMATIC_ENABLED: NO\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
   s += "A22_MODULE_PUSH: " + String(modulePushReady?"READY":"OFF") + "\n";
-  s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
+  s += "MODULE_SOURCE: A22_CACHE_PINNED_GITHUB\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
   s += "TELEMETRY: A22_LOCAL\n";
   s += "OLED: " + oledStatus + "\n";
