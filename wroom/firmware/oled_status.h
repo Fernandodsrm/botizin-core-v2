@@ -54,7 +54,7 @@ static void diagnosticPage(){
   }else if(navDiagnostic==1){
     oledLine(2,"Pausa max "+diagnosticMs(diagnosticLoopMaxUs));
     oledLine(3,"Git max "+diagnosticMs(diagnosticOps[DIAG_GIT].maxUs));
-    oledLine(4,"Site max "+diagnosticMs(diagnosticOps[DIAG_TB].maxUs));
+    oledLine(4,"Central A22 "+diagnosticMs(diagnosticOps[DIAG_TB].maxUs));
     oledLine(5,"Comandos "+diagnosticMs(diagnosticOps[DIAG_RPC].maxUs));
     oledLine(6,"Max desde reinicio");
   }else if(navDiagnostic==2){
@@ -76,9 +76,9 @@ static void refreshOled() {
   nextOledRefresh=millis()+1000;DiagnosticScope diagnosticScope(DIAG_OLED);
   if(!oledPresent()){oledReady=false;faceDisplayEnabled.store(false);oledStatus="PAUSED_I2C_ERROR";diagnosticScope.failed=true;return;}
   oled.clearDisplay();
-  const char *areas[]={"Conexoes","Diagnostico","Atualizacoes","Ambientes"};
+  const char *areas[]={"Conexoes","Diagnostico","Ajuda","Modulos"};
   if(navLevel==0){
-    oledLine(0,"BOTIZIN - WROOM");oledLine(1,"Placa independente");oledList(areas,4,oledMenuChoice);
+    oledLine(0,"BOTIZIN - WROOM");oledLine(1,"Auxiliar de bancada");oledList(areas,4,oledMenuChoice);
   }else if(navLevel==2){
     oledLine(0,String("DIAGNOSTICO ")+"WROOM");oledLine(1,"Recursos e esperas");
     const char *items[]={"Memoria","Tempos da rede","Tela e coleta","Ultimo reinicio"};oledList(items,4,navDiagnostic);
@@ -87,21 +87,13 @@ static void refreshOled() {
     oledLine(0,"CONEXAO WROOM");oledLine(1,"Medido na WROOM");
       oledLine(2,WiFi.status()==WL_CONNECTED?"Wi-Fi: conectado":"Wi-Fi: desconectado");
       oledLine(3,"IP "+WiFi.localIP().toString());oledLine(4,"Versao "+String(BOTIZIN_VERSION));
-      oledLine(5,telemetryStatus=="HTTP_200"?"Site: ultimo envio OK":"Site: "+telemetryStatus);
+      oledLine(5,String("Central A22: local"));
       oledLine(6,"Origem: WROOM local");
-  } else if (oledPage == 2 && oledDetail && candidateReady()) {
-    oledLine(0, "INSTALAR NA WROOM?");
-    oledLine(1, "OK:SIM Voltar:NAO");
-    oledLine(2, "Atual " + String(BOTIZIN_VERSION));
-    oledLine(3, "Nova  " + otaTargetVersion);
-    oledLine(4, "Vai reiniciar WROOM");
-    oledLine(5, String("Prazo ") + String((otaManualUntil - millis()) / 1000) + "s");
-    oledLine(6, otaAutomaticEnabled?"Automatico: LIGADO":"Automatico: DESLIGADO");
   } else if(oledPage==10) {
-    oledLine(0,"AMBIENTES WROOM");oledLine(1,catalogStatus);
+    oledLine(0,"MODULOS BOTIZIN");oledLine(1,catalogStatus);
     uint8_t first=catalogChoice>=5?catalogChoice-4:0;
     for(uint8_t i=first;i<=environmentCount&&i<first+5;++i){
-      String title=i?environments[i-1].title:String("Atualizar lista");
+      String title=i?environments[i-1].title:String("Catalogo fixo");
       if(i&&moduleAvailable&&moduleId==environments[i-1].id)title="* "+title;
       oledLine(2+i-first,String(i==catalogChoice?"> ":"  ")+title);
     }
@@ -109,18 +101,19 @@ static void refreshOled() {
     auto &e=environments[catalogChoice-1];bool installed=moduleAvailable&&moduleId==e.id;
     oledLine(0,e.title);oledLine(1,"Versao "+(installed&&otaEnvironment!=e.id?moduleVersion:e.version));
     bool downloadPrepared=oledDetail&&otaEnvironment==e.id;
-    oledLine(2,downloadPrepared?"Baixar esta versao?":installed?"Instalado: abre offline":e.bytes?"Disponivel para baixar":"Atualize a lista");
-    oledLine(3,installed&&!downloadPrepared?"Menu sera preservado":"Substitui outro slot");
-    oledLine(4,installed?"Baixo: baixar/atual.":"Atual: "+(moduleAvailable?moduleId:String("sem ambiente")));
-    oledLine(5,oledDetail?"Direita: confirmar":installed?"Direita: abrir":"Direita: preparar");
-    oledLine(6,"Esquerda: voltar");
+    oledLine(2,downloadPrepared?"Pedir ao A22?":installed?"Instalado: abrir":"Instalar via A22");
+    oledLine(3,installed&&!downloadPrepared?"Menu sera preservado":"Base fica OTA0");
+    oledLine(4,String("Modulo fica OTA1"));
+    oledLine(5,oledDetail?"OK: confirmar":installed?"OK: abrir":"OK: preparar");
+    oledLine(6,"Voltar: cancelar");
   } else if (oledPage == 2) {
-    oledLine(0, String("OTA WROOM ") + BOTIZIN_VERSION);
-    oledLine(1, otaAutomaticEnabled?"Automatico: LIGADO":"Automatico: DESLIGADO");
-    const char *actions[]={"Consultar GitHub","Instalar nova","Cancelar pedido","Ver ambientes"};
-    bool active[]={otaReady&&!internetStopped&&!otaCheckQueued&&!otaInstallQueued,candidateReady(),manualWindowActive(),true};
-    for(uint8_t i=0;i<4;++i) oledLine(i+2,String(i==oledOtaChoice?"> ":"  ")+actions[i]+(active[i]?"":" [X]"));
-    oledLine(6,candidateReady()?"Nova "+otaTargetVersion:internetStatus);
+    oledLine(0,"AJUDA BOTIZIN");
+    oledLine(1,"Base 0.0.40");
+    oledLine(2,"Modulos: menu");
+    oledLine(3,"OTA0: BOTIZIN");
+    oledLine(4,"OTA1: ambiente");
+    oledLine(5,"Arquivos via A22");
+    oledLine(6,"Voltar: menu");
   }
 
   oled.display();
