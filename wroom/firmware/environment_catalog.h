@@ -46,7 +46,7 @@ static void loadCatalog(){
 static void checkCatalog(){
   // Online catalog updates belong to A22. Only pinned images above can be loaded.
   clearOtaCandidate();oledDetail=false;oledPage=10;navLevel=3;oledMenu=false;
-  catalogStatus="LISTA_FIXA_040";nextOledRefresh=0;
+  catalogStatus="LISTA_FIXA_040";
 }
 static bool prepareEnvironment(const String &id){
  int i=environmentIndex(id);if(i<0||catalogBusy()||moduleStartQueued||!otaReady)return false;
