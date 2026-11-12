@@ -13,7 +13,7 @@ def main():
     cores = json.loads(subprocess.check_output(["arduino-cli","core","list","--format","json"],text=True))
     assert any(p.get("id")=="esp32:esp32" and p.get("installed_version")=="3.3.12" for p in cores["platforms"])
     subprocess.run(["arduino-cli","board","details","--fqbn",FQBN],check=True)
-    for version in ("0.0.38",):
+    for version in ("0.0.40",):
         source = ROOT / "wroom-build" / "firmware"; source.parent.mkdir(exist_ok=True)
         shutil.copytree(original,source,dirs_exist_ok=True)
         (source/"version.h").write_text('#pragma once\n#define BOTIZIN_VERSION "'+version+'"\n')
@@ -27,6 +27,11 @@ def main():
         assert binary[0]==0xe9 and struct.unpack_from("<H",binary,12)[0]==0,"Wrong chip"
         assert len(binary)<=0x140000,"Does not fit preserved OTA partition"
         assert b"BOTIZIN WROOM V" in binary and version.encode() in binary
+        assert b"BOTIZIN_MODULE_REQUEST_V1" in binary
+        assert b"AGUARDANDO_A22" in binary
+        assert b"OTA_AUTOMATIC_ENABLED: NO" in binary
+        assert b"thingsboard.cloud" not in binary
+        assert b"api/v1/" not in binary
         table=(out/"firmware.ino.partitions.bin").read_bytes()
         for i,expected in enumerate(EXPECTED):
             magic,typ,sub,offset,size,label,flags=struct.unpack_from("<HBBII16sI",table,i*32)
