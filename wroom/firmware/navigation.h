@@ -21,7 +21,7 @@ static void beginNavigation() {
     pinMode(button.pin, INPUT_PULLUP);
     attachInterruptArg(button.pin, navPress, &button, FALLING);
   }
-  Serial.println("BUTTONS: OK25 UP27 BACK32 DOWN33; navigation + explicit OTA query/confirmation");
+  Serial.println("BUTTONS: OK25 UP27 BACK32 DOWN33; navigation + physically approved modules");
 }
 
 static void discardNavigation() {
@@ -62,19 +62,9 @@ static void pollNavigation() {
       else if(moduleAvailable&&moduleId==e.id){if(!oledDetail)oledDetail=true;else{queueModuleStart(telemetryBootId,moduleSHA);oledDetail=false;}}
       else{oledDetail=prepareEnvironment(e.id);}
     }
-  }else if(oledPage==2){
-    uint8_t &choice=oledOtaChoice;
-    if(pending&(2|8)){oledDetail=false;choice=(choice+((pending&8)?1:3))%4;}
-    else if(pending&1){
+   }else if(oledPage==2){
+    if(pending&1){navGroup=3;navLevel=3;oledPage=10;}
 
-        if(choice==3){oledDetail=false;oledPage=10;}
-        else if(choice==0){oledDetail=false;queueOtaCheck();}
-        else if(choice==1&&candidateReady()){
-          if(!oledDetail)oledDetail=true;
-          else{confirmOta(otaCandidateId,otaTargetVersion,otaTargetSHA,telemetryBootId);oledDetail=false;}
-        }else if(choice==2&&manualWindowActive()){cancelOtaCheck();oledDetail=false;}
-
-    }
   }
   oledMenu=navLevel==0;nextOledRefresh=0;
 }
