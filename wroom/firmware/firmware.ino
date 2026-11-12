@@ -7,17 +7,13 @@
 #include <esp_system.h>
 #include <esp_partition.h>
 #include <mbedtls/sha256.h>
-#include <NetworkClientSecure.h>
-#include <HTTPClient.h>
 #include <cJSON.h>
-#include <time.h>
 #include "internet_config.h"
 #include "version.h"
 #define BOTIZIN_LOCAL_NAME "botizin-wroom"
 #define BOTIZIN_LOCAL_BOARD "esp32-wroom-4mb"
 #include "local_name.h"
 #include "provisioning.h"
-#include "ps4_config.h"
 #include "remote_led.h"
 
 WebServer server(80);
@@ -37,6 +33,9 @@ uint32_t rebootAt = 0;
 String internetStatus = "WAITING_FOR_FIRST_CHECK";
 bool internetStopped = false;
 uint32_t nextInternetCheck = 0;
+// Physical menu approval only. A22 may upload a SHA-pinned module for 120 seconds.
+static bool modulePushReady=false;
+static uint32_t modulePushUntil=0;
 int responseCode = 400;
 String telemetryStatus = "WAITING";
 String oledStatus = "WAITING";
@@ -162,10 +161,11 @@ String snapshot() {
   s += "WIFI: " + String(WiFi.status() == WL_CONNECTED ? "OK" : "DISCONNECTED") + "\n";
   s += "OTA: " + String(otaReady ? "READY" : "BLOCKED: hardware/partition mismatch") + "\n";
   s += "INTERNET_OTA: " + internetStatus + "\n";
-  s += "OTA_AUTOMATIC_ENABLED: " + String(otaAutomaticEnabled?"YES":"NO") + "\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
+  s += "OTA_AUTOMATIC_ENABLED: NO\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
+  s += "A22_MODULE_PUSH: " + String(modulePushReady?"READY":"OFF") + "\n";
   s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
-  s += "TELEMETRY: " + telemetryStatus + "\n";
+  s += "TELEMETRY: A22_LOCAL\n";
   s += "OLED: " + oledStatus + "\n";
   s += "FACE_FRAMES: " + String(faceFrames.load()) + "\n";
   s += "FACE_MAX_GAP_MS: " + String(faceMaxGapMs.load()) + "\n";
@@ -250,11 +250,24 @@ void beginUpload(const String &length, const String &sha) {
     for (size_t i = 0; i < expectedSha.length(); ++i) validSha = validSha && (isxdigit((unsigned char)expectedSha[i]) != 0);
     logLine("EXPECTED_BYTES: " + String(expectedBytes));
     logLine("SHA_EXPECTED: " + expectedSha);
-    if (!otaReady || rebootScheduled || !destination || !validSha || expectedBytes == 0 ||
-        expectedBytes > destination->size) {
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    bool buttonAuthorized = modulePushReady &&
+        (int32_t)(modulePushUntil-millis())>0 &&
+        expectedBytes==otaTargetBytes && expectedSha==otaTargetSHA &&
+        !otaEnvironment.isEmpty();
+    // Fixed architecture: BOTIZIN app0 never writes itself, modules only app1.
+    bool correctSlots = running && running->subtype==ESP_PARTITION_SUBTYPE_APP_OTA_0 &&
+        destination && destination->subtype==ESP_PARTITION_SUBTYPE_APP_OTA_1;
+    if (!otaReady || rebootScheduled || !correctSlots || !buttonAuthorized ||
+        !validSha || expectedBytes == 0 || expectedBytes > destination->size) {
       failUpload("invalid metadata, hardware, partitions or pending reboot; Update.begin NOT CALLED"); return;
     }
     if(!saveReturnAnchor()) { failUpload("Menu return anchor could not be saved; no flash writes"); return; }
+    if(!saveReturnAnchor()){
+      failUpload("cannot validate/save BOTIZIN base return anchor"); return;
+    }
+    // One-time physical authorization; fail closed if transport aborts.
+    modulePushReady=false;
     bool beginOK = Update.begin(expectedBytes, U_FLASH);
     logLine("Update.begin: " + String(beginOK ? "TRUE" : "FALSE"));
     if (!beginOK) { failUpload("Update.begin rejected image size/partition"); return; }
@@ -307,10 +320,16 @@ void finishUpload() {
       logLine("RESTORE_ORIGINAL_BOOT: " + String(esp_err_to_name(restore)));
       failUpload("post-write verification failed; STOP, no automatic reboot"); return;
     }
+    if(!saveInstalledEnvironment(otaEnvironment,otaTargetVersion,expectedSha,expectedBytes,destination)){
+      esp_err_t restored=esp_ota_set_boot_partition(originalBoot);
+      logLine("RESTORE_BASE_AFTER_METADATA_ERROR: "+String(esp_err_to_name(restored)));
+      failUpload("module metadata did not persist; no boot");return;
+    }
     uploadActive = false;
     uploadOK = true;
     responseCode = 200;
-    logLine("OTA_WRITE_VERIFIED: YES; reboot requires POST /reboot");
+    manualOtaStatus = "MODULE_VERIFIED_READY_TO_BOOT";
+    logLine("OTA_WRITE_VERIFIED: YES; module return anchor written");
     checkpoint();
   }
 
@@ -336,241 +355,22 @@ void stopInternet(const String &reason) {
   Serial.println("INTERNET_OTA: " + internetStatus);
 }
 
-void checkInternetOTA(bool manual) {
-  DiagnosticScope diagnosticScope(DIAG_GIT);
-  if (manual) { manualOtaStatus = "CHECKING"; showOtaProgress("CONSULTANDO GITHUB"); }
-  if (!otaReady) { stopInternet("hardware/partition mismatch"); return; }
-  if (WiFi.status() != WL_CONNECTED) {
-    internetStatus = "WAITING_FOR_WIFI"; return;
-  }
-  // TLS certificate validity requires a clock synchronized by SNTP.
-  if (time(nullptr) < 1700000000) {
-    internetStatus = "WAITING_FOR_NTP";
-    Serial.println("INTERNET_OTA: " + internetStatus); return;
-  }
-  Serial.println("INTERNET_OTA: CHECKING_MANIFEST");
-  NetworkClientSecure tls;
-  tls.useBuiltinCACertBundle();
-  tls.setHandshakeTimeout(15);
-  HTTPClient http;
-  http.setConnectTimeout(15000);
-  http.setTimeout(15000);
-  http.useHTTP10(true);
-  if (!http.begin(tls, BOTIZIN_MANIFEST_URL)) {
-    diagnosticScope.failed=true;internetStatus = "MANIFEST_BEGIN_FAILED"; return;
-  }
-  http.addHeader("Cache-Control", "no-cache");
-  int code = http.GET();
-  Serial.printf("MANIFEST_HTTP: %d\n", code);
-  int manifestSize = http.getSize();
-  if (code != 200) {
-    diagnosticScope.failed=true;
-    internetStatus = "MANIFEST_HTTP_" + String(code);
-    http.end(); return;
-  }
-  if (manifestSize <= 0 || manifestSize > 2048) {
-    http.end(); stopInternet("invalid manifest size"); return;
-  }
-  String body = http.getString();
-  http.end();
-  if (body.length() != (size_t)manifestSize) {
-    stopInternet("incomplete manifest"); return;
-  }
-  cJSON *root = cJSON_Parse(body.c_str());
-  cJSON *version = cJSON_GetObjectItemCaseSensitive(root, "version");
-  cJSON *url = cJSON_GetObjectItemCaseSensitive(root, "url");
-  cJSON *sha = cJSON_GetObjectItemCaseSensitive(root, "sha256");
-  cJSON *size = cJSON_GetObjectItemCaseSensitive(root, "size");
-  cJSON *board = cJSON_GetObjectItemCaseSensitive(root, "board");
-  bool valid = cJSON_IsObject(root) && cJSON_IsString(version) &&
-      cJSON_IsString(url) && cJSON_IsString(sha) && cJSON_IsNumber(size) &&
-      cJSON_IsString(board) && String(board->valuestring) == "esp32-wroom-4mb" &&
-      size->valuedouble >= 1 && size->valuedouble <= 1310720 &&
-      size->valuedouble == (double)size->valueint;
-  if (!valid) {
-    cJSON_Delete(root); stopInternet("invalid manifest fields"); return;
-  }
-  String targetVersion(version->valuestring), targetURL(url->valuestring), targetSHA(sha->valuestring);
-  size_t targetBytes = (size_t)size->valueint;
-  cJSON_Delete(root);
-  // Restrict downloads to this new repository; reject plain HTTP and redirects.
-  if (!targetURL.startsWith(BOTIZIN_FIRMWARE_PREFIX) || targetSHA.length() != 64) {
-    stopInternet("unexpected firmware URL/SHA"); return;
-  }
-  for (size_t i = 0; i < targetSHA.length(); ++i) {
-    if (isxdigit((unsigned char)targetSHA[i]) == 0) {
-      stopInternet("invalid firmware SHA"); return;
-    }
-  }
-  if (targetVersion == BOTIZIN_VERSION) {
-    internetStatus = "UP_TO_DATE " + targetVersion;
-    Serial.println("INTERNET_OTA: " + internetStatus); return;
-  }
-  if ((otaEnvironment.isEmpty() && !newerVersion(targetVersion))) {
-    stopInternet("manifest version is invalid or older"); return;
-  }
-  if (manual) {
-    otaTargetVersion = targetVersion; otaTargetURL = targetURL; otaTargetSHA = targetSHA; otaTargetBytes = targetBytes;
-    otaCandidateId = telemetryBootId + "-" + String((unsigned long)esp_random(), HEX);
-    otaManualUntil = millis() + 300000; manualOtaStatus = "AVAILABLE";
-    nextTelemetry = millis(); showOtaProgress("VERSAO DISPONIVEL"); return;
-  }
-  installInternetOTA(targetVersion, targetURL, targetSHA, targetBytes);
+// WROOM 0.0.40 does not fetch firmware or manifests from cloud.
+void checkInternetOTA(bool manual){
+  (void)manual;
+  internetStatus="MOVIDO_PARA_A22";
+  manualOtaStatus="A22_CATALOGO_FIXO";
 }
-
-void installInternetOTA(const String &targetVersion, const String &targetURL, const String &targetSHA, size_t targetBytes) {
-  if (!otaReady || internetStopped || uploadActive || uploadOK || rebootScheduled || WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000 || (otaEnvironment.isEmpty() && !newerVersion(targetVersion))) {
-    manualOtaStatus = "INSTALL_REJECTED"; return;
-  }
-  showOtaProgress("ABRINDO DOWNLOAD");
-  Serial.println("TARGET_VERSION: " + targetVersion);
-  Serial.println("DOWNLOAD_URL: " + targetURL);
-  NetworkClientSecure firmwareTLS;
-  firmwareTLS.useBuiltinCACertBundle();
-  firmwareTLS.setHandshakeTimeout(15);
-  HTTPClient download;
-  download.setConnectTimeout(15000);
-  download.setTimeout(15000);
-  download.useHTTP10(true);
-  if (!download.begin(firmwareTLS, targetURL)) {
-    stopInternet("firmware HTTP begin failed"); return;
-  }
-  int firmwareCode = download.GET();
-  Serial.printf("FIRMWARE_HTTP: %d\n", firmwareCode);
-  if (firmwareCode != 200 || download.getSize() != (int)targetBytes) {
-    download.end(); stopInternet("firmware HTTP/size mismatch; no flash writes"); return;
-  }
-  internetStatus = "DOWNLOADING " + targetVersion;
-  beginUpload(String(targetBytes), targetSHA);
-  logLine("TRANSPORT: HTTPS / authenticated CA bundle");
-  logLine("TARGET_VERSION: " + targetVersion);
-  if(!otaEnvironment.isEmpty())logLine("ENVIRONMENT_ID: "+otaEnvironment);
-  checkpoint();
-  if (!uploadActive) {
-    download.end(); stopInternet("Update.begin/SHA rejected; inspect journal"); return;
-  }
-  NetworkClient *stream = download.getStreamPtr();
-  static uint8_t buffer[4096]; // Fixed storage: do not consume loopTask stack.
-  uint32_t lastData = millis(), started = millis();
-  size_t nextProgress = 65536;
-  while (uploadActive && writtenBytes < expectedBytes) {
-    int available = stream->available();
-    if (available > 0) {
-      size_t count = min((size_t)available, min(sizeof(buffer), expectedBytes - writtenBytes));
-      int received = stream->read(buffer, count);
-      if (received > 0) {
-        writeUpload(buffer, (size_t)received);
-        lastData = millis();
-        if (writtenBytes >= nextProgress) {
-          Serial.printf("DOWNLOAD_PROGRESS: %lu/%lu\n", (unsigned long)writtenBytes, (unsigned long)expectedBytes);
-          nextProgress += 65536;
-          showOtaProgress("BAIXANDO", writtenBytes, expectedBytes);
-        }
-      }
-    } else if (!download.connected()) {
-      failUpload("HTTPS connection ended before expected bytes"); break;
-    }
-    if (millis() - lastData > 15000 || millis() - started > 180000) {
-      failUpload("HTTPS download timeout"); break;
-    }
-    delay(1);
-  }
-  download.end();
-  showOtaProgress("VERIFICANDO SHA256", writtenBytes, expectedBytes);
-  if (uploadActive) finishUpload();
-  if (!uploadOK) { stopInternet("download/write verification failed; no retry or reboot"); return; }
-  if(!otaEnvironment.isEmpty() && !saveInstalledEnvironment(otaEnvironment,targetVersion,targetSHA,targetBytes,destination)) {
-    esp_ota_set_boot_partition(originalBoot);uploadOK=false;manualOtaStatus="ENVIRONMENT_RECORD_FAILED";return;
-  }
-  internetStatus = "VERIFIED " + targetVersion + "; REBOOT_PENDING";
-  manualOtaStatus = "VERIFIED_REBOOT_PENDING";
-  showOtaProgress("SHA OK REINICIANDO", writtenBytes, expectedBytes);
-  logLine("REBOOT_REQUESTED: SOFTWARE / INTERNET_OTA");
-  checkpoint();
-  rebootAt = millis() + 2000;
-  rebootScheduled = true;
+void installInternetOTA(const String &, const String &, const String &, size_t){
+  internetStatus="MOVIDO_PARA_A22";
 }
 
 // Separate diagnostic sender: no Update, NVS write, boot change or Wi-Fi reconfiguration.
 // Called sequentially AFTER the existing OTA check has returned and freed its TLS clients.
-void __attribute__((noinline)) sendTelemetry() {
-  if (!provisioned || telemetryStopped || rebootScheduled || uploadActive || uploadOK ||
-      WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000) return;
-  if (ESP.getFreeHeap() < 80000) { telemetryStatus = "SKIPPED_LOW_HEAP"; return; }
-  DiagnosticScope diagnosticScope(DIAG_TB);
-  cJSON *root = cJSON_CreateObject();
-  if (!root) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
-  const esp_partition_t *run = esp_ota_get_running_partition();
-  String runText = partitionInfo(run);
-  String bootText = partitionInfo(esp_ota_get_boot_partition());
-  String nextText = partitionInfo(esp_ota_get_next_update_partition(nullptr));
-  String resetText = resetInfo(), stateText = stateInfo(run);
-  // Preserve the persisted source version and SHA evidence without rewriting the OTA journal.
-  String evidence = priorAttempt.substring(0, 4096);
-  bool ok = cJSON_AddStringToObject(root, "origin", "ESP32_REAL") &&
-    cJSON_AddBoolToObject(root, "simulated", false) &&
-    cJSON_AddStringToObject(root, "firmware_version", BOTIZIN_VERSION) &&
-    cJSON_AddBoolToObject(root, "led_on", remoteLedOn) &&
-    cJSON_AddNumberToObject(root, "led_gpio", 26) &&
-    cJSON_AddStringToObject(root,"installed_environment",moduleAvailable?moduleId.c_str():"") &&
-    cJSON_AddStringToObject(root,"catalog_status",catalogStatus.c_str()) &&
-    cJSON_AddStringToObject(root,"wifi_ip",WiFi.localIP().toString().c_str()) &&
-    cJSON_AddStringToObject(root,"local_name",BOTIZIN_LOCAL_NAME ".local") &&
-    cJSON_AddBoolToObject(root,"mdns_ready",localNameReady) &&
-    cJSON_AddStringToObject(root, "board", "esp32-wroom-4mb") &&
-    cJSON_AddStringToObject(root, "device_id", WiFi.macAddress().c_str()) &&
-    cJSON_AddStringToObject(root, "boot_id", telemetryBootId.c_str()) &&
-    cJSON_AddNumberToObject(root, "sequence", ++telemetrySequence) &&
-    cJSON_AddNumberToObject(root, "uptime_seconds", diagnosticUptime()) &&
-    cJSON_AddStringToObject(root, "running_partition", runText.c_str()) &&
-    cJSON_AddStringToObject(root, "boot_partition", bootText.c_str()) &&
-    cJSON_AddStringToObject(root, "next_update_partition", nextText.c_str()) &&
-    cJSON_AddStringToObject(root, "reset_reason", resetText.c_str()) &&
-    cJSON_AddStringToObject(root, "ota_state", stateText.c_str()) &&
-    cJSON_AddStringToObject(root, "ota_journal", evidence.c_str()) &&
-    cJSON_AddBoolToObject(root, "ota_automatic_enabled", otaAutomaticEnabled) &&
-    cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str());
-  ok = ok && cJSON_AddBoolToObject(root,"face_active",faceActive.load()) &&
-    cJSON_AddNumberToObject(root,"face_frames",faceFrames.load()) &&
-    cJSON_AddNumberToObject(root,"face_max_gap_ms",faceMaxGapMs.load()) && diagnosticJSON(root);
-  char *payload = ok ? cJSON_PrintUnformatted(root) : nullptr;
-  cJSON_Delete(root);
-  if (!payload) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
-  size_t length = strlen(payload);
-  int code = -1000;
-  if (length <= 8192) {
-    NetworkClientSecure tls;
-    tls.useBuiltinCACertBundle();
-    tls.setHandshakeTimeout(5);
-    HTTPClient http;
-    http.setConnectTimeout(5000);
-    http.setTimeout(5000);
-    http.useHTTP10(true);
-    http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
-    // Device token only. The account API key is NEVER used by the ESP32.
-    String url = "https://thingsboard.cloud/api/v1/";
-    url += BOTIZIN_TB_DEVICE_TOKEN;
-    url += "/telemetry";
-    if (http.begin(tls, url)) {
-      http.addHeader("Content-Type", "application/json");
-      code = http.POST((uint8_t *)payload, length);
-    }
-    http.end();
-    tls.stop();
-  }
-  diagnosticScope.failed = code != 200;
-  cJSON_free(payload);
-  telemetryStatus = "HTTP_" + String(code);
-  Serial.println("TELEMETRY: " + telemetryStatus);
-  if (code >= 200 && code < 300) telemetryFailures = 0;
-  else if (++telemetryFailures >= 3) {
-    telemetryFailures = 3; nextTelemetry = millis() + 60000;
-    telemetryStatus = "RETRY_AFTER_60_SECONDS";
-    Serial.println("TELEMETRY: " + telemetryStatus);
-  }
-}
+// Remote telemetry/RPC moved to A22; the local status route remains available.
+void sendTelemetry(){telemetryStatus="A22_LOCAL";}
 
-#include "ping_rpc.h"
+
 #include "oled_status.h"
 #include "navigation.h"
 
@@ -592,7 +392,6 @@ void setup() {
   beginNavigation();
   beginFaceTask();
   delay(1500);
-  loadPS4Button();
   bool journalOK = journal.begin("wroom-journal", false);
   if (journalOK) priorAttempt = journal.getString("last", "");
   else Serial.println("JOURNAL_OPEN_FAILED");
@@ -612,7 +411,7 @@ void setup() {
   sampleDiagnostics();
   Serial.println(snapshot());
   loadProvisioning();
-  { Preferences prefs; if(prefs.begin("ota-policy",true)) { otaAutomaticEnabled=prefs.getBool("automatic",true); prefs.end(); } }
+  otaAutomaticEnabled=false;
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
@@ -637,6 +436,19 @@ void setup() {
     setRemoteLed(enabled=="1");
     server.send(200,"text/plain",remoteLedOn?"LED_STATE: ON; AUTO_OFF_SECONDS: 30":"LED_STATE: OFF");
   });
+  server.on("/module/request", HTTP_GET, [](){
+    bool ready=modulePushReady && (int32_t)(modulePushUntil-millis())>0 &&
+        !uploadActive && !uploadOK && !rebootScheduled;
+    if(!ready){server.send(204,"text/plain","");return;}
+    String msg="BOTIZIN_MODULE_REQUEST_V1\n";
+    msg+="ID: "+otaEnvironment+"\n";
+    msg+="VERSION: "+otaTargetVersion+"\n";
+    msg+="SIZE: "+String(otaTargetBytes)+"\n";
+    msg+="SHA256: "+otaTargetSHA+"\n";
+    msg+="BOOT_ID: "+telemetryBootId+"\n";
+    msg+="EXPIRES_IN: "+String((modulePushUntil-millis())/1000)+"\n";
+    server.send(200,"text/plain; charset=utf-8",msg);
+  });
   server.on("/update", HTTP_POST, []() {
     if (uploadActive) failUpload("request ended before file completion");
     server.send(responseCode, "text/plain; charset=utf-8", attempt.length() ? attempt : "No firmware uploaded\n");
@@ -647,11 +459,7 @@ void setup() {
     server.send(200, "text/plain", "Reboot in 2 seconds\n");
     rebootAt = millis() + 2000; rebootScheduled = true;
   });
-  configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
   telemetryBootId = String((unsigned long)esp_random(), HEX) + String((unsigned long)esp_random(), HEX);
-  nextPingPoll = millis() + 30000;
-  nextTelemetry = millis() + 20000;
-  nextInternetCheck = millis() + 10000;
   server.begin();
   maintainLocalName();
   Serial.println("HTTP_SERVER: port 80; GET /status; POST /update?size=...&sha256=...");
@@ -669,11 +477,15 @@ void loop() {
   if(catalogRefreshQueued && !uploadActive && !uploadOK && !rebootScheduled && !otaInstallQueued && !otaCheckQueued){catalogRefreshQueued=false;checkCatalog();discardNavigation();nextOledRefresh=0;nextTelemetry=millis();}
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
   if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued) {
-    String version = otaTargetVersion, url = otaTargetURL, sha = otaTargetSHA;
-    size_t bytes = otaTargetBytes;
-    String environment=otaEnvironment;
-    otaInstallQueued = false; clearOtaCandidate(); otaEnvironment=environment; otaManualUntil = 0;
-    installInternetOTA(version, url, sha, bytes);
+    otaInstallQueued=false;
+    // The user confirmed the selected module on the WROOM's physical buttons.
+    modulePushReady=true;
+    modulePushUntil=millis()+120000;
+    manualOtaStatus="AGUARDANDO_A22";
+    showOtaProgress("AGUARDANDO A22");
+  }
+  if(modulePushReady && (int32_t)(millis()-modulePushUntil)>=0) {
+    modulePushReady=false;manualOtaStatus="A22_TEMPO_ESGOTADO";
   }
   if (!rebootScheduled && !uploadActive && !uploadOK && otaCheckQueued) {
     otaCheckQueued = false;
@@ -682,22 +494,8 @@ void loop() {
     // Presses made while the synchronous query was running cannot confirm its result.
     discardNavigation(); nextOledRefresh = 0; nextTelemetry = millis();
   }
-  if (!rebootScheduled && !uploadActive && !uploadOK && !internetStopped &&
-      (int32_t)(millis() - nextInternetCheck) >= 0) {
-    nextInternetCheck = millis() + 60000;
-    if (otaAutomaticEnabled && !manualWindowActive()) { clearOtaCandidate(); checkInternetOTA(false); }
+  // Cloud polling removed. A22 handles external services.
 
-  }
-  if (!rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
-      (int32_t)(millis() - nextTelemetry) >= 0) {
-    nextTelemetry = millis() + 60000;
-    sendTelemetry();
-  }
-  if (!rebootScheduled && !uploadActive && !uploadOK && !pingStopped &&
-      (int32_t)(millis() - nextPingPoll) >= 0) {
-    nextPingPoll = millis() + 15000;
-    pollPing();
-  }
   pollNavigation();
   pollFaceIdle();
   refreshOled();
