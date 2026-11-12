@@ -57,22 +57,19 @@ int main(){
  // Diagnostics category back returns directly to root.
  press(8);press(1);assert(navLevel==2);press(8);press(1);assert(navLevel==3&&oledPage==7&&navDiagnostic==1);
  press(4);assert(navLevel==2);press(4);assert(navLevel==0);
- // Query, expired candidate, explicit second confirmation and cancellation.
+ // Help page cannot initiate OTA or installs; only the physical module menu can.
  oledMenuChoice=2;press(1);assert(oledPage==2&&navLevel==3);
- press(1);assert(checks==1);press(8);press(1);assert(installs==0&&!oledDetail);
- candidate=true;window=true;press(1);assert(oledDetail&&installs==0);press(4);assert(!oledDetail&&navLevel==3);
- press(1);candidate=false;press(1);assert(installs==0);candidate=true;oledDetail=false;press(1);press(1);assert(installs==1);
- press(8);press(1);assert(cancels==1);
- uploadActive=true;press(4);assert(navLevel==3);uploadActive=false;
+ press(1);assert(oledPage==10&&checks==0&&installs==0&&cancels==0);
+ press(4);assert(navLevel==0);
  // Catalog: refresh explicitly, confirm replacement, then open installed offline.
  press(4);oledMenuChoice=3;press(1);assert(oledPage==10);
  press(1);assert(catalogRefreshQueued);catalogRefreshQueued=false;
  press(8);press(8);press(1);assert(oledPage==11&&catalogChoice==2);
  press(1);assert(prepares==1&&oledDetail&&otaEnvironment=="servo");press(4);assert(oledPage==11&&!oledDetail);
- press(1);assert(prepares==2&&oledDetail);press(1);assert(installs==2);
+ press(1);assert(prepares==2&&oledDetail);press(1);assert(installs==1);
  press(4);assert(oledPage==10);press(2);press(1);assert(catalogChoice==1&&oledPage==11);
- moduleAvailable=true;press(8);candidate=false;press(1);assert(moduleStarts==0&&!oledDetail&&otaEnvironment.empty());press(8);assert(prepares==4&&otaEnvironment=="ps4"&&oledDetail);press(1);assert(installs==3);clearOtaCandidate();press(1);assert(oledDetail&&moduleStarts==0);press(1);assert(moduleStarts==1);
+ moduleAvailable=true;press(8);candidate=false;press(1);assert(moduleStarts==0&&!oledDetail&&otaEnvironment.empty());press(8);assert(prepares==4&&otaEnvironment=="ps4"&&oledDetail);press(1);assert(installs==2);clearOtaCandidate();press(1);assert(oledDetail&&moduleStarts==0);press(1);assert(moduleStarts==1);
  press(4);assert(oledPage==10);press(4);assert(navLevel==0);
  oledMenuChoice=0;press(2);assert(oledMenuChoice==3);press(8);assert(oledMenuChoice==0);
- puts("NAVIGATION_TREE_OK: hierarchy, fixed button roles, expiry and explicit install confirmation");
+ puts("NAVIGATION_TREE_OK: help is inert, module menu requires physical confirmation, buttons preserved");
 }
