@@ -3,7 +3,7 @@
 #include <esp_timer.h>
 // Fixed-size counters; no trace log, NVS write, task creation or network here.
 struct DiagnosticOp { uint32_t calls=0, lastUs=0, maxUs=0, failures=0; uint64_t totalUs=0; };
-enum DiagnosticIndex { DIAG_GIT, DIAG_TB, DIAG_RPC, DIAG_OLED, DIAG_SAMPLE, DIAG_COUNT };
+enum DiagnosticIndex { DIAG_CATALOG, DIAG_A22, DIAG_COMMAND, DIAG_OLED, DIAG_SAMPLE, DIAG_COUNT };
 static DiagnosticOp diagnosticOps[DIAG_COUNT];
 struct DiagnosticMemory { uint32_t free=0, minimum=0, largest=0, psram=0, otaFree=0, at=0; bool ready=false; };
 static DiagnosticMemory diagnosticMemory;
@@ -45,7 +45,7 @@ static String diagnosticText(){String s="DIAG_SCHEMA: 1\n";
   s+="DIAG_OTA_FREE: "+String(diagnosticMemory.otaFree)+"\nDIAG_SAMPLE_AGE: "+String((millis()-diagnosticMemory.at)/1000)+"\n";
   s+="DIAG_FLASH_INIT_US: "+String(diagnosticFlashInitUs)+"\n";
   s+="DIAG_LOOP_MAX_US: "+String(diagnosticLoopMaxUs)+"\n";
-  const char *names[]={"GIT","TB","RPC","OLED","SAMPLE"};
+  const char *names[]={"CATALOG","A22","COMMAND","OLED","SAMPLE"};
   for(uint8_t i=0;i<DIAG_COUNT;++i){s+="DIAG_"+String(names[i])+"_MAX_US: "+String(diagnosticOps[i].maxUs)+"\n";}
   return s;
 }
