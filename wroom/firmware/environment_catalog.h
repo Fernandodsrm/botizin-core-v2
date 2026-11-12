@@ -21,29 +21,35 @@ static bool parseCatalog(const String &body){
  for(int i=0;i<count;++i)environments[i]=pending[i];
  environmentCount=count;catalogChoice=0;return true;
 }
+// Pinned GitHub catalog from wroom/catalog.json (base-040).
+// No unauthenticated LAN catalog update may authorize a new executable image.
 static void loadCatalog(){
- environments[0].id="ps4";environments[0].title="PS4 + servo";
- environments[1].id="servo";environments[1].title="Servo pelos botoes";
- environments[2].id="led";environments[2].title="LED pelos botoes";
- Preferences p;if(p.begin("catalog",true)){String body=p.getString("json","");p.end();if(body.length()<=4096&&parseCatalog(body))catalogStatus="CACHED";}
+  struct Entry {const char *id,*title,*version,*sha,*url; size_t bytes;};
+  static const Entry entries[]={
+    {"ps4","PS4 + servo","0.0.30","225fcc4a132bc8918adb3374b7392e4706c8a6e210b51ee0f1f8a75ff9688c25",
+      "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.30/firmware.bin",761360},
+    {"servo","Servo pelos botoes","0.0.31","2f3c152373c097b93941304cec74f2782efdfb30cee50cf8478102fb1a7d20ff",
+      "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.31/firmware.bin",758992},
+    {"led","LED pelos botoes","0.0.32","a45d4963571d144b0a316e787b7977e3594cd8c0f9907dceefc207e897d7564b",
+      "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.32/firmware.bin",753328},
+    {"a22-expresso","A22 Expresso","0.0.34","ccb52a6ce531775a4d0243d3f02dcb1894583d6dc907c39d124a62e0402fb78a",
+      "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/0.0.34/firmware.bin",1021888},
+  };
+  static_assert(sizeof(entries)/sizeof(entries[0])<=catalogLimit,"catalog overflow");
+  environmentCount=sizeof(entries)/sizeof(entries[0]);
+  for(uint8_t i=0;i<environmentCount;++i){
+    auto &e=environments[i];const auto &x=entries[i];
+    e.id=x.id;e.title=x.title;e.version=x.version;e.sha=x.sha;e.url=x.url;e.bytes=x.bytes;
+  }
+  catalogChoice=0;catalogStatus="CATALOGO_FIXO_GITHUB_040";
 }
 static void checkCatalog(){
- clearOtaCandidate();oledDetail=false;oledPage=10;navLevel=3;oledMenu=false;
- pauseFace();showOtaProgress("CONSULTANDO LISTA");
- if(WiFi.status()!=WL_CONNECTED||time(nullptr)<1700000000){catalogStatus="OFFLINE_CACHE";return;}
- if(ESP.getFreeHeap()<80000){catalogStatus="LOW_MEMORY_CACHE";return;}
- NetworkClientSecure tls;tls.useBuiltinCACertBundle();tls.setHandshakeTimeout(10);
- HTTPClient http;http.setConnectTimeout(10000);http.setTimeout(10000);http.useHTTP10(true);http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
- if(!http.begin(tls,catalogURL)){catalogStatus="BEGIN_FAILED_CACHE";return;}
- http.addHeader("Cache-Control","no-cache");int code=http.GET(),size=http.getSize();
- String body;if(code==200&&size>0&&size<=4096)body=http.getString();http.end();tls.stop();
- if(body.length()!=(size_t)size||body.length()>4096||!parseCatalog(body)){catalogStatus="REJECTED_CACHE";return;}
- Preferences p;bool saved=p.begin("catalog",false);
- if(saved){if(p.getString("json","")!=body)saved=p.putString("json",body)==body.length();p.end();}
- catalogStatus=saved?"READY_CACHED":"READY_CACHE_SAVE_FAILED";
+  // Online catalog updates belong to A22. Only pinned images above can be loaded.
+  clearOtaCandidate();oledDetail=false;oledPage=10;navLevel=3;oledMenu=false;
+  catalogStatus="LISTA_FIXA_040";nextOledRefresh=0;
 }
 static bool prepareEnvironment(const String &id){
- int i=environmentIndex(id);if(i<0||catalogBusy()||moduleStartQueued||!otaReady||internetStopped)return false;
+ int i=environmentIndex(id);if(i<0||catalogBusy()||moduleStartQueued||!otaReady)return false;
  auto &e=environments[i];if(!e.bytes||e.sha.length()!=64||WiFi.status()!=WL_CONNECTED)return false;
  clearOtaCandidate();otaEnvironment=e.id;otaTargetVersion=e.version;otaTargetURL=e.url;otaTargetSHA=e.sha;otaTargetBytes=e.bytes;
  otaCandidateId=telemetryBootId+"-"+String((unsigned long)esp_random(),HEX);otaManualUntil=millis()+300000;manualOtaStatus="ENVIRONMENT_AVAILABLE";pauseFace();nextTelemetry=millis();return true;
