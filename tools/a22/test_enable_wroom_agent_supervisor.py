@@ -18,8 +18,9 @@ def main():
         now=0
         last_state=0
         mcp=True
-        if now-last_state>30:
-            pass
+        while True:
+            if now-last_state>30:
+                pass
 '''
 class PatcherTests(unittest.TestCase):
     def test_idempotence(self):
