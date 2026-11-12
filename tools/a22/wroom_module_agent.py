@@ -8,6 +8,7 @@ exact release image into WROOM's existing local firmware upload endpoint.
 Use --once for a supervised poll, --watch for a low-rate long-running service.
 """
 import argparse
+import fcntl
 import datetime as dt
 import hashlib
 import http.client
@@ -236,6 +237,19 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--watch",action="store_true",help="poll every 5 seconds")
     args=parser.parse_args()
+    # A supervisor restart must not create two competing module uploads.
+    lockpath=Path("/root/botizin-mcp/.wroom-module-agent.lock")
+    lockpath.parent.mkdir(parents=True,exist_ok=True)
+    fd=os.open(lockpath,os.O_CREAT|os.O_RDWR,0o600)
+    try:
+        with os.fdopen(fd,"w") as lock:
+            try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            except BlockingIOError:return
+            return run_authorized_agent(args)
+    except BaseException:
+        raise
+
+def run_authorized_agent(args):
     if args.watch:
         while True:
             try:
