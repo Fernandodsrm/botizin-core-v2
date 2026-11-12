@@ -53,9 +53,9 @@ static void diagnosticPage(){
     oledLine(6,"Margem OTA "+diagnosticBytes(diagnosticMemory.otaFree));
   }else if(navDiagnostic==1){
     oledLine(2,"Pausa max "+diagnosticMs(diagnosticLoopMaxUs));
-    oledLine(3,"Git max "+diagnosticMs(diagnosticOps[DIAG_GIT].maxUs));
-    oledLine(4,"Central A22 "+diagnosticMs(diagnosticOps[DIAG_TB].maxUs));
-    oledLine(5,"Comandos "+diagnosticMs(diagnosticOps[DIAG_RPC].maxUs));
+    oledLine(3,"Git max "+diagnosticMs(diagnosticOps[DIAG_CATALOG].maxUs));
+    oledLine(4,"Central A22 "+diagnosticMs(diagnosticOps[DIAG_A22].maxUs));
+    oledLine(5,"Comandos "+diagnosticMs(diagnosticOps[DIAG_COMMAND].maxUs));
     oledLine(6,"Max desde reinicio");
   }else if(navDiagnostic==2){
     oledLine(2,"Tela max "+diagnosticMs(diagnosticOps[DIAG_OLED].maxUs));
