@@ -7,16 +7,15 @@ on:
       - 'tools/a22/ota_bridge_038_040.py'
       - 'tools/a22/test_ota_bridge_038_040.py'
       - '.github/workflows/wroom-ota-bridge-lab.yml'
-      - 'ci/build_wroom.py'
-      - 'wroom/firmware/**'
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
   offline-migration-and-candidate:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 10
     steps:
       - name: Check out exact isolated candidate
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -26,45 +25,41 @@ jobs:
         run: |
           python3 -m py_compile tools/a22/ota_bridge_038_040.py
           python3 tools/a22/test_ota_bridge_038_040.py
-      - name: Install Arduino CLI 1.5.1
-        uses: arduino/setup-arduino-cli@v2
-        with:
-          version: '1.5.1'
-      - name: Install exact ESP32 core 3.3.12
+      - name: Download exact already-approved 0.0.40 CI artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-      - name: Install pinned OLED libraries
-        run: |
-          arduino-cli lib update-index
-          arduino-cli lib install "Adafruit BusIO@1.17.4" --no-deps
-          arduino-cli lib install "Adafruit GFX Library@1.12.6" --no-deps
-          arduino-cli lib install "Adafruit SSD1306@2.5.17" --no-deps
-      - name: Compile and inspect WROOM 0.0.40 (never deploy)
-        run: python3 ci/build_wroom.py
-      - name: Require immutable laboratory firmware identity
+          set -euo pipefail
+          gh run download 43261030671 \
+            -R "$GITHUB_REPOSITORY" \
+            -n botizin-wroom-2adad3f469c1bb55fa38f292f87b9abc031708a4 \
+            -D dist-wroom
+          test -s dist-wroom/0.0.40/firmware.ino.bin
+          test -s dist-wroom/0.0.40/build-record.json
+      - name: Require exact original laboratory firmware identity
         run: |
           python3 - <<'PY'
           import hashlib,json,pathlib
           root=pathlib.Path("dist-wroom/0.0.40")
           rec=json.loads((root/"build-record.json").read_text())
           data=(root/"firmware.ino.bin").read_bytes()
+          assert rec["source_commit"]=="2adad3f469c1bb55fa38f292f87b9abc031708a4"
           assert rec["version"]=="0.0.40" and rec["published"] is False
           assert rec["credentials_compiled"] is False and rec["partitions_verified"] is True
           assert rec["bytes"]==len(data)==1069744
           assert rec["sha256"]==hashlib.sha256(data).hexdigest()=="1a52d58619bdfa8fb7af505c40fc668dc35f233b184ced58f50be41bbe28ef51"
           assert data[:1]==b"\xe9"
           (root/"firmware.bin").write_bytes(data)
-          print("OTA040_LAB_IDENTITY_VERIFIED, NOT INSTALLED")
+          print("ORIGINAL_OTA040_ARTIFACT_VERIFIED, NOT INSTALLED")
           PY
-      - name: Publish only an isolated prerelease binary, never main manifest
+      - name: Publish only isolated prerelease, never the production main manifest
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           tag="wroom-040-ota-lab-1a52d586"
           if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Prerelease tag already exists: will NOT overwrite asset"
+            echo "Prerelease already exists. Never overwrite the immutable candidate."
             exit 0
           fi
           gh release create "$tag" \
@@ -72,8 +67,8 @@ jobs:
             "dist-wroom/0.0.40/build-record.json#build-record.json" \
             -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
             --title "BOTIZIN WROOM 0.0.40 OTA LAB - not production" \
-            --notes "Laboratory test image pinned by SHA256. Not published to main/wroom/manifest.json. Do not flash until staged 038 bridge and recovery checks are verified."
-      - name: Preserve CI evidence
+            --notes "Exact binary from successful build 43261030671 at source commit 2adad3f. SHA256 1a52d58619bdfa8fb7af505c40fc668dc35f233b184ced58f50be41bbe28ef51. Does not modify main/wroom/manifest.json. Not installed on device."
+      - name: Preserve laboratory CI evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
