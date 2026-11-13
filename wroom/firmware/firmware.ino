@@ -41,6 +41,7 @@ String telemetryStatus = "WAITING";
 String oledStatus = "WAITING";
 uint8_t oledPage = 0;
 bool oledDetail = false, oledMenu = true;
+static bool voiceLabNextBootBaseArmed=false;
 uint8_t oledMenuChoice = 0, oledOtaChoice = 0;
 uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
@@ -172,6 +173,7 @@ String snapshot() {
   s += "VOICE_SYNC_MODE: " + String(voiceSync.mode(millis())) + "\n";
   s += "VOICE_SYNC_AGE_MS: " + String(voiceSync.age(millis())) + "\n";
   s += "VOICE_SYNC_EVENTS: " + String(voiceSync.accepted.load()) + "\n";
+  s += "VOICE_LAB_RETURN_BASE_ARMED: " + String(voiceLabNextBootBaseArmed?"YES":"NO") + "\n";
   s += "ENVIRONMENT_INSTALLED: " + (moduleAvailable?moduleId:String("NONE")) + "\n";
   s += "CATALOG_STATUS: " + catalogStatus + "\n";
   s += "OLED_PAGE: " + String(faceActive.load() ? "BOTIZIN" : oledMenu ? "MENU" : navLevel == 2 ? "DIAGNOSTIC_LIST" : oledPage == 7 ? "DIAGNOSTICS" : oledPage == 8 ? "CONNECTION" : oledPage == 9 ? "CONTROLS" : oledPage == 2 ? "OTA_WROOM" : oledPage==10||oledPage==11 ? "ENVIRONMENTS" : "HELP") + "\n";
@@ -410,6 +412,13 @@ void setup() {
              a->size == 0x140000 && b->size == 0x140000 &&
              data->address == 0xe000 && data->size == 0x2000 && run &&
              (run->address == a->address || run->address == b->address);
+  // Lab test safety: when 0.0.41 runs from OTA1, make the intact
+  // 0.0.40 base in OTA0 the NEXT boot. This never writes either app image.
+  // A normal power-cycle/reset after the pilot therefore returns to app0.
+  if(otaReady && run && run->subtype==ESP_PARTITION_SUBTYPE_APP_OTA_1 && a){
+    voiceLabNextBootBaseArmed=(esp_ota_set_boot_partition(a)==ESP_OK);
+    Serial.println(voiceLabNextBootBaseArmed?"VOICE_LAB_RETURN_BASE_ARMED":"VOICE_LAB_RETURN_BASE_FAILED");
+  }
   initializeDiagnosticFlash();
   sampleDiagnostics();
   Serial.println(snapshot());
