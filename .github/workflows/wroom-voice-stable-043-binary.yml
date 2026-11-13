@@ -24,7 +24,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run download 43483535949 --repo "$GITHUB_REPOSITORY" --name 'botizin-wroom-voice-direct-s3-lab-e5c29981a5b49af613cbf109b9e0bdd8eb6fe022' --dir /tmp/voice-lab-artifact
+          gh run download 43484881807 --repo "$GITHUB_REPOSITORY" --name 'botizin-wroom-voice-direct-s3-lab-62ab9ee23192912f2f094c1a5969225546e97d46' --dir /tmp/voice-lab-artifact
       - name: Verify hardcoded version, SHA and no embedded credentials flag
         run: |
           python3 - <<'PY'
@@ -32,11 +32,11 @@ jobs:
           root=pathlib.Path('/tmp/voice-lab-artifact/0.0.43')
           binary=(root/'firmware.ino.bin').read_bytes()
           record=json.loads((root/'build-record.json').read_text())
-          expected='ddeb66420f3cb85873938db54f885254bcd364d8d5b1a7c70542b1b60ead4b14'
-          assert len(binary)==1104848
+          expected='d462bec420b8ca8c30e9d86be78ad29e8472257c6c62d9c0947037f59650f705'
+          assert len(binary)==1104992
           assert hashlib.sha256(binary).hexdigest()==expected
           assert record['version']=='0.0.43'
-          assert record['source_commit']=='e5c29981a5b49af613cbf109b9e0bdd8eb6fe022'
+          assert record['source_commit']=='62ab9ee23192912f2f094c1a5969225546e97d46'
           assert record['credentials_compiled'] is False and record['partitions_verified'] is True
           assert record['published'] is False
           assert b'BOTIZIN WROOM V' in binary
@@ -45,7 +45,7 @@ jobs:
         run: |
           mkdir -p lab-builds/wroom-voice-stable-043
           cp /tmp/voice-lab-artifact/0.0.43/firmware.ino.bin lab-builds/wroom-voice-stable-043/firmware.bin
-          printf '%s\n' 'ddeb66420f3cb85873938db54f885254bcd364d8d5b1a7c70542b1b60ead4b14' > lab-builds/wroom-voice-stable-043/SHA256.txt
+          printf '%s\n' 'd462bec420b8ca8c30e9d86be78ad29e8472257c6c62d9c0947037f59650f705' > lab-builds/wroom-voice-stable-043/SHA256.txt
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add lab-builds/wroom-voice-stable-043/firmware.bin lab-builds/wroom-voice-stable-043/SHA256.txt
