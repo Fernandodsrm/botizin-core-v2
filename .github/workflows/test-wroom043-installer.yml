@@ -33,3 +33,4 @@ jobs:
           python -m py_compile tools/wroom043/install_stable.py
           python tools/wroom043/test_install_stable.py
           python tools/wroom043/test_stable_boot_static.py
+          python tools/wroom043/test_post_usb_reset_static.py
