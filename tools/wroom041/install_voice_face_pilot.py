@@ -217,7 +217,7 @@ def main():
     if zip_path.suffix.lower()==".bin":
         blob=zip_path.read_bytes()
         if (len(blob)!=EXPECTED_BIN_SIZE or sha(blob)!=EXPECTED_BIN_SHA
-            or not blob.startswith(b"\\xe9")):
+            or not blob.startswith(b"\xe9")):
             stop("Binario nao confere tamanho, assinatura ou SHA256 esperado.")
     else:
         blob=package_from_zip(zip_path)
