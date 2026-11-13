@@ -32,7 +32,7 @@ public:
     // When the bridge disappears, caller passes 0 and original moods resume.
     if(voiceMode>=3 && voiceMode<=6){
       mood=voiceMode==3?0:voiceMode==4?7:voiceMode==5?1:3;
-      tx=voiceMode==5?0:voiceMode==6?int((now/420)%3-1)*256:0;
+      tx=voiceMode==5?0:voiceMode==6?(int((now/420)%3)-1)*256:0;
       ty=voiceMode==5?-2*256:0;
       nextMood=now+800;
       nextLook=now+800;
