@@ -22,7 +22,7 @@ async def check_mcp():
         }
         assert expected.issubset(names), sorted(names)
         r = await c.call_tool("consultar_central_windows", {})
-        assert not r.isError
+        assert not r.is_error
         print("WINDOWS_MCP_REAL_PROTOCOL_OK", sorted(names))
 
 
