@@ -171,7 +171,7 @@ static void faceTask(void *){
         uint32_t now=millis();
         if(!oledPresent()){faceDisplayEnabled.store(false);}
         else{
-          face.draw(oled,now);oled.display();
+          face.draw(oled,now,voiceSync.mode(now));oled.display();
           if(!oledPresent())faceDisplayEnabled.store(false);
           else{
             faceFrames.fetch_add(1);
