@@ -13,7 +13,7 @@ class BotizinFace {
 public:
   explicit BotizinFace(uint32_t seed):rng(seed?seed:1){}
   uint8_t expression() const{return mood;}
-  template<class Canvas> void draw(Canvas &c,uint32_t now){
+  template<class Canvas> void draw(Canvas &c,uint32_t now,uint8_t voiceMode=0){
     if(due(now,nextMood)){
       // Shuffle bag guarantees variety without a predictable repeating sequence.
       if(!bag)bag=255;
@@ -27,6 +27,15 @@ public:
       if(mood==1){tx=0;ty=-2*256;} // A brief attentive glance back to the viewer.
       if(mood==5){tx=-6*256;ty=-3*256;}
       nextLook=now+550+random()%1450;
+    }
+    // Overlay an actual XiaoZhi state while A22 heartbeats are fresh.
+    // When the bridge disappears, caller passes 0 and original moods resume.
+    if(voiceMode>=3 && voiceMode<=6){
+      mood=voiceMode==3?0:voiceMode==4?7:voiceMode==5?1:3;
+      tx=voiceMode==5?0:voiceMode==6?int((now/420)%3-1)*256:0;
+      ty=voiceMode==5?-2*256:0;
+      nextMood=now+800;
+      nextLook=now+800;
     }
     if(!blinking&&due(now,nextBlink)){
       blinking=true;blinkAt=now;blinkKind=mood==6?1:0;
@@ -73,7 +82,11 @@ public:
       }
     }
     // Tiny mouth stays secondary to the eyes and inside the blue band.
-    if(mood==4)c.drawCircle(64+gx/2,60,2,1);
+    if(voiceMode==6){
+      // Simple speech cadence synchronized to the S3 speaking state, not audio PCM.
+      if((now/190)&1)c.fillRoundRect(61,58,7,5,2,1);
+      else c.drawLine(60,60,68,60,1);
+    }else if(mood==4)c.drawCircle(64+gx/2,60,2,1);
     else if(mood==3||mood==6){c.drawLine(59,59,61,61,1);c.drawLine(61,61,67,61,1);c.drawLine(67,61,69,59,1);}
     else c.drawLine(61+gx/2,60,66+gx/2,60,1);
   }
