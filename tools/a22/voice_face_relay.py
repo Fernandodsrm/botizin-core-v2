@@ -29,8 +29,8 @@ def fetch(ip, path, timeout=0.8):
     try:
         conn.request("GET", path)
         response = conn.getresponse()
-        body = response.read(1500)
-        if response.status != 200 or response.length is not None and response.length > 1500:
+        body = response.read(8193)
+        if response.status != 200 or len(body) > 8192:
             raise RuntimeError("Unexpected HTTP status/size")
         return body
     finally:
