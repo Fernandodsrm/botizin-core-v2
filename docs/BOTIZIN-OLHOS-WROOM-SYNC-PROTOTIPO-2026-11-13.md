@@ -19,11 +19,11 @@
 ## Etapas de validação
 1. CI compila WROOM 0.0.41 com ESP32 Arduino 3.3.12, garante binário <= 1.310.720 bytes e tabela de partições **sem mudanças**; testa OLED e conversor A22. Reprovar se qualquer regressão.
 2. Antes de instalar, preservar backup atual da 0.0.40 e confirmar método de inicialização/retorno: **WROOM base está em app0 e módulo em app1**. Não substituir app0 só para fazer a demonstração.
-3. Validar A22 `python3 voice_face_relay.py --once --dry-run`: consulta S3 real sem acionar WROOM. Conferir retorno, IP e identificação.
-4. Só instalar a WROOM se houver decisão explícita, caminho de rollback testado e transição do agente de módulos A22 validada.
-5. Teste físico WROOM: conversação 'ouvindo → falando → ouvindo', captação e reprodução continuam no A35; monitorar FACE_MAX_GAP_MS, DIAG_FREE/MIN e VOICE_SYNC_EVENTS. Tirar a ponte de operação e confirmar fallback em <=4s.
-6. Testar sem regressões menu, OLED, LED GPIO26 com auto-off, módulo OTA manual, boot, WROOM status; monitorar S3 opus/PCM em paralelo.
-7. Depois refinar sincronismo falando pelo áudio *reproduzido no A35* (não somente estado S3) e melhorar animações.
+3. Se for usada a OTA1 para ensaio da LAB .41, conferir \`VOICE_LAB_RETURN_BASE_ARMED: YES\` após o primeiro boot e demonstrar retorno à OTA0 no reinício antes de considerar estável. Não presumir rollback apenas pelo nome do slot; verificar boot efetivo.\n4. Validar A22 `python3 voice_face_relay.py --once --dry-run`: consulta S3 real sem acionar WROOM. Conferir retorno, IP e identificação.
+5. Só instalar a WROOM se houver decisão explícita, caminho de rollback testado e transição do agente de módulos A22 validada.
+6. Teste físico WROOM: conversação 'ouvindo → falando → ouvindo', captação e reprodução continuam no A35; monitorar FACE_MAX_GAP_MS, DIAG_FREE/MIN e VOICE_SYNC_EVENTS. Tirar a ponte de operação e confirmar fallback em <=4s.
+7. Testar sem regressões menu, OLED, LED GPIO26 com auto-off, módulo OTA manual, boot, WROOM status; monitorar S3 opus/PCM em paralelo.
+8. Depois refinar sincronismo falando pelo áudio *reproduzido no A35* (não somente estado S3) e melhorar animações.
 
 ## Limites atuais
 - Implementação apenas de **estado**, sem transcrição da fala no OLED; a transcrição fica na página A35.
