@@ -105,6 +105,12 @@ try {
     Write-Host 'VOZ: mantenha a aba Chrome http://192.168.0.24/botizin'
     Write-Host ('PASTA: '+$root)
     Write-Host 'A35 remoto e plugin ChatGPT na nuvem exigem tunel autenticado adicional.'
+    Write-Host 'Diagnostico dos programas de tunel (sem ler credenciais):'
+    foreach($name in @('tailscale.exe','cloudflared.exe','tunnel-client.exe')){
+        $program=Get-Command $name -ErrorAction SilentlyContinue
+        if($program){Write-Host ('  '+$name+': ENCONTRADO')}
+        else{Write-Host ('  '+$name+': nao esta no PATH')}
+    }
     Write-Host 'WROOM .40 ainda precisa de LAB com receptor para olhos sincronizados.'
 } catch {
     Write-Host ('FALHA SEGURA: '+$_.Exception.Message) -ForegroundColor Red
