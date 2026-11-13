@@ -82,3 +82,17 @@ Interpretação:
 - **A segurança é de melhor esforço, ainda NÃO validada fisicamente neste novo piloto.** Requer WROOM conectada em USB própria, não confundir com S3 COM4; porta esperada da WROOM COM6, pode mudar.
 - Em 13/11/2026, CI de validação do instalador, parser de seletores OTA e compilação nova **aprovada**: https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43387411206. O binário pinado foi validado anteriormente em https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43382742776.
 - **Nenhuma gravação real foi executada pelo assistente; próximo passo depende de o usuário executar o instalador no Windows com WROOM ligada no USB.** A sincronização real depende posteriormente de ativar `tools/a22/voice_face_relay.py` no A22, não vem ativa pelo instalador.
+
+
+## A22 desligado — central temporária notebook (13/11/2026)
+- Proprietário relatou que **Samsung A22 descarregou e desligou**, derrubando túnel/MCP do A22. Nenhum comando de instalação WROOM foi executado antes da descarga.
+- A **S3 LAB 0.0.41** permaneceu operacional no Chrome do notebook em `http://192.168.0.24/botizin`: a captura mostrou estado OUVINDO, microfone e áudio prontos e transcrição em texto. Isso prova operação local sem A22.
+- Preparada central provisória Windows em branch [`lab/windows-hub-a22-offline-20261113`](https://github.com/Fernandodsrm/botizin-core-v2/tree/lab/windows-hub-a22-offline-20261113), commit fixado de CI `ae11adab138a707e7c6facbe7b28b953923a0f73`. Arquivos:
+  - `tools/windows_hub/windows_mcp.py`: MCP SDK v2 em `127.0.0.1:8766/mcp`, separado do MCP anterior 8765; ferramentas `consultar_status_botizin`, `consultar_telemetria_s3`, `consultar_status_wroom`, `controlar_led_wroom` (GPIO26/30s) e `consultar_central_windows`. Somente IPs S3/WROOM fixados na LAN; nunca retorna `activation_code` da S3.
+  - `tools/windows_hub/start_windows_hub.ps1`: cria venv isolada em `%USERPROFILE%\BOTIZIN_WINDOWS_TEMP`, instala dependência MCP na venv, valida Python, inicia só 8766, confere ferramentas de túnel em PATH sem ler credenciais. **Não altera A22, Windows MCP antigo, S3/WROOM, firewall nem abre porta pública**. Necessita execução explícita pelo usuário; não instala autostart.
+  - `tools/windows_hub/stop_windows_hub.ps1`: encerra somente PID verificado do MCP temporário.
+  - `tools/windows_hub/test_protocol.py`: teste local real listando cinco ferramentas e chamando status da central.
+- **CI Windows validou o início/fim do script e protocolo MCP real**: https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43473011197. Isso NÃO comprova conectividade LAN das placas no notebook do usuário, apenas execução do software isolado no runner Windows.
+- **Pendências reais**: plugin ChatGPT original aponta para túnel do A22 e não muda automaticamente para 127.0.0.1:8766; configurar **túnel autenticado** Windows e reconectar plugin, sem expor MCP sem autenticação. MacroDroid/voz ChatGPT no Android não são portáveis para Windows. O acesso A35 remoto requer HTTPS/tailnet e bridge WebSocket; não automatizado.
+- **Olhos físicos**: WROOM segue 0.0.40, não tem `/face/voice` e não mostra estados S3; próximo teste exige firmware WROOM LAB com origem Windows autorizada (o piloto .41 atual aceita IP A22 .14 apenas). Não afirmar sincronia antes de flash e teste físico.
+- **Retorno ao A22**: não copiar segredos nem reinstalar; quando voltar, consultar serviços antigos antes de parar o Windows para não perder acesso.
