@@ -21,7 +21,14 @@ proot-distro login botizin-linux -- sh -c 'python3 -m py_compile /root/botizin-m
 mv "$TEMP" "$STAGE/voice_face_relay.py"
 if [[ "$ACTION" == "preflight" ]]; then
   echo "A22: verifying S3 read-only state path..."
-  proot-distro login botizin-linux -- python3 /root/botizin-mcp/voice_face_relay.py --once --dry-run
+  ok=0
+  for attempt in 1 2 3; do
+    if proot-distro login botizin-linux -- python3 /root/botizin-mcp/voice_face_relay.py --once --dry-run; then
+      ok=1; break
+    fi
+    sleep 2
+  done
+  if [[ "$ok" != 1 ]]; then echo "STOP: A22 nao acessou S3; WROOM nao deve ser gravada" >&2; exit 4; fi
   echo "A22_PREFLIGHT_OK"
   exit 0
 fi
