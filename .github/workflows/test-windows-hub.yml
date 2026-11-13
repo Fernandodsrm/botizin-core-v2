@@ -43,3 +43,4 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check 'mcp>=2,<3'
           python -c 'from mcp.server import MCPServer; print("MCP_SERVER_V2_IMPORT_OK")'
+          python tools/windows_hub/test_protocol.py
