@@ -73,3 +73,12 @@ Interpretação:
 - **CI FINAL PASSOU:** https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43382742776, versão WROOM LAB 0.0.41, `1.071.504 B`, `SHA256 91998bebbf287a590436791234a08cb2b322662c734bb72813881eb9e0b052da`, margem `239.216 B` na partição.
 - **NÃO TESTADO FISICAMENTE:** sincronização A22↔WROOM, retorno app1→app0, segurança do receptor na rede doméstica, compatibilidade operacional com módulos. A22 está rodando software anterior; script novo não foi instalado.
 - Última consulta física WROOM: `BOTIZIN WROOM V0.0.40`, app0, OLED pronto, IP `192.168.0.23`. Preservar base e checar atualização/backup antes de qualquer OTA.
+
+
+## Pronto para instalação USB CONTROLADA da WROOM LAB 0.0.41
+- Fizemos consulta de leitura em 13/11/2026: hardware WROOM **0.0.40, OTA0 app0, boot OTA0, OTA READY, 160588 B livres, OLED READY**, IP 192.168.0.23; A22 MCP/SSH/HTTP disponíveis, supervisor sinaliza S3 offline (monitor legado possivelmente não compatível).
+- **Firmware WROOM LAB 0.0.41** publicado exclusivamente no branch experimental `wroom/voice-face-sync-lab-041`, em `lab-builds/wroom-voice-face-041/firmware.bin`, SHA256 `91998bebbf287a590436791234a08cb2b322662c734bb72813881eb9e0b052da`, tamanho 1.071.504 B. Não é uma release do firmware-base da WROOM.
+- Instalador controlado em `tools/wroom041/install_voice_face_pilot.py` no mesmo branch: aceita binário SHA pinado, verifica status WROOM .40/app0 e MAC 30:76:f5:90:67:e0, salva backup integral local 4MB com SHA, valida mapa partições, grava só OTA1 0x150000 e relê SHA, muda otadata com setor inativo e CRC conforme método IDF, faz boot de teste app1, confirma `VOICE_LAB_RETURN_BASE_ARMED: YES` e tenta reversão app0 se falhar.
+- **A segurança é de melhor esforço, ainda NÃO validada fisicamente neste novo piloto.** Requer WROOM conectada em USB própria, não confundir com S3 COM4; porta esperada da WROOM COM6, pode mudar.
+- Em 13/11/2026, CI de validação do instalador, parser de seletores OTA e compilação nova **aprovada**: https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43387411206. O binário pinado foi validado anteriormente em https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43382742776.
+- **Nenhuma gravação real foi executada pelo assistente; próximo passo depende de o usuário executar o instalador no Windows com WROOM ligada no USB.** A sincronização real depende posteriormente de ativar `tools/a22/voice_face_relay.py` no A22, não vem ativa pelo instalador.
