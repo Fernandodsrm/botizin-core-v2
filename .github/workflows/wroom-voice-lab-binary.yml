@@ -1,0 +1,53 @@
+name: Publish verified WROOM voice-face 041 binary to isolated LAB branch
+
+on:
+  push:
+    branches: ['wroom/voice-face-sync-lab-041']
+    paths:
+      - '.github/workflows/wroom-voice-lab-binary.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout experimental branch only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: wroom/voice-face-sync-lab-041
+          persist-credentials: true
+      - name: Download artifact from previously successful isolated build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 43382742776 --repo "$GITHUB_REPOSITORY" --name 'botizin-wroom-voice-sync-lab-6d77918a31d7723030cca288bf5adfb2f9dd1472' --dir /tmp/voice-lab-artifact
+      - name: Verify hardcoded version, SHA and no embedded credentials flag
+        run: |
+          python3 - <<'PY'
+          import pathlib,hashlib,json
+          root=pathlib.Path('/tmp/voice-lab-artifact/0.0.41')
+          binary=(root/'firmware.ino.bin').read_bytes()
+          record=json.loads((root/'build-record.json').read_text())
+          expected='91998bebbf287a590436791234a08cb2b322662c734bb72813881eb9e0b052da'
+          assert len(binary)==1071504
+          assert hashlib.sha256(binary).hexdigest()==expected
+          assert record['version']=='0.0.41'
+          assert record['source_commit']=='6d77918a31d7723030cca288bf5adfb2f9dd1472'
+          assert record['credentials_compiled'] is False and record['partitions_verified'] is True
+          assert record['published'] is False
+          assert b'BOTIZIN WROOM V' in binary
+          PY
+      - name: Commit trial binary ONLY to lab-builds on experimental branch
+        run: |
+          mkdir -p lab-builds/wroom-voice-face-041
+          cp /tmp/voice-lab-artifact/0.0.41/firmware.ino.bin lab-builds/wroom-voice-face-041/firmware.bin
+          printf '%s\n' '91998bebbf287a590436791234a08cb2b322662c734bb72813881eb9e0b052da' > lab-builds/wroom-voice-face-041/SHA256.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lab-builds/wroom-voice-face-041/firmware.bin lab-builds/wroom-voice-face-041/SHA256.txt
+          git commit -m 'lab(wroom): archive verified OLED voice pilot bin on experiment branch'
+          git push origin HEAD:refs/heads/wroom/voice-face-sync-lab-041
