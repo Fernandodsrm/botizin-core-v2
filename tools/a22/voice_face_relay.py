@@ -59,7 +59,8 @@ def check_wroom(body, ip):
     return (
         text.startswith("BOTIZIN WROOM V0.0.41\n")
         and f"IP: {ip}\n" in text
-        and "RUNNING_PARTITION: app0 / ota_0" in text
+        and ("RUNNING_PARTITION: app0 / ota_0" in text
+             or "RUNNING_PARTITION: app1 / ota_1" in text)
         and "WIFI: OK\n" in text
         and "VOICE_SYNC_MODE:" in text
     )
