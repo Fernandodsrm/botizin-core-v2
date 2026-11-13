@@ -108,7 +108,7 @@ static void refreshOled() {
     oledLine(6,"Voltar: cancelar");
   } else if (oledPage == 2) {
     oledLine(0,"AJUDA BOTIZIN");
-    oledLine(1,"Lab 0.0.42");
+    oledLine(1,"Estavel 0.0.43");
     oledLine(2,"Modulos: menu");
     oledLine(3,"OTA0: BOTIZIN");
     oledLine(4,"OTA1: ambiente");
