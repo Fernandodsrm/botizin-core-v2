@@ -24,14 +24,14 @@ No primeiro boot app1, firmware **arma app0 .40 como proximo boot**, preservando
 Use o commit SHA do branch `wroom/voice-face-stable-043` que contem o pacote verificado:
 
 ```powershell
-$rev = 'REVISAO_CONGELADA'
+$rev = '12a9e9e747d7e590182688877327b85a6a279d54'
 $p = "$env:USERPROFILE\BOTIZIN_WROOM_STABLE_043\instalar-botizin-043.ps1"
 New-Item -ItemType Directory -Path (Split-Path $p) -Force | Out-Null
 Invoke-WebRequest "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/$rev/tools/wroom043/instalar-botizin-043.ps1" -UseBasicParsing -OutFile $p
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -SourceRevision $rev -Port COM6 -Confirm INSTALAR_WROOM_043_OTA1
 ```
 
-Substituir `REVISAO_CONGELADA` pelo commit escolhido no momento do uso; nao usar `main` como origem do binario experimental.
+Substituir `12a9e9e747d7e590182688877327b85a6a279d54` pelo commit escolhido no momento do uso; nao usar `main` como origem do binario experimental.
 
 ## Diferenca entre fisico e remoto
 A WROOM .43 consulta a S3 **diretamente**; nao precisa de A22/notebook para olhos, desde que S3 e Wi-Fi estejam ligados. Audio/transcricao XiaoZhi ainda precisam de microfone e speaker no navegador (hoje notebook). ChatGPT pelo MCP depende do computador rodando `tunnel-client` + `windows_mcp.py`; o codigo Windows no branch `lab/windows-hub-a22-offline-20261113` foi atualizado para reconhecer .43, mas o processo **ja rodando no notebook** ainda requer reinicio controlado para carregar essa alteracao. Nao reiniciar Windows automaticamente como parte do flash.
