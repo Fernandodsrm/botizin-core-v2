@@ -68,7 +68,7 @@ def get_local(ip,path,timeout=3):
 
 def status_wroom(ip):
     code, body=get_local(ip,"/status")
-    if code!=200 or not body.startswith("BOTIZIN WROOM V0.0.40\n"):
+    if code!=200 or not re.match(r"^BOTIZIN WROOM V0\.0\.(?:40|41)\n",body):
         raise RuntimeError("not WROOM base 0.0.40")
     fields=parse_fields(body)
     if fields.get("IP")!=ip or fields.get("WIFI")!="OK" or fields.get("OTA")!="READY":
