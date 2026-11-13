@@ -37,3 +37,11 @@
 - Os arquivos de firmware e a política OTA da WROOM .40 não são alterados automaticamente nesta branch.
 - CI nunca deve publicar release para `main` ou fazer OTA/flash.
 - WROOM app0 .40 e S3 OTA0 CORE .25 permanecem preservados durante o estudo.
+
+## Resultado de compilação final (CI)
+- **Build validado:** https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43382742776
+- **Artifact privado:** `botizin-wroom-voice-sync-lab-6d77918a31d7723030cca288bf5adfb2f9dd1472`, artifact ID `14017088175` (não publicado em releases).
+- **Binário WROOM LAB 0.0.41:** `1.071.504 bytes`; SHA256 `91998bebbf287a590436791234a08cb2b322662c734bb72813881eb9e0b052da`; cabe na OTA de 1.310.720 bytes, margem `239.216` bytes.
+- **Teste automático:** FACE_ENGINE_OK, parser/TTL/rollover, ponte A22, agente de módulos, navegação OLED e validação de tabela de partições passaram; RAM estática da aplicação `53.848` bytes.
+- **NOVO:** quando executado no app1 da WROOM, a LAB arma `esp_ota_set_boot_partition(app0)` e apresenta `VOICE_LAB_RETURN_BASE_ARMED: YES` (se bem-sucedido). Esse comportamento foi compilado, **ainda não foi comprovado fisicamente**. Não declarar retorno garantido sem teste.
+- **Estado físico:** WROOM segue 0.0.40 no app0 conforme MCP de leitura. Nenhuma OTA ou instalação feita.
