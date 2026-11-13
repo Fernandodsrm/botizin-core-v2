@@ -13,6 +13,9 @@ assert 'uint32_t(millis()-voiceStableStartMs)>=60000' in fw
 assert 'faceDisplayEnabled.load() && faceFrames.load()>=100' in fw
 assert 'ESP.getFreeHeap()>90000 && voiceS3HttpOK>=25' in fw
 assert 'uint32_t(millis()-voiceS3LastMs)<=2500' in fw
+assert 'voiceStableConfirmAttempts<3' in fw
+assert 'voiceStableNextConfirmAt=millis()+5000' in fw
+assert 'const esp_partition_t* boot=esp_ota_get_boot_partition()' in fw
 assert 'esp_ota_set_boot_partition(candidate)==ESP_OK' in fw
 assert 'voiceLabNextBootBaseArmed=false;' in fw
 assert 'http://192.168.0.24/status' in p and 'XIAOZHI_REAL' in p
