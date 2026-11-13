@@ -214,7 +214,13 @@ def main():
     zip_path=pathlib.Path(args.package)
     if not zip_path.is_file():
         stop("ZIP nao encontrado.")
-    blob=package_from_zip(zip_path)
+    if zip_path.suffix.lower()==".bin":
+        blob=zip_path.read_bytes()
+        if (len(blob)!=EXPECTED_BIN_SIZE or sha(blob)!=EXPECTED_BIN_SHA
+            or not blob.startswith(b"\\xe9")):
+            stop("Binario nao confere tamanho, assinatura ou SHA256 esperado.")
+    else:
+        blob=package_from_zip(zip_path)
     print("LAB 0.0.41 validada:",len(blob),"bytes",sha(blob))
     check_old_status()
     check_serial(args.port)
