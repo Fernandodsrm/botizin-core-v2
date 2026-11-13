@@ -7,9 +7,10 @@ on:
       - 'wroom/**'
       - 'ci/build_wroom.py'
       - 'tools/wroom041/**'
+      - 'tools/wroom042/**'
       - 'tools/a22/voice_face_relay.py'
       - 'tools/a22/start_voice_face_termux.sh'
-      - '.github/workflows/wroom-voice-direct-s3-lab-041.yml'
+      - '.github/workflows/wroom-voice-direct-s3-lab-042.yml'
   workflow_dispatch:
 
 permissions:
