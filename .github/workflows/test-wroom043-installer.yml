@@ -1,0 +1,35 @@
+name: Test Windows WROOM stable 0.0.43 installer
+
+on:
+  push:
+    branches: ['wroom/voice-face-stable-043']
+    paths:
+      - 'tools/wroom043/**'
+      - '.github/workflows/test-wroom043-installer.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: windows-2025
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Parse PowerShell 5.1 install script without executing
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'tools/wroom043/instalar-botizin-043.ps1').Path,
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_ }; exit 1 }
+          Write-Host 'WROOM043_WINDOWS_PS51_SYNTAX_OK'
+      - name: Offline test OTA selector and health-gate invariants
+        shell: pwsh
+        run: |
+          python -m py_compile tools/wroom043/install_stable.py
+          python tools/wroom043/test_install_stable.py
+          python tools/wroom043/test_stable_boot_static.py
