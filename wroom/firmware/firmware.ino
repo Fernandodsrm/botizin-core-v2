@@ -169,6 +169,9 @@ String snapshot() {
   s += "OLED: " + oledStatus + "\n";
   s += "FACE_FRAMES: " + String(faceFrames.load()) + "\n";
   s += "FACE_MAX_GAP_MS: " + String(faceMaxGapMs.load()) + "\n";
+  s += "VOICE_SYNC_MODE: " + String(voiceSync.mode(millis())) + "\n";
+  s += "VOICE_SYNC_AGE_MS: " + String(voiceSync.age(millis())) + "\n";
+  s += "VOICE_SYNC_EVENTS: " + String(voiceSync.accepted.load()) + "\n";
   s += "ENVIRONMENT_INSTALLED: " + (moduleAvailable?moduleId:String("NONE")) + "\n";
   s += "CATALOG_STATUS: " + catalogStatus + "\n";
   s += "OLED_PAGE: " + String(faceActive.load() ? "BOTIZIN" : oledMenu ? "MENU" : navLevel == 2 ? "DIAGNOSTIC_LIST" : oledPage == 7 ? "DIAGNOSTICS" : oledPage == 8 ? "CONNECTION" : oledPage == 9 ? "CONTROLS" : oledPage == 2 ? "OTA_WROOM" : oledPage==10||oledPage==11 ? "ENVIRONMENTS" : "HELP") + "\n";
@@ -435,6 +438,27 @@ void setup() {
     }
     setRemoteLed(enabled=="1");
     server.send(200,"text/plain",remoteLedOn?"LED_STATE: ON; AUTO_OFF_SECONDS: 30":"LED_STATE: OFF");
+  });
+  // XiaoZhi voice face notifications may originate ONLY from the known local
+  // A22 relay. Presentation-only: no audio, shell, LED, OTA or flash mutation.
+  server.on("/face/voice",HTTP_POST,[](){
+    const IPAddress peer=server.client().remoteIP();
+    const IPAddress a22(192,168,0,14);
+    if(WiFi.status()!=WL_CONNECTED || peer!=a22){
+      server.send(403,"text/plain","A22 relay required");return;
+    }
+    if(uploadActive || uploadOK || rebootScheduled){
+      server.send(409,"text/plain","WROOM busy");return;
+    }
+    const String token=server.arg("state");
+    if(token!="3" && token!="4" && token!="5" && token!="6"){
+      server.send(400,"text/plain","state must be 3,4,5 or 6");return;
+    }
+    const uint8_t mode=static_cast<uint8_t>(token[0]-'0');
+    if(!voiceSync.receive(mode,millis())){
+      server.send(400,"text/plain","invalid mode");return;
+    }
+    server.send(200,"text/plain","VOICE_SYNC_OK");
   });
   server.on("/module/request", HTTP_GET, [](){
     bool ready=modulePushReady && (int32_t)(modulePushUntil-millis())>0 &&
