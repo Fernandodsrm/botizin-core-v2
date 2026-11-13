@@ -94,8 +94,15 @@ def parse_partition_table(backup):
     }
     if any(found.get(key) != value for key,value in expected.items()):
         stop("Tabela de particoes diferente do esperado; OTA1 nao sera tocada.")
-    if b"BOTIZIN WROOM V0.0.40" not in backup[APP0:APP0+APP_SIZE]:
-        stop("Nao encontrei firmware BOTIZIN no backup APP0.")
+    # Arduino stores these as two separate string literals in flash:
+    # "BOTIZIN WROOM V" + BOTIZIN_VERSION ("0.0.40").
+    # Checking a concatenated literal rejects genuine base images.
+    app0_image = backup[APP0:APP0+APP_SIZE]
+    if not (app0_image[:1] == b"\xe9"
+            and b"BOTIZIN WROOM V" in app0_image
+            and b"0.0.40" in app0_image):
+        stop("Imagem APP0 nao corresponde a base WROOM .40 esperada: STOP sem gravar.")
+    print("APP0 verificada: imagem ESP32 + identificador BOTIZIN + versao .40.")
     print("Particoes WROOM verificadas: app0, app1, otadata.")
 
 def package_from_zip(zip_path):
