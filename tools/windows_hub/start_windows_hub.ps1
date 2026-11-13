@@ -51,8 +51,10 @@ try {
     if($LASTEXITCODE -ne 0){throw 'Falha de sintaxe Python'}
 
     Etapa '[3/5] Checando SDK MCP v2'
-    & $python -c "from mcp.server import MCPServer" 2>$null
-    if($LASTEXITCODE -ne 0){
+    # Windows PowerShell 5 throws on native STDERR when ErrorActionPreference=Stop.
+    # Probe package presence without triggering that failure path.
+    $probe=& $python -c "import importlib.util; print('SDK_PRESENT' if importlib.util.find_spec('mcp') else 'SDK_MISSING')"
+    if(($probe -join '') -ne 'SDK_PRESENT'){
         Write-Host 'Instalando dependencias SOMENTE na venv isolada...'
         & $python -m pip --disable-pip-version-check install 'mcp>=2,<3'
         if($LASTEXITCODE -ne 0){throw 'Instalacao do SDK MCP falhou'}
