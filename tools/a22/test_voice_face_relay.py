@@ -17,6 +17,7 @@ class VoiceRelayTest(unittest.TestCase):
         status=b"BOTIZIN WROOM V0.0.41\nIP: 192.168.0.23\nRUNNING_PARTITION: app0 / ota_0 / address=0x00010000\nWIFI: OK\nVOICE_SYNC_MODE: 5\n"
         self.assertTrue(check_wroom(status,"192.168.0.23"))
         self.assertFalse(check_wroom(status.replace(b"0.0.41",b"0.0.40"),"192.168.0.23"))
+        self.assertTrue(check_wroom(status.replace(b"app0 / ota_0",b"app1 / ota_1"),"192.168.0.23"))
         self.assertFalse(check_wroom(status,"192.168.0.66"))
 
     def test_private_addresses(self):
