@@ -8,6 +8,8 @@
 
 **[AUDITORIA TÉCNICA DA WROOM 0.0.38 — tamanho, fontes exatas, SPIFFS e histórico 0–38](docs/AUDITORIA-WROOM-038-HISTORICO-E-OTIMIZACAO-2026-11-11.md)**
 
+**Checkpoint validado em 13/11/2026:** [LAB S3 0.0.41 — voz, transcrição, MCP, áudio e plano dos olhos OLED WROOM](docs/BOTIZIN-CHECKPOINT-VOZ-MCP-OLED-2026-11-13.md). S3 LAB 0.0.41 testada pelo proprietário; WROOM 0.0.40 preservada; próximas verificações incluem perdas PCM e handoff A22.
+
 ## Onde estamos realmente
 - **ESP32-S3:** CORE 0.0.25, OTA/Wi-Fi, comunicação e diagnósticos confirmados. A voz XiaoZhi foi testada pelo proprietário no notebook com LAB; o CORE de produção atual não é a LAB de voz.
 - **ESP32-WROOM:** 0.0.38, OLED com rosto BOTIZIN, menu/catálogo e LED GPIO26 controlado pelo ChatGPT; partições de app apertadas. Ainda não existe launcher enxuto OTA0↔OTA1 consolidado.
