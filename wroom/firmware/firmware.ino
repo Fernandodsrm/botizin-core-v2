@@ -44,7 +44,8 @@ bool oledDetail = false, oledMenu = true;
 static bool voiceLabNextBootBaseArmed=false;
 static bool voiceStableBootConfirmed=false;
 static bool voiceStablePilot=false;
-static uint32_t voiceStableStartMs=0, voiceStableConfirmFails=0;
+static uint32_t voiceStableStartMs=0, voiceStableConfirmFails=0, voiceStableNextConfirmAt=0;
+static uint8_t voiceStableConfirmAttempts=0;
 uint8_t oledMenuChoice = 0, oledOtaChoice = 0;
 uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
@@ -534,16 +535,24 @@ void loop() {
      otaReady && WiFi.status()==WL_CONNECTED && oledReady &&
      faceDisplayEnabled.load() && faceFrames.load()>=100 &&
      ESP.getFreeHeap()>90000 && voiceS3HttpOK>=25 &&
-     voiceS3LastMs && uint32_t(millis()-voiceS3LastMs)<=2500){
+     voiceS3LastMs && uint32_t(millis()-voiceS3LastMs)<=2500 &&
+     voiceStableConfirmAttempts<3 && (int32_t)(millis()-voiceStableNextConfirmAt)>=0){
+    ++voiceStableConfirmAttempts;
+    voiceStableNextConfirmAt=millis()+5000;
     const esp_partition_t* candidate=esp_ota_get_running_partition();
+    bool switched=false;
     if(candidate && candidate->subtype==ESP_PARTITION_SUBTYPE_APP_OTA_1 &&
-       esp_ota_set_boot_partition(candidate)==ESP_OK &&
-       esp_ota_get_boot_partition()->address==candidate->address){
+       esp_ota_set_boot_partition(candidate)==ESP_OK) {
+      const esp_partition_t* boot=esp_ota_get_boot_partition();
+      switched=boot && boot->address==candidate->address;
+    }
+    if(switched){
       voiceStableBootConfirmed=true;
       voiceLabNextBootBaseArmed=false;
       Serial.println("VOICE_STABLE_APP1_CONFIRMED_HEALTHY");
     } else {
       ++voiceStableConfirmFails;
+      Serial.println("VOICE_STABLE_CONFIRM_ATTEMPT_FAILED");
     }
   }
   if(catalogRefreshQueued && !uploadActive && !uploadOK && !rebootScheduled && !otaInstallQueued && !otaCheckQueued){catalogRefreshQueued=false;checkCatalog();discardNavigation();nextOledRefresh=0;nextTelemetry=millis();}
