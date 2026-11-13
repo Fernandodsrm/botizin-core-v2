@@ -19,6 +19,12 @@ int main(){
     BotizinFace face(seed);Canvas c;unsigned moods=0;
     for(uint32_t now=0;now<60000;now+=62){face.draw(c,now);moods|=1u<<face.expression();}
     assert(moods==255&&c.draws>5000);
+    // Voice overlay is deterministic and coexists with the original procedural face.
+    for(uint8_t state:{uint8_t(3),uint8_t(4),uint8_t(5),uint8_t(6)}){
+      for(uint32_t now=61000;now<62000;now+=62)face.draw(c,now,state);
+      assert(face.expression()==(state==3?0:state==4?7:state==5?1:3));
+    }
+    for(uint32_t now=62000;now<80000;now+=62)face.draw(c,now,0);
     // Timer rollover cannot stop or invalidate drawing.
     for(uint32_t step=0;step<10000;step+=62)face.draw(c,uint32_t(0xfffff000u+step));
   }
