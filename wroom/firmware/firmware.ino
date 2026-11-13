@@ -66,6 +66,7 @@ void showOtaProgress(const String &phase, size_t done = 0, size_t total = 0);
 static void discardNavigation();
 #include "navigation_model.h"
 #include "face_state.h"
+#include "voice_poll_s3.h"
 #include "catalog_state.h"
 
 bool manualWindowActive() { return otaManualUntil && (int32_t)(otaManualUntil - millis()) > 0; }
@@ -173,6 +174,9 @@ String snapshot() {
   s += "VOICE_SYNC_MODE: " + String(voiceSync.mode(millis())) + "\n";
   s += "VOICE_SYNC_AGE_MS: " + String(voiceSync.age(millis())) + "\n";
   s += "VOICE_SYNC_EVENTS: " + String(voiceSync.accepted.load()) + "\n";
+  s += "VOICE_S3_POLL_OK: " + String(voiceS3HttpOK) + "\n";
+  s += "VOICE_S3_POLL_FAIL: " + String(voiceS3HttpFail) + "\n";
+  s += "VOICE_S3_AGE_MS: " + String(voiceS3LastMs?uint32_t(millis()-voiceS3LastMs):0) + "\n";
   s += "VOICE_LAB_RETURN_BASE_ARMED: " + String(voiceLabNextBootBaseArmed?"YES":"NO") + "\n";
   s += "ENVIRONMENT_INSTALLED: " + (moduleAvailable?moduleId:String("NONE")) + "\n";
   s += "CATALOG_STATUS: " + catalogStatus + "\n";
@@ -507,6 +511,10 @@ void loop() {
   pollNavigation();
   pollProvisioning(uploadActive || uploadOK || rebootScheduled);
   server.handleClient();
+  // Presentation-only: poll real XiaoZhi state while browser is active.
+  // Guard other synchronous tasks/OTA from this bounded network read.
+  if(!uploadActive && !uploadOK && !rebootScheduled && !otaCheckQueued &&
+     !otaInstallQueued && !catalogRefreshQueued)voicePollS3Status();
   if(catalogRefreshQueued && !uploadActive && !uploadOK && !rebootScheduled && !otaInstallQueued && !otaCheckQueued){catalogRefreshQueued=false;checkCatalog();discardNavigation();nextOledRefresh=0;nextTelemetry=millis();}
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
   if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued) {
