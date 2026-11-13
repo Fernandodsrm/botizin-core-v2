@@ -1,0 +1,40 @@
+name: Test Windows WROOM S3 face pilot installer
+
+on:
+  push:
+    branches: ['wroom/voice-face-direct-s3-042']
+    paths:
+      - 'tools/wroom042/**'
+      - '.github/workflows/test-wroom042-installer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-2025
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11'
+      - name: Parse single-script PowerShell 5.1 installer
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'tools/wroom042/instalar-olhos-wroom.ps1').Path,
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_ }
+            exit 1
+          }
+          Write-Host 'WROOM42_POWERSHELL_SYNTAX_OK'
+      - name: Validate USB pilot OTA selection algorithm offline
+        shell: pwsh
+        run: |
+          python -m py_compile tools/wroom042/install_voice_face_pilot.py
+          python tools/wroom042/test_install_voice_face_pilot.py
+          python tools/wroom042/test_voice_poll_static.py
