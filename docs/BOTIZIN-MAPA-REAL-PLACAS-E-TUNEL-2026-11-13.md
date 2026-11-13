@@ -69,3 +69,10 @@ A **0.0.43 candidata estável** deriva da .42 e mantém os olhos da S3. Em todo 
 3. Escolher central ligada 24h: A22 reparado, notebook sob demanda ou host barato/reciclado. O **túnel não exige notebook**, exige um cliente sempre ativo ao lado do MCP.
 4. Planejar microfone e saída de áudio própria para liberar o notebook, sem comprar hardware antes de validar alternativas.
 5. Só então ações reais por voz entre XiaoZhi e MCP/ChatGPT, com permissões e confirmação de ações físicas.
+
+
+## Preparacao efetiva para estabilizar os olhos (sem gravacao remota)
+- Firmware WROOM **candidata 0.0.43** compilado com SHA256 `d462bec420b8ca8c30e9d86be78ad29e8472257c6c62d9c0947037f59650f705`, 1.104.992 bytes; imagem verificada publicada no branch isolado [wroom/voice-face-stable-043](https://github.com/Fernandodsrm/botizin-core-v2/tree/wroom/voice-face-stable-043), com [README de instalacao](https://github.com/Fernandodsrm/botizin-core-v2/blob/wroom/voice-face-stable-043/tools/wroom043/README.md).
+- CI de compilacao ESP32 3.3.12 [43484881807](https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43484881807), instalador Windows 5.1 + testes OTA [43485352096](https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43485352096) e arquivamento de binario [43485364367](https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43485364367) **aprovados**.
+- Nova protecao da .43: app0 .40 armado primeiro, promocao app1 apenas apos 60s com leitura S3/ OLED/RAM saudaveis, maximo tres tentativas espacadas de 5s; **nao testada fisicamente ainda**. Nenhuma placa foi gravada durante preparacao.
+- O servidor MCP Windows foi preparado em fonte para ler `WROOM V0.0.43` ([branch da central](https://github.com/Fernandodsrm/botizin-core-v2/tree/lab/windows-hub-a22-offline-20261113)); instalacao local e reinicio do processo continuam pendentes. Ultima consulta MCP posteriormente falhou por falta de polling do cliente de tunel; **nao inferir WROOM offline**.
