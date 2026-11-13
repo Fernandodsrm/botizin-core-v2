@@ -40,9 +40,9 @@ try{
  $raw="https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/$SourceRevision"
  Invoke-WebRequest "$raw/lab-builds/wroom-voice-stable-043/firmware.bin" -UseBasicParsing -OutFile $bin -TimeoutSec 90
  Invoke-WebRequest "$raw/tools/wroom043/install_stable.py" -UseBasicParsing -OutFile $installer -TimeoutSec 45
- $expect='ddeb66420f3cb85873938db54f885254bcd364d8d5b1a7c70542b1b60ead4b14'
+ $expect='d462bec420b8ca8c30e9d86be78ad29e8472257c6c62d9c0947037f59650f705'
  if(((Get-FileHash $bin -Algorithm SHA256).Hash.ToLowerInvariant()) -ne $expect -or
-    (Get-Item $bin).Length -ne 1104848){
+    (Get-Item $bin).Length -ne 1104992){
      throw 'Firmware divergiu do SHA pinado. STOP.'
  }
  Write-Host 'Firmware .43: tamanho e SHA256 confirmados' -ForegroundColor Green
