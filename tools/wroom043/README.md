@@ -24,17 +24,23 @@ No primeiro boot app1, firmware **arma app0 .40 como proximo boot**, preservando
 Use o commit SHA do branch `wroom/voice-face-stable-043` que contem o pacote verificado:
 
 ```powershell
-$rev = '12a9e9e747d7e590182688877327b85a6a279d54'
+$rev = 'a557318927f69213a6e7ac6c215f099c8572c352'
 $p = "$env:USERPROFILE\BOTIZIN_WROOM_STABLE_043\instalar-botizin-043.ps1"
 New-Item -ItemType Directory -Path (Split-Path $p) -Force | Out-Null
 Invoke-WebRequest "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/$rev/tools/wroom043/instalar-botizin-043.ps1" -UseBasicParsing -OutFile $p
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File $p -SourceRevision $rev -Port COM6 -Confirm INSTALAR_WROOM_043_OTA1
 ```
 
-Substituir `12a9e9e747d7e590182688877327b85a6a279d54` pelo commit escolhido no momento do uso; nao usar `main` como origem do binario experimental.
+Substituir `a557318927f69213a6e7ac6c215f099c8572c352` pelo commit escolhido no momento do uso; nao usar `main` como origem do binario experimental.
 
 ## Diferenca entre fisico e remoto
 A WROOM .43 consulta a S3 **diretamente**; nao precisa de A22/notebook para olhos, desde que S3 e Wi-Fi estejam ligados. Audio/transcricao XiaoZhi ainda precisam de microfone e speaker no navegador (hoje notebook). ChatGPT pelo MCP depende do computador rodando `tunnel-client` + `windows_mcp.py`; o codigo Windows no branch `lab/windows-hub-a22-offline-20261113` foi atualizado para reconhecer .43, mas o processo **ja rodando no notebook** ainda requer reinicio controlado para carregar essa alteracao. Nao reiniciar Windows automaticamente como parte do flash.
 
 ## Decisao arquitetural pendente
 Este pacote mantem app0 .40 de seguranca e app1 .43 de rosto, portanto **reserva a OTA1** e impede carregar um modulo diferente em paralelo nessa mesma WROOM. A consolidacao final como firmware-base OTA0 exige projeto e autorizacao separados.
+
+
+## Correcao de auditoria APP0 (13/11/2026)
+No primeiro ensaio da .43, o instalador salvou corretamente um backup de **4.194.304 bytes**, mas parou antes de gravar APP1 com `STOP SEM CONTINUAR: Nao encontrei firmware BOTIZIN no backup APP0`. A placa foi verificada pelo usuario em WROOM **0.0.40 OTA0**, sem instaladores em execucao. **A causa foi um falso negativo no validador**: o firmware Arduino monta a identidade dinamicamente como `"BOTIZIN WROOM V" + BOTIZIN_VERSION`; a imagem nao contem necessariamente o texto todo `"BOTIZIN WROOM V0.0.40"` contiguo.
+
+A revisao `a557318927f69213a6e7ac6c215f099c8572c352` corrige a checagem para exigir simultaneamente o byte-magic de imagem ESP32 `0xE9`, `"BOTIZIN WROOM V"` e `"0.0.40"`, dentro do **APP0** e com particoes intactas. A regressao simula explicitamente esses literais separados e rejeita imagem sem cabecalho/versao incorreta. O [CI Windows da correcao](https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43510852489) passou. **Nenhuma imagem APP0 ou APP1 foi gravada no ensaio que falhou; um novo ensaio e necessario para validar a 0.0.43 fisicamente.**
