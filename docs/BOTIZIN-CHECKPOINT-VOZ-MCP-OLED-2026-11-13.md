@@ -41,3 +41,27 @@
 - `Fernandodsrm/botizin-core` branch `lab/s3-voice-transcript-mcp-041`: `research/xiaozhi-028aba2/upstream/main/application.cc`, `boards/botizin-web-s3/{web_audio_server.cc,web_audio_codec.h,web_panel.h,phone_bridge.h,lab_return_025.cc,botizin_web_board.cc}`.
 - CI concluída com sucesso: https://github.com/Fernandodsrm/botizin-core/actions/runs/43373020129.
 - Contexto anterior no projeto central: `docs/BOTIZIN-CHECKPOINT-XIAOZHI-S3-WROOM-2026-11-12.md`.
+
+## Medição de áudio da LAB 0.0.41 — 13/11/2026
+
+**Fonte:** console PowerShell enviada pelo proprietário após coleta de duas leituras de `/lab/telemetry`. Leitura inicial `uptime_ms=1529457`; leitura final `uptime_ms=1588187`; intervalo **58,73 segundos**, sem reinicialização observada.
+
+| Métrica | Delta |
+|---|---:|
+| `speaker_pcm_queued_samples` | +495.360 |
+| `speaker_pcm_dropped_samples` | **+0** |
+| `speaker_popped_samples` | +499.200 |
+| `mic_browser_rejected` | **+0** |
+| `mic_codec_reads_failed` | +2.670 |
+| `ws_rx_errors` | **+0** |
+| `ws_tx_errors` | **+0** |
+| `backend_opus_rx_frames` | +345 |
+| `backend_opus_rx_accepted` | +344 |
+
+Interpretação:
+- A grande contagem acumulada `speaker_pcm_dropped_samples=809472` **não aumentou** durante a janela. Não há evidência de perda de amostras na FIFO de saída durante esta medição, apesar de perdas anteriores. Não afirmar que o defeito original foi permanentemente corrigido.
+- WebSocket sem novos erros no intervalo. Houve **1 frame Opus não aceito entre 345** (aprox. 0,29%), o que não prova por si só erro do decodificador ou corrupção de pacote.
+- `mic_codec_reads_failed` cresceu 2670; `Read()` no codec falha quando a FIFO do microfone não fornece quadro inteiro após tentativas limitadas. Averiguar se isso acontece nos momentos de escuta ou apenas enquanto a captura está pausada e o backend mudou de estado; não tratar o número cru como taxa de perda de rede.
+- A leitura final mostrou `state=3`, `ws_fd=-1`, `cmd_stop` 3→4 e `ws_open_count` permaneceu 9. Pode ser término normal da sessão; sem relato do instante não classificar como travamento.
+- O terminal apresentou erros adicionais porque o usuário aparentemente colou novamente texto que continha `PS C:\Users\ferna>` e prompts `>>`; esses são erros de digitação/colagem do PowerShell e **não evidenciam problema do firmware nem exigem regravação**.
+- Próxima decisão: preservar LAB 0.0.41 e WROOM 0.0.40, fazer comparação em mais um teste concentrado no estado OUVINDO se a gagueira persistir, priorizar sincronização de expressão OLED após estabilidade, sem remapear áudio nem repetir testes desnecessários.
