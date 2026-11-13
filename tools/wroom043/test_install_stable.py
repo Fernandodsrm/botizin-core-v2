@@ -46,8 +46,20 @@ class TestSelector(unittest.TestCase):
         image=bytearray(b"\xff"*0x400000)
         for i,(t,s,off,size) in enumerate(((0,16,APP0,APP_SIZE),(0,17,APP1,APP_SIZE),(1,0,0xe000,0x2000))):
             struct.pack_into("<HBBII",image,0x8000+i*32,0x50aa,t,s,off,size)
-        image[APP0:APP0+24]=b"BOTIZIN WROOM V0.0.40"
+        # Real Arduino firmware stores the prefix and version SEPARATELY;
+        # the status concatenates them at runtime, never in a binary literal.
+        image[APP0]=0xe9
+        image[APP0+0x40:APP0+0x40+len(b"BOTIZIN WROOM V")]=b"BOTIZIN WROOM V"
+        image[APP0+0x90:APP0+0x90+len(b"0.0.40")]=b"0.0.40"
         parse_partition_table(bytes(image))
+        bad_magic=bytearray(image)
+        bad_magic[APP0]=0xff
+        with self.assertRaises(SystemExit):
+            parse_partition_table(bytes(bad_magic))
+        bad_version=bytearray(image)
+        bad_version[APP0+0x90:APP0+0x96]=b"0.0.41"
+        with self.assertRaises(SystemExit):
+            parse_partition_table(bytes(bad_version))
         struct.pack_into("<I",image,0x8000+32+4,0x160000)
         with self.assertRaises(SystemExit):
             parse_partition_table(bytes(image))
