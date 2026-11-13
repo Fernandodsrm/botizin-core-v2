@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstdio>
+#include <initializer_list>
 #include "../firmware/face_engine.h"
 struct Canvas {
   unsigned draws=0;
