@@ -18,7 +18,7 @@ WROOM = "192.168.0.23"
 LOCAL_PORT = 8766
 TRUSTED_LAN = ipaddress.ip_network("192.168.0.0/24")
 NO_PROXY = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-WROOM_VERSIONS = ("0.0.40", "0.0.41", "0.0.42")
+WROOM_VERSIONS = ("0.0.40", "0.0.41", "0.0.42", "0.0.43")
 
 
 def http_get(url: str, size: int = 13000, timeout: float = 4) -> bytes:
@@ -62,6 +62,9 @@ def wroom_fields(s: str) -> dict[str, str]:
         "DIAG_MIN", "DIAG_OTA_FREE", "VOICE_SYNC_MODE",
         "VOICE_SYNC_EVENTS", "VOICE_SYNC_AGE_MS", "VOICE_LAB_RETURN_BASE_ARMED",
         "RESET_REASON", "UPTIME_SECONDS", "OTA",
+        "VOICE_STABLE_BOOT", "VOICE_STABLE_CONFIRM_FAILS",
+        "VOICE_STABLE_RECOVERY_BASE", "VOICE_S3_POLL_OK",
+        "VOICE_S3_POLL_FAIL", "VOICE_S3_AGE_MS",
     }
     result: dict[str, str] = {}
     for line in s.splitlines():
@@ -151,7 +154,7 @@ def consultar_central_windows() -> dict:
             "porta_local": LOCAL_PORT, "bind": "127.0.0.1",
             "s3_ip": S3, "wroom_ip": WROOM,
             "a22": "OFFLINE_NAO_ALTERADO",
-            "tunnel_externo": "NAO_CONFIGURADO",
+            "tunnel_externo": "VERIFICAR_NO_CLIENTE",
             "controle_fisico": "LED_WROOM_SE_AUTORIZADO"}
 
 
