@@ -68,27 +68,40 @@ try{
      throw 'MAC/flash da COM nao bate com WROOM; STOP sem gravar'
  }
  Write-Host 'MAC 30:76:f5:90:67:e0, flash 4MB' -ForegroundColor Green
- if($pilot){
-   Log 'RETORNANDO PILOTO .42 A BASE .40 POR RESET USB'
-   $confirmBase=$false
-   for($i=0;$i -lt 18;$i++){
-     try{
-       $current=Wroom
-       if($current.StartsWith(('BOTIZIN WROOM V0.0.40'+[char]10)) -and
-          $current -match 'RUNNING_PARTITION: app0 / ota_0' -and
-          $current -match 'BOOT_PARTITION: app0 / ota_0'){
-          $confirmBase=$true;break
-       }
-     } catch{}
-     Start-Sleep -Seconds 2
+ # esptool flash-id causes a HARD RESET even on the already-running .40.
+ # Its Wi-Fi association and HTTP server take time to restart. Never assume
+ # a one-shot /status request will succeed immediately after the USB probe.
+ Log 'ESPERANDO WROOM VOLTAR AO WIFI APOS RESET USB'
+ $baseStatus=$null
+ $baseDeadline=[DateTime]::UtcNow.AddSeconds(110)
+ $wifiAttempt=0
+ while([DateTime]::UtcNow -lt $baseDeadline){
+   ++$wifiAttempt
+   try{
+     $candidate=Wroom
+     if($candidate.StartsWith(('BOTIZIN WROOM V0.0.40'+[char]10)) -and
+        $candidate -match 'RUNNING_PARTITION: app0 / ota_0' -and
+        $candidate -match 'BOOT_PARTITION: app0 / ota_0' -and
+        $candidate -match 'OTA: READY'){
+       $baseStatus=$candidate
+       break
+     }
+     # A responding but unexpected firmware must NOT be silently accepted.
+     if($candidate -match '^BOTIZIN WROOM V'){
+       throw 'Identidade inesperada depois do reset USB.'
+     }
+   } catch {
+     if($_.Exception.Message -eq 'Identidade inesperada depois do reset USB.'){
+       throw
+     }
+     if(($wifiAttempt % 4) -eq 0){
+       Write-Host ('Aguardando a WROOM religar Wi-Fi/HTTP, tentativa '+$wifiAttempt) -ForegroundColor Yellow
+     }
    }
-   if(!$confirmBase){throw 'Nao confirmei base .40 apos reset; NADA gravado'}
+   Start-Sleep -Seconds 3
  }
- $baseStatus=Wroom
- if(!$baseStatus.StartsWith(('BOTIZIN WROOM V0.0.40'+[char]10)) -or
-    $baseStatus -notmatch 'RUNNING_PARTITION: app0 / ota_0'){
-    throw 'Base OTA0 nao conferiu. STOP'
- }
+ if(!$baseStatus){throw 'A WROOM nao retornou online como BASE .40/OTA0 apos reset. NADA gravado. Verifique /status e alimentacao.'}
+ Write-Host 'WROOM .40 voltou do reset USB, OTA0 e HTTP CONFIRMADOS' -ForegroundColor Green
 
  Log '[5/7] BACKUP INTEGRAL + GRAVACAO APENAS APP1'
  Write-Host 'Nao desconecte o cabo USB enquanto o instalador estiver gravando' -ForegroundColor Yellow
