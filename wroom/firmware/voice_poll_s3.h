@@ -46,12 +46,13 @@ static void voicePollS3Status() {
     ++voiceS3HttpFail;
     return;
   }
+  // GET only; no headers/tokens or data leaving the home LAN.
   http.addHeader("Connection","close");
   const int status=http.GET();
   if(status==200) {
     // S3 /status returns <640 bytes. Bound parsing and reject unrelated JSON.
     const int n=http.getSize();
-    if(n<0 || n>1200) {
+    if(n>1200) {
       ++voiceS3HttpFail;
     } else {
       String response=http.getString();
