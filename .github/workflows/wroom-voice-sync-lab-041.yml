@@ -6,6 +6,8 @@ on:
     paths:
       - 'wroom/**'
       - 'ci/build_wroom.py'
+      - 'tools/wroom041/**'
+      - 'tools/a22/voice_face_relay.py'
       - '.github/workflows/wroom-voice-sync-lab-041.yml'
   workflow_dispatch:
 
