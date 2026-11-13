@@ -13,7 +13,7 @@ def main():
     cores = json.loads(subprocess.check_output(["arduino-cli","core","list","--format","json"],text=True))
     assert any(p.get("id")=="esp32:esp32" and p.get("installed_version")=="3.3.12" for p in cores["platforms"])
     subprocess.run(["arduino-cli","board","details","--fqbn",FQBN],check=True)
-    for version in ("0.0.40",):
+    for version in ("0.0.41",):
         source = ROOT / "wroom-build" / "firmware"; source.parent.mkdir(exist_ok=True)
         shutil.copytree(original,source,dirs_exist_ok=True)
         (source/"version.h").write_text('#pragma once\n#define BOTIZIN_VERSION "'+version+'"\n')
@@ -42,7 +42,7 @@ def main():
         assert boot_app0.stat().st_size == 8192
         shutil.copy2(boot_app0,target/"boot_app0.bin")
         sha=hashlib.sha256(binary).hexdigest()
-        manifest={"board":"esp32-wroom-4mb","version":version,"size":len(binary),"sha256":sha,"url":"https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/wroom/releases/"+version+"/firmware.bin"}
+        manifest={"board":"esp32-wroom-4mb","version":version,"size":len(binary),"sha256":sha,"url":None}
         (target/"manifest.json").write_text(json.dumps(manifest,indent=2)+"\n")
         record={"version":version,"bytes":len(binary),"sha256":sha,"fqbn":FQBN,"source_commit":os.environ.get("GITHUB_SHA"),"published":False,"credentials_compiled":False,"partitions_verified":True}
         (target/"build-record.json").write_text(json.dumps(record,indent=2)+"\n")
