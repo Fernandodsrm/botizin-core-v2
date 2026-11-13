@@ -1,6 +1,8 @@
 #pragma once
 #include <atomic>
 #include <stdint.h>
+#include "voice_sync_state.h"
+static BotizinVoiceSync voiceSync;
 // Shared mode/counters only. The renderer never reads network Strings or OTA flags.
 static std::atomic<bool> faceActive{true};
 static std::atomic<bool> faceDisplayEnabled{false};
