@@ -42,6 +42,9 @@ String oledStatus = "WAITING";
 uint8_t oledPage = 0;
 bool oledDetail = false, oledMenu = true;
 static bool voiceLabNextBootBaseArmed=false;
+static bool voiceStableBootConfirmed=false;
+static bool voiceStablePilot=false;
+static uint32_t voiceStableStartMs=0, voiceStableConfirmFails=0;
 uint8_t oledMenuChoice = 0, oledOtaChoice = 0;
 uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
@@ -178,6 +181,9 @@ String snapshot() {
   s += "VOICE_S3_POLL_FAIL: " + String(voiceS3HttpFail) + "\n";
   s += "VOICE_S3_AGE_MS: " + String(voiceS3LastMs?uint32_t(millis()-voiceS3LastMs):0) + "\n";
   s += "VOICE_LAB_RETURN_BASE_ARMED: " + String(voiceLabNextBootBaseArmed?"YES":"NO") + "\n";
+  s += "VOICE_STABLE_BOOT: " + String(voiceStableBootConfirmed?"CONFIRMED_APP1":voiceStablePilot?"WAIT_HEALTH_APP0_ARMED":"NOT_APP1") + "\n";
+  s += "VOICE_STABLE_CONFIRM_FAILS: " + String(voiceStableConfirmFails) + "\n";
+  s += "VOICE_STABLE_RECOVERY_BASE: " + String(voiceStablePilot?"APP0_INTACT":"APP0_ACTIVE") + "\n";
   s += "ENVIRONMENT_INSTALLED: " + (moduleAvailable?moduleId:String("NONE")) + "\n";
   s += "CATALOG_STATUS: " + catalogStatus + "\n";
   s += "OLED_PAGE: " + String(faceActive.load() ? "BOTIZIN" : oledMenu ? "MENU" : navLevel == 2 ? "DIAGNOSTIC_LIST" : oledPage == 7 ? "DIAGNOSTICS" : oledPage == 8 ? "CONNECTION" : oledPage == 9 ? "CONTROLS" : oledPage == 2 ? "OTA_WROOM" : oledPage==10||oledPage==11 ? "ENVIRONMENTS" : "HELP") + "\n";
@@ -416,12 +422,14 @@ void setup() {
              a->size == 0x140000 && b->size == 0x140000 &&
              data->address == 0xe000 && data->size == 0x2000 && run &&
              (run->address == a->address || run->address == b->address);
-  // Lab test safety: when 0.0.41 runs from OTA1, make the intact
-  // 0.0.40 base in OTA0 the NEXT boot. This never writes either app image.
-  // A normal power-cycle/reset after the pilot therefore returns to app0.
+  // Stable candidate runs ONLY from app1. Arm the untouched app0 base first:
+  // a reset BEFORE the health window falls back to 0.0.40.
+  // Re-arm on EVERY boot; a successful live health test later reselects app1.
   if(otaReady && run && run->subtype==ESP_PARTITION_SUBTYPE_APP_OTA_1 && a){
+    voiceStablePilot=true;
+    voiceStableStartMs=millis();
     voiceLabNextBootBaseArmed=(esp_ota_set_boot_partition(a)==ESP_OK);
-    Serial.println(voiceLabNextBootBaseArmed?"VOICE_LAB_RETURN_BASE_ARMED":"VOICE_LAB_RETURN_BASE_FAILED");
+    Serial.println(voiceLabNextBootBaseArmed?"VOICE_STABLE_APP0_RECOVERY_ARMED":"VOICE_STABLE_APP0_RECOVERY_FAILED");
   }
   initializeDiagnosticFlash();
   sampleDiagnostics();
@@ -515,6 +523,29 @@ void loop() {
   // Guard other synchronous tasks/OTA from this bounded network read.
   if(!uploadActive && !uploadOK && !rebootScheduled && !otaCheckQueued &&
      !otaInstallQueued && !catalogRefreshQueued)voicePollS3Status();
+
+  // Promote only a physically running, healthy app1 after a full minute.
+  // Updating the OTA selector NEVER writes over the app0 base image.
+  // If OLED, RAM, WiFi or S3 are unhealthy, keep app0 selected for fallback.
+  if(voiceStablePilot && !voiceStableBootConfirmed && voiceLabNextBootBaseArmed &&
+     uint32_t(millis()-voiceStableStartMs)>=60000 &&
+     !uploadActive && !uploadOK && !rebootScheduled && !otaCheckQueued &&
+     !otaInstallQueued && !moduleStartQueued && !catalogRefreshQueued &&
+     otaReady && WiFi.status()==WL_CONNECTED && oledReady &&
+     faceDisplayEnabled.load() && faceFrames.load()>=100 &&
+     ESP.getFreeHeap()>90000 && voiceS3HttpOK>=25 &&
+     voiceS3LastMs && uint32_t(millis()-voiceS3LastMs)<=2500){
+    const esp_partition_t* candidate=esp_ota_get_running_partition();
+    if(candidate && candidate->subtype==ESP_PARTITION_SUBTYPE_APP_OTA_1 &&
+       esp_ota_set_boot_partition(candidate)==ESP_OK &&
+       esp_ota_get_boot_partition()->address==candidate->address){
+      voiceStableBootConfirmed=true;
+      voiceLabNextBootBaseArmed=false;
+      Serial.println("VOICE_STABLE_APP1_CONFIRMED_HEALTHY");
+    } else {
+      ++voiceStableConfirmFails;
+    }
+  }
   if(catalogRefreshQueued && !uploadActive && !uploadOK && !rebootScheduled && !otaInstallQueued && !otaCheckQueued){catalogRefreshQueued=false;checkCatalog();discardNavigation();nextOledRefresh=0;nextTelemetry=millis();}
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
   if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued) {
