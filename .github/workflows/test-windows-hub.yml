@@ -32,6 +32,15 @@ jobs:
               $errors | ForEach-Object { Write-Error $_ }
               exit 1
           }
+          $stopTokens = $null
+          $stopErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path 'tools/windows_hub/stop_windows_hub.ps1').Path,
+              [ref]$stopTokens,[ref]$stopErrors) | Out-Null
+          if ($stopErrors.Count -gt 0) {
+              $stopErrors | ForEach-Object { Write-Error $_ }
+              exit 1
+          }
           Write-Host 'WINDOWS_POWERSHELL_SYNTAX_OK'
       - name: Python restricted HTTP handlers and identity test
         shell: pwsh
@@ -44,3 +53,10 @@ jobs:
           python -m pip install --disable-pip-version-check 'mcp>=2,<3'
           python -c 'from mcp.server import MCPServer; print("MCP_SERVER_V2_IMPORT_OK")'
           python tools/windows_hub/test_protocol.py
+      - name: Start and stop the isolated Windows hub by its own PowerShell launcher
+        shell: powershell
+        run: |
+          & .\tools\windows_hub\start_windows_hub.ps1 -SourceRevision $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & .\tools\windows_hub\stop_windows_hub.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
