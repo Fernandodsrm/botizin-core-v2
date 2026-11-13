@@ -2,7 +2,7 @@ name: Publish verified WROOM voice-face 042 binary to isolated LAB branch
 
 on:
   push:
-    branches: ['wroom/voice-face-sync-lab-042']
+    branches: ['wroom/voice-face-direct-s3-042']
     paths:
       - '.github/workflows/wroom-voice-direct-s3-lab-binary.yml'
 
@@ -18,7 +18,7 @@ jobs:
       - name: Checkout experimental branch only
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: wroom/voice-face-sync-lab-042
+          ref: wroom/voice-face-direct-s3-042
           persist-credentials: true
       - name: Download artifact from previously successful isolated build
         env:
@@ -50,4 +50,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add lab-builds/wroom-voice-face-042/firmware.bin lab-builds/wroom-voice-face-042/SHA256.txt
           git commit -m 'lab(wroom): archive verified OLED voice pilot bin on experiment branch'
-          git push origin HEAD:refs/heads/wroom/voice-face-sync-lab-042
+          git push origin HEAD:refs/heads/wroom/voice-face-direct-s3-042
