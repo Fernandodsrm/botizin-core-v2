@@ -8,6 +8,7 @@ on:
       - 'ci/build_wroom.py'
       - 'tools/wroom041/**'
       - 'tools/a22/voice_face_relay.py'
+      - 'tools/a22/start_voice_face_termux.sh'
       - '.github/workflows/wroom-voice-sync-lab-041.yml'
   workflow_dispatch:
 
@@ -67,6 +68,7 @@ jobs:
           /tmp/voice-sync-test
           python3 tools/a22/test_voice_face_relay.py
           python3 -m py_compile tools/a22/voice_face_relay.py
+          bash -n tools/a22/start_voice_face_termux.sh
           python3 -m py_compile tools/wroom041/install_voice_face_pilot.py
           python3 tools/wroom041/test_install_voice_face_pilot.py
       - name: Compile and validate firmware package
