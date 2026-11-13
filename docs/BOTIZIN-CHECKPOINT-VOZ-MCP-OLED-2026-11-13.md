@@ -65,3 +65,11 @@ Interpretação:
 - A leitura final mostrou `state=3`, `ws_fd=-1`, `cmd_stop` 3→4 e `ws_open_count` permaneceu 9. Pode ser término normal da sessão; sem relato do instante não classificar como travamento.
 - O terminal apresentou erros adicionais porque o usuário aparentemente colou novamente texto que continha `PS C:\Users\ferna>` e prompts `>>`; esses são erros de digitação/colagem do PowerShell e **não evidenciam problema do firmware nem exigem regravação**.
 - Próxima decisão: preservar LAB 0.0.41 e WROOM 0.0.40, fazer comparação em mais um teste concentrado no estado OUVINDO se a gagueira persistir, priorizar sincronização de expressão OLED após estabilidade, sem remapear áudio nem repetir testes desnecessários.
+
+## Continuação — protótipo olhos WROOM S3/A22 de 13/11/2026
+- Branch isolado público: `wroom/voice-face-sync-lab-041`, [documento técnico](https://github.com/Fernandodsrm/botizin-core-v2/blob/wroom/voice-face-sync-lab-041/docs/BOTIZIN-OLHOS-WROOM-SYNC-PROTOTIPO-2026-11-13.md). Não unido à `main`, não publicado como release.
+- Implementado na **fonte**: `POST /face/voice?state=3|4|5|6` restrito a IP A22 de laboratório (192.168.0.14), estado atômico com TTL 4s, animação OLED em cima do `BotizinFace`, retorno a comportamento procedural quando não há sinais; script A22 `tools/a22/voice_face_relay.py` com consulta S3 e heartbeat de estado.
+- Segurança de teste: se WROOM LAB .41 for executada de app1, arma app0 para o próximo boot (validado apenas em compilação); S3 continua sem alterações.
+- **CI FINAL PASSOU:** https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43382742776, versão WROOM LAB 0.0.41, `1.071.504 B`, `SHA256 91998bebbf287a590436791234a08cb2b322662c734bb72813881eb9e0b052da`, margem `239.216 B` na partição.
+- **NÃO TESTADO FISICAMENTE:** sincronização A22↔WROOM, retorno app1→app0, segurança do receptor na rede doméstica, compatibilidade operacional com módulos. A22 está rodando software anterior; script novo não foi instalado.
+- Última consulta física WROOM: `BOTIZIN WROOM V0.0.40`, app0, OLED pronto, IP `192.168.0.23`. Preservar base e checar atualização/backup antes de qualquer OTA.
