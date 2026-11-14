@@ -36,6 +36,16 @@ class TestSelector(unittest.TestCase):
         self.assertEqual(ota_entries(pilot)[0],(1,2,True))
         self.assertEqual(ota_entries(pilot)[1],(2,2,True))
 
+    def test_boot_health_wait_accepts_two_states(self):
+        import inspect
+        from install_stable import wait_for_lab
+        src=inspect.getsource(wait_for_lab)
+        self.assertIn('seconds=110',src)
+        self.assertIn('VOICE_STABLE_BOOT: CONFIRMED_APP1',src)
+        self.assertIn('VOICE_LAB_RETURN_BASE_ARMED: YES',src)
+        self.assertIn('BOOT_PARTITION: app1 / ota_1',src)
+        self.assertIn('BOOT_PARTITION: app0 / ota_0',src)
+
     def test_bad_metadata(self):
         with self.assertRaises(SystemExit):
             patch_ota(b"garbage",1)
