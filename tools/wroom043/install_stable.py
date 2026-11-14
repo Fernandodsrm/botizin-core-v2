@@ -181,19 +181,26 @@ def do_switch(port, output_dir, target):
     # write-flash verifies its own hash and hard-resets the chip.
     return seq
 
-def wait_for_lab(seconds=35):
+def wait_for_lab(seconds=110):
+    # The ESP32 reconnects Wi-Fi after each esptool hard reset. The initial
+    # health gate arms APP0 and subsequently promotes APP1 after 60 seconds.
+    # Accept either valid intermediate state, never confuse health promotion
+    # with a failed trial and unnecessarily roll back a working device.
     until=time.monotonic()+seconds
     while time.monotonic()<until:
         try:
-            s=status(timeout=2)
-            if (s.startswith("BOTIZIN WROOM V0.0.43\n")
-                and "RUNNING_PARTITION: app1 / ota_1" in s
-                and "VOICE_LAB_RETURN_BASE_ARMED: YES" in s
-                and "VOICE_SYNC_EVENTS:" in s):
+            s=status(timeout=3)
+            is43=s.startswith("BOTIZIN WROOM V0.0.43\n")
+            running="RUNNING_PARTITION: app1 / ota_1" in s
+            safe=(("BOOT_PARTITION: app0 / ota_0" in s
+                    and "VOICE_LAB_RETURN_BASE_ARMED: YES" in s)
+                  or ("BOOT_PARTITION: app1 / ota_1" in s
+                      and "VOICE_STABLE_BOOT: CONFIRMED_APP1" in s))
+            if is43 and running and safe and "VOICE_SYNC_EVENTS:" in s:
                 return s
         except Exception:
             pass
-        time.sleep(2)
+        time.sleep(3)
     return None
 
 def wait_for_base(seconds=25):
@@ -256,7 +263,7 @@ def main():
         stop("Leitura OTA1 divergiu. Boot app1 NAO selecionado.")
     print("OTA1 gravada e verificada. Selecionando boot TEMPORARIO da LAB...")
     do_switch(args.port,destination,1)
-    if wait_for_lab(35):
+    if wait_for_lab(110):
         print("LAB 0.0.43 ATIVA NA WROOM (OTA1).")
         print("CANDIDATA ESTA EM TESTE DE 60s. REINICIAR AGORA VOLTA A BASE .40.")
         print("AGUARDE CONFIRMACAO VOICE_STABLE_BOOT=CONFIRMED_APP1 ANTES DE DECLARAR PERSISTENTE.")
