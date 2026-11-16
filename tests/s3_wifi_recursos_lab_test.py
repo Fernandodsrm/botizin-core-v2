@@ -12,6 +12,7 @@ controls = (ROOT / "firmware/control_routes.h").read_text()
 
 assert '#include "wifi_manager.h"\n#include "wifi_readonly.h"' in fw
 assert "wifiReadOnlyRegisterRoutes();" in fw
+assert 'LAB_BUILD: WIFI_RECURSOS_01 (EXPERIMENTAL)' in fw
 assert 'server.on("/read/wifi", HTTP_GET' in route
 assert "WiFi.status() != WL_CONNECTED" in route
 assert "server.client().localIP() != WiFi.localIP()" in route
