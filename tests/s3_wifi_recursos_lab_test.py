@@ -44,7 +44,7 @@ for label in (
     "void checkInternetOTA(bool manual)",
     "void installInternetOTA(const String &targetVersion, const String &targetURL, const String &targetSHA, size_t targetBytes)",
 ):
-    assert label + " {\n#if BOTIZIN_LAB_OTA_DISABLED" in fw, label
+    assert re.search(re.escape(label) + r" \{(?:[^{}]|\{[^{}]*\}){0,250}#if BOTIZIN_LAB_OTA_DISABLED", fw, re.DOTALL), label
 assert '#if !BOTIZIN_LAB_OTA_DISABLED\n  if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued)' in fw
 assert 'server.on("/update", HTTP_POST, []() {\n    server.send(403, "text/plain; charset=utf-8", "LAB_OTA_DISABLED");' in fw
 assert 'OTA_AUTOMATIC_ENABLED: YES' in fw
