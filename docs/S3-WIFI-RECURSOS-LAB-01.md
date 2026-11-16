@@ -44,3 +44,21 @@ Workflow `.github/workflows/s3-wifi-recursos-lab-ci.yml`:
 
 A comparação em CI emprega o mesmo compilador, flags e token de teste nas duas imagens. **Não comparar diretamente os 1.264.224 bytes desta compilação-base com os 1.259.872 bytes do binário de produção e atribuir a diferença ao módulo.** O custo adicional de RAM, PSRAM e latência na S3 permanece desconhecido até medições físicas. Esta aprovação é de compilação/estática, não de funcionamento em placa.
 
+
+## Auditoria de segurança e preparo de recuperação (16/11/2026)
+
+**Revisão de código sem acesso à placa:**
+
+- `GET /read/wifi` não contém ações que modifiquem NVS, SSID, interface ou rádio; aceita apenas pedidos na interface STA conectada; a resposta contém SSID e dados de rede, mas **nenhuma senha**. Como HTTP não é criptografado, SSID/IP podem ser lidos por clientes da rede local: comportamento deliberado de consulta sem login, não adequado para internet pública.
+- Os novos cards não criam sessões, comandos de gravação, scanning ou timers. As rotas administrativas antigas permanecem protegidas por autenticação; **o firmware herdado ainda possui outras rotas que alteram OTA/NVS**, portanto não se deve chamar a imagem inteira de *firmware read-only*.
+- **Marcador LAB** incluído em `/status`: `LAB_BUILD: WIFI_RECURSOS_01 (EXPERIMENTAL)`. O cabeçalho histórico `CORE V0.0.25` continua por compatibilidade com código existente; **não confundir esta imagem LAB com release publicado**.
+- **Bloqueio antes de instalar:** o firmware herdado possui OTA automática habilitada e fluxos de atualização/recuperação ainda não ensaiados fisicamente nesta branch. Não gravar LAB em `app1` nem acionar OTA até que o modo LAB tenha proteção explícita contra substituir `app0` e exista plano de retorno verificado.
+- As compilações CI usam token fictício de validação. **O binário CI não está preparado para retomar telemetria ThingsBoard de produção**; não afirmar que serviços externos funcionariam após instalá-lo.
+
+### Backup USB pequeno, como alternativa ao backup integral que falhou
+
+Ferramenta de **somente leitura**: `tools/s3/Backup-Critico-S3-64KB.ps1`. Usa esptool local 5.1.0 e Python 3.11, lê apenas `0x0..0x0FFFF` (64 KiB): área que compreende bootloader, tabela de partições, NVS e otadata no layout atual. **Não faz cópia do aplicativo app0, app1, armazenamento de dados ou dos 16 MiB inteiros**. Preserva dados sensíveis em `Downloads/BOTIZIN-RECUPERACAO-S3/BACKUP-PRIVADO`, verifica exit code e tamanho e reporta hash SHA-256; não confiar em `.partial` caso falhe.
+
+O binário original app0 `releases/0.0.25/firmware.bin` já está publicado com SHA256 `bc68a1c45c43f4b0e63d40767521b50290a664725568cd0e6acfae24c37e049a` e foi verificado por esptool na recuperação. Para restaurar **todo** o estado, outras partições podem precisar de backup próprio e procedimento validado. **A leitura USB pode resetar a placa e interromper momentaneamente o Wi-Fi, mas não grava a flash**. Nunca compartilhar o backup, porque inclui possível senha Wi-Fi, token e estado OTA.
+
+**Saída desta etapa:** apenas após `BACKUP_CRITICO_64KB_OK` e checklist técnico aprovado será planejado ensaio no slot `app1`. Não há gravação física agendada ou autorizada neste documento.
