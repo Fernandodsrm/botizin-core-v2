@@ -71,3 +71,10 @@
 - Ao inicializar um firmware de módulo no segundo slot, o programa do rosto no outro slot **não executa simultaneamente**. Voz independente no A22 pode continuar, mas OLED/rosto na WROOM só volta quando ela reiniciar no BOTIZIN.
 - A WROOM tem Bluetooth Clássico; C3, S3 e ESP8266 não têm. Não prometer PS4 direto na C3.
 - Compilação, pacote arquivado, teste físico e uso real são estados diferentes. Nunca regravar slot estável nem alterar o túnel por interpretar um plano como autorização.
+
+### Checkpoint: backup crítico S3 de 64 KB validado (16/11/2026)
+
+- A leitura USB de **0x00000 a 0x0FFFF (65.536 bytes)** concluiu com `BACKUP_CRITICO_64KB_OK` na S3 reconhecida como **ESP32-S3 N16R8**, 16 MB flash, na **COM5** (identificação física por MAC já conferida). Python 3.11.9; esptool 5.1.0. Nenhuma gravação realizada na S3.
+- Backup mantido **somente no notebook**, em `Downloads\\BOTIZIN-RECUPERACAO-S3\\BACKUP-PRIVADO`. Contém NVS e pode conter senhas/tokens; **não publicar nem enviar para o GitHub**. SHA-256 foi obtido localmente. Não tratar os 64 KB como imagem integral de recuperação: aplicativo app0, app1 e armazenamento restante não estão nesse arquivo.
+- A referência do aplicativo 0.0.25 continua publicada em `releases/0.0.25/firmware.bin`, recuperada e testada fisicamente com o bootloader/tabela de partições remanescentes do CORE.1. **S3 em produção permanece intocada; WROOM fora do escopo.**
+- O próximo passo é **blindar a branch LAB** contra OTA automática, gravação por HTTP/peer e publicação no manifesto de produção, revisar método de ativação e retorno de app1 e só então considerar ensaio físico.
