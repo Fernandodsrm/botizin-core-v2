@@ -115,7 +115,7 @@ for forbidden in ("setInterval(", "WebSocket(", "EventSource(", "location.reload
 assert "firmware/firmware.ino" not in html
 print("S3_WIFI_RECURSOS_READONLY_STATIC_OK", len(html), "HTML bytes")
 
-// Candidate build must restore the original OTA execution on purpose.
+# Candidate build must restore the original OTA execution on purpose.
 assert '#define BOTIZIN_VERSION "0.0.26"' in (ROOT/"firmware/version.h").read_text()
 assert '#if !BOTIZIN_LAB_OTA_DISABLED' in fw
 assert 'checkInternetOTA(false);' in fw
