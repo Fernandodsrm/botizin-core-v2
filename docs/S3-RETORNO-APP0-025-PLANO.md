@@ -1,0 +1,48 @@
+# BOTIZIN S3 — plano de retorno da LAB para a CORE 0.0.25
+
+Estado: **procedimento de contingência preparado, não executado fisicamente**. Não autoriza instalar LAB.
+
+## Referências comprovadas
+
+- ESP32-S3 N16R8, 16 MB flash, 8 MB PSRAM; firmware físico CORE 0.0.25 executa em `app0 / ota_0` e possui estado `VALID`.
+- Manifesto de produção: versão `0.0.25`, binário de **1.259.872 bytes**, SHA-256 `bc68a1c45c43f4b0e63d40767521b50290a664725568cd0e6acfae24c37e049a` (a imagem instalada foi verificada durante a recuperação).
+- Tabela de partições reconhecida no firmware e no pacote CORE.1: `otadata` em `0xE000` / `0x2000`; `app0` em `0x10000` / `0x300000`; `app1` em `0x310000` / `0x300000`. Não há partição `factory` nesse layout.
+- Backup crítico dos primeiros **65.536 bytes** concluído com hash no notebook privado, sem gravação. Pode conter NVS com credenciais: **NUNCA enviar/publicar**.
+- Fonte do CORE 0.0.25 e binário publicado **não foram demonstrados idênticos bit a bit**: referenciar o binário publicado para verificação/restauração física, não assumir equivalência da reconstrução de laboratório.
+- A LAB experimental tem `LAB_BUILD: WIFI_RECURSOS_01 (EXPERIMENTAL)` no `/status` e bloqueios de OTA (GitHub, HTTP e peer); ainda não passou teste físico.
+
+## Fase A — pré-verificação, SOMENTE LEITURA (ação atual)
+
+Arquivo local privado: `Verificar-Retorno-S3-025.ps1`. Executar em PowerShell 5.1 com Python 3.11 + esptool 5.1.0 pré-instalados, monitores seriais fechados. Etapas:
+
+1. Localizar e conferir tamanho e SHA-256 **do backup anterior de 64 KiB** na pasta privada.
+2. Analisar tabela de partições desse backup e exigir offsets/tamanhos exatos de `otadata`, `app0`, `app1`.
+3. Encontrar a porta USB e reconhecer a **mesma S3 física** pelo modelo, flash de 16 MB e MAC conhecido (o identificador não é versionado no repositório).
+4. Ler **somente os 1.259.872 bytes iniciais do app0** em `0x10000` e calcular SHA-256. Se não coincidir com o binário oficial, **parar**.
+5. Preservar cópia dessa imagem na pasta privada. Em caso de sucesso, imprimir `APP0_ORIGINAL_025_OK` e `RETORNO_APP0_PREPARADO_PARA_PLANEJAMENTO`.
+
+O script **não contém comandos de escrita, erase-region ou mudança de boot**. Uma leitura via USB pode reiniciar/desconectar momentaneamente a placa. Não enviar as cópias, pois o binário pode conter tokens compilados.
+
+## Fase B — contingência futura se um teste LAB falhar (NÃO EXECUTAR AGORA)
+
+Conforme documentação oficial Espressif ESP-IDF, apagar `otadata` faz o bootloader procurar a imagem factory; **sem factory**, tenta o primeiro slot OTA disponível, normalmente `ota_0`. **Isso não é garantia universal:** só considerar após Fase A comprovada e após verificar também a tabela de partições presente na placa no dia do ensaio.
+
+1. Com acesso USB, autenticar **novamente** placa, mapa de partições e integridade `app0`.
+2. Antes de qualquer modificação, preservar uma cópia de `otadata` atual para registro.
+3. **Apenas sob aprovação explícita e somente na situação de emergência**: limpar **somente `otadata` em `0xE000` com 8.192 bytes** usando método oficial de erase-region, sem `erase-flash`, sem alterar `app0`, `app1`, bootloader, tabela de partições ou NVS. A limpeza muda a seleção de boot e será uma gravação física; não está automatizada nem autorizada neste documento.
+4. Reiniciar e confirmar `BOTIZIN CORE V0.0.25`, `RUNNING_PARTITION: app0`, `RUNNING_OTA_STATE: VALID`, Wi-Fi/mDNS/HTTP, painel e memória.
+5. Caso a imagem `app0` não seja idêntica à original, **não aplicar o método otadata**: recuperar pelo binário original verificado mediante procedimento separado.
+
+## Antes de qualquer teste físico em app1
+
+- Planejar a **instalação explícita da LAB em `app1`** e seleção de boot sem usar caminhos de OTA inseguros; escrever uma análise de rotas e autenticação, já que o HTTP legado inclui um upload dedicado.
+- Não modificar `main/manifest.json` nem o release 0.0.25, e não enviar segredos para workflows CI.
+- Conferir tamanho binário LAB, SHA-256, proteção contra OTA e comportamento do bootloader.
+- Definir critérios para desligar o ensaio e reverter: ausência de rede/painel, reboot repetido, heap mínima crítica, falha de controle local.
+- A CORE.1 deixou bootloader/tabela de partições na flash durante a recuperação; **manter o binário original e o backup de 64 KiB disponíveis offline**.
+
+Referências oficiais:
+- https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/ota.html
+- https://docs.espressif.com/projects/esptool/en/latest/esp32s3/esptool/basic-commands.html
+
+**Proibição atual:** não escrever/alternar qualquer partição da S3 até a pré-verificação ser concluída e o usuário aprovar um teste específico.
