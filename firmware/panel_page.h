@@ -97,12 +97,33 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <div class="link-card"><h3>Nome local (mDNS)</h3><p id="wf-mdns">—</p></div>
 <div class="link-card"><h3>Portal de recuperação</h3><p id="wf-ap">—</p></div>
 </div>
-<div class="buttons">
-<button id="wifi-read" type="button">Consultar Wi-Fi agora</button>
-<button id="wifi-settings" type="button">Trocar rede (autenticado)</button>
+<div class="buttons"><button id="wifi-read" type="button">Consultar Wi-Fi agora</button></div>
+<p class="tiny" role="status" aria-live="polite" id="wf-feedback">Aguardando consulta manual.</p>
+<div class="panel" style="margin-top:14px">
+<h2>Wi-Fi 2.0 · Buscar e trocar rede com segurança</h2>
+<p class="muted small">Teste sem salvar. Se falhar, a S3 retorna à rede antiga. Quando conectar, confirme em até 120 segundos para gravar na NVS.</p>
+<div class="control-line">
+<input class="control-input" type="password" id="wf-admin-pass" maxlength="32" autocomplete="off" placeholder="Senha de administrador da S3" aria-label="Senha de administrador"/>
+<button id="wf-admin-login" type="button">Desbloquear Wi-Fi</button>
 </div>
-<p class="tiny" role="status" aria-live="polite" id="wf-feedback">Aguardando consulta manual. O botão Trocar rede só abre a configuração existente.</p>
-<p class="note">Diagnóstico de gateway, DNS e internet com testes ativos e recuperação automática: planejados, ainda não implementados nesta etapa.</p>
+<p class="tiny" id="wf-admin-feedback" role="status">É necessário login local para procurar redes ou testar credenciais.</p>
+<div class="buttons"><button id="wf-scan" type="button">Procurar redes 2,4 GHz</button></div>
+<label for="wf-network-choice" class="small muted">Redes encontradas (opcional)</label>
+<select id="wf-network-choice" class="control-input" style="max-width:100%"><option value="">Selecione ou digite o nome abaixo</option></select>
+<form id="wf-change-form" class="control-form" autocomplete="off" style="margin-top:12px">
+<label for="wf-target-ssid">Nome da rede (SSID)</label>
+<input class="control-input" id="wf-target-ssid" maxlength="32" required autocomplete="off" placeholder="Nome da rede 2,4 GHz"/>
+<label for="wf-target-pass">Senha da nova rede</label>
+<input class="control-input" id="wf-target-pass" type="password" maxlength="63" autocomplete="new-password" placeholder="Senha WPA2 (ou vazio para rede aberta)"/>
+<button type="submit" id="wf-test">Testar conexão (não salvar ainda)</button>
+</form>
+<div class="buttons">
+<button id="wf-stage-state" type="button">Consultar resultado do teste</button>
+<button id="wf-confirm" type="button" disabled>Confirmar e salvar rede</button>
+</div>
+<pre id="wf-test-result" role="status" aria-live="polite">Nenhum teste iniciado. Sem consultas automáticas.</pre>
+<p class="note">Durante o teste, o navegador pode desconectar. Conecte seu aparelho à rede nova e abra <b>http://botizin-s3.local/</b>; autentique novamente e confirme. Se não confirmar, a S3 tenta voltar à rede antiga automaticamente. Se o painel não abrir, aguarde o retorno e consulte novamente.</p>
+</div>
 </section></div>
 <div id="page-resources" role="tabpanel" aria-labelledby="tab-resources" hidden>
 <section class="panel">
@@ -169,15 +190,9 @@ Digite ajuda para listar comandos.</pre>
 </div>
 <div class="control-grid" style="margin-top:13px">
 <div class="panel">
-<h2>Trocar Wi-Fi</h2>
-<form id="controlWifiForm" class="control-form" autocomplete="off">
-<label for="controlSsid">Rede Wi-Fi 2,4 GHz</label>
-<input class="control-input" id="controlSsid" name="ssid" minlength="1" maxlength="32" required placeholder="Nome da rede" autocomplete="off"/>
-<label for="controlWifiPassword">Senha da nova rede</label>
-<input class="control-input" id="controlWifiPassword" name="password" type="password" minlength="8" maxlength="63" placeholder="Senha da rede" autocomplete="new-password"/>
-<button id="controlSaveWifi" type="submit">Salvar Wi-Fi e reiniciar</button>
-</form>
-<p class="tiny">Se a rede estiver errada, o ponto de acesso de recuperação da S3 volta a aparecer. Anote a senha individual antes de trocar a rede.</p>
+<h2>Wi-Fi 2.0</h2>
+<p class="muted small">A troca imediata foi substituída pelo teste com confirmação. Abra a aba Wi-Fi para procurar redes, testar e salvar sem reinicialização forçada.</p>
+<button id="settingsGotoWifi" type="button">Abrir Wi-Fi 2.0</button>
 </div>
 <div class="panel"><h2>Sistema</h2>
 <p class="muted small">Reinício solicitado, nunca automático pelo painel.</p>
@@ -277,10 +292,7 @@ async function loadResourceReadOnly(){
 }
 $('wifi-read').addEventListener('click',loadWifiReadOnly);
 $('resources-read').addEventListener('click',loadResourceReadOnly);
-$('wifi-settings').addEventListener('click',()=>{
-  $('tab-settings').click();
-  $('controlWifiForm').scrollIntoView({block:'center',behavior:'smooth'});
-});
+
 function renderStatus(txt){
  latestStatus=txt;statusLoaded=true;$('copy').disabled=false;
  const links=parseStatus(txt);
@@ -451,15 +463,79 @@ $('controlCancel').addEventListener('click',async()=>{
  currentCandidate=null;$('controlInstall').disabled=true;
  await runControl('/control/cancel-ota');
 });
-$('controlWifiForm').addEventListener('submit',async e=>{
- e.preventDefault();
- const ssid=$('controlSsid').value.trim(),pass=$('controlWifiPassword').value;
- if(!ssid || (pass.length>0 && pass.length<8))return;
- if(!window.confirm('Trocar a rede para "'+ssid+'"? A S3 vai reiniciar. Se a senha estiver errada, será necessário usar a rede de recuperação.'))return;
- const result=await runControl('/control/wifi-save',{ssid,password:pass});
- $('controlWifiPassword').value='';
- if(result)clearControlSession('Wi-Fi salvo. S3 reiniciando. Autentique novamente após conectar.');
+// All Wi-Fi 2.0 actions use the existing volatile admin session.
+function wifiFeedback(message){showText('wf-test-result',message)}
+async function wifiCommand(path,fields={}){
+  if(!controlSession){wifiFeedback('Bloqueado: autentique no Wi-Fi 2.0 antes de usar.');return null}
+  try {return await controlPost(path,fields)}
+  catch(e){
+    wifiFeedback('Falha: '+e.message+'. O teste pode ter mudado de rede: atualize o painel após reconectar.');
+    if(String(e.message).includes('AUTH_REQUIRED_OR_EXPIRED'))clearControlSession('Sessão expirada.');
+    return null;
+  }
+}
+$('wf-admin-login').addEventListener('click',async()=>{
+  const pass=$('wf-admin-pass').value;
+  if(!pass){showText('wf-admin-feedback','Informe a senha de administrador.');return}
+  $('wf-admin-login').disabled=true;
+  try{
+    const token=await controlPost('/control/login',{password:pass},false);
+    if(!/^[0-9a-f]{32}$/.test(token))throw new Error('Token inválido');
+    controlSession=token;
+    $('wf-admin-pass').value='';
+    $('controlLoginBox').hidden=true;$('controlActions').hidden=false;
+    showText('controlAuthStatus','Sessão administrativa ativa (10 minutos).');
+    showText('wf-admin-feedback','Desbloqueado. Use os botões de Wi-Fi sob demanda.');
+  }catch(e){showText('wf-admin-feedback','Erro ao autenticar: '+e.message)}
+  finally{$('wf-admin-login').disabled=false}
 });
+$('wf-scan').addEventListener('click',async()=>{
+  const btn=$('wf-scan');btn.disabled=true;
+  wifiFeedback('Procurando redes 2,4 GHz nesta solicitação…');
+  try{
+    const txt=await wifiCommand('/control/wifi-scan');
+    if(!txt)return;
+    const list=JSON.parse(txt).networks||[];
+    const select=$('wf-network-choice');
+    select.replaceChildren(new Option('Selecione ou digite o nome abaixo',''));
+    for(const item of list){
+      if(typeof item.ssid!=='string')continue;
+      select.add(new Option(item.ssid+' · '+item.rssi_dbm+' dBm · canal '+item.channel,item.ssid));
+    }
+    wifiFeedback(list.length+' redes encontradas. Selecione uma ou digite o SSID manualmente.');
+  }catch(e){wifiFeedback('Não foi possível ler o resultado: '+e.message)}
+  finally{btn.disabled=false}
+});
+$('wf-network-choice').addEventListener('change',()=>{
+  if($('wf-network-choice').value) $('wf-target-ssid').value=$('wf-network-choice').value;
+});
+$('wf-change-form').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const ssid=$('wf-target-ssid').value.trim(),password=$('wf-target-pass').value;
+  if(!ssid || (password.length>0 && password.length<8)){wifiFeedback('Nome ou senha inválida.');return}
+  if(!window.confirm('Testar a rede "'+ssid+'" sem salvar? A conexão atual será interrompida; sem confirmação a S3 tentará voltar à rede antiga.'))return;
+  const btn=$('wf-test');btn.disabled=true;
+  const result=await wifiCommand('/control/wifi-test',{ssid,password});
+  $('wf-target-pass').value='';
+  $('wf-confirm').disabled=true;
+  wifiFeedback(result?result+'\nConsulte o resultado manualmente depois de conectar ao Wi-Fi da S3.':'Teste não iniciado.');
+  btn.disabled=false;
+});
+$('wf-stage-state').addEventListener('click',async()=>{
+  const result=await wifiCommand('/control/wifi-state');
+  if(!result)return;
+  wifiFeedback(result);
+  const d=parseStatus(result);
+  $('wf-confirm').disabled=d.WIFI_TRIAL_STATE!=='CONFIRM_REQUIRED';
+});
+$('wf-confirm').addEventListener('click',async()=>{
+  if(!window.confirm('Confirmar esta conexão e gravar a nova rede na S3?'))return;
+  const result=await wifiCommand('/control/wifi-confirm');
+  wifiFeedback(result||'Não confirmado. Consulte o estado do teste.');
+  $('wf-confirm').disabled=true;
+  if(result)loadWifiReadOnly();
+});
+$('settingsGotoWifi').addEventListener('click',()=>{$('tab-wifi').click()});
 $('controlReboot').addEventListener('click',async()=>{
  if(!window.confirm('Reiniciar a S3 agora?'))return;
  const result=await runControl('/control/reboot');
