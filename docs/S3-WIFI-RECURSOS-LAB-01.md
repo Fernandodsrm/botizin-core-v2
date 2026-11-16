@@ -70,3 +70,18 @@ O binário original app0 `releases/0.0.25/firmware.bin` já está publicado com 
 **Proteção incluída no código LAB (não na versão instalada):** `firmware/lab_policy.h` define `BOTIZIN_LAB_OTA_DISABLED=1`; bloqueia `queueOtaCheck`, `checkInternetOTA`, `installInternetOTA`, `beginUpload`, `handleUpload`, o upload HTTP em `/update` e o agendamento de atualização automática no loop. As rotas autenticadas de verificação/instalação OTA e ações OTA de peer retornam `LAB_OTA_DISABLED`. `/status`, telemetria e diagnóstico peer indicam que a OTA automática está desativada. O painel LAB sinaliza visualmente essa política e impede uso dos botões OTA. **O firmware estável 0.0.25, seu manifest principal e os arquivos da WROOM continuam sem alteração.**
 
 **Limitações ainda existentes:** bloquear gravação OTA *dentro da LAB* não impede gravação USB externa nem prova que o `app0` ficará intocado durante o processo de seleção de `app1`. O bootloader Arduino pode confirmar a imagem antes de a rede ser validada. Falta pacote USB com validação de partição, procedimento de boot temporário, caminho de retorno documentado e teste físico em condições controladas. A LAB também é compilada com token ThingsBoard fictício, então não equivale a uma atualização de produção. **Não instalar só porque a CI passou.**
+
+## CI final: LAB sem OTA
+
+Em 16/11/2026, a [execução #43920647687](https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43920647687) terminou com **success**. Todos os passos passaram: testes estáticos da política LAB, JavaScript do painel, testes unitários disponíveis, compilação baseline e compilação LAB com Arduino ESP32 core 3.3.12, sem publicação OTA.
+
+| Comparação com ambiente idêntico | Imagem .bin |
+|---|---:|
+| Base histórica recompilada (token de teste) | 1.264.224 bytes |
+| LAB com leitura Wi-Fi/Recursos e OTA bloqueada | 1.253.232 bytes |
+| **Delta LAB total** | **−10.992 bytes** |
+| Margem estimada no slot de 3 MiB | 1.892.496 bytes |
+
+**Interpretação:** a diminuição de 10.992 bytes é líquida e inclui código de OTA desativado e cards novos. Não se deve interpretá-la como consumo individual de módulos. Não há medida física de RAM, PSRAM ou comportamento de conexão.
+
+**Estado de autorização:** backup privado de 64 KiB OK, build CI OK, mas **não instalar ainda**. Antes do teste físico em `app1`, requer validação do método de escrita/seleção do slot sem apagar `app0`, procedimento confiável de retorno, confirmação de compatibilidade da imagem LAB com as partições presentes e forma de restaurar caso não inicialize. O bootloader não fornece garantia de rollback funcional apenas com esta CI.
