@@ -63,6 +63,8 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <nav class="tabs" role="tablist" aria-label="Áreas do painel">
 <button role="tab" id="tab-home" aria-controls="page-home" aria-selected="true" data-page="home">Visão geral</button>
 <button role="tab" id="tab-links" aria-controls="page-links" aria-selected="false" data-page="links">Conexões</button>
+<button role="tab" id="tab-wifi" aria-controls="page-wifi" aria-selected="false" data-page="wifi">Wi-Fi</button>
+<button role="tab" id="tab-resources" aria-controls="page-resources" aria-selected="false" data-page="resources">Recursos</button>
 <button role="tab" id="tab-events" aria-controls="page-events" aria-selected="false" data-page="events">Eventos</button>
 <button role="tab" id="tab-settings" aria-controls="page-settings" aria-selected="false" data-page="settings">Configurações</button>
 <button role="tab" id="tab-diag" aria-controls="page-diag" aria-selected="false" data-page="diag">Diagnóstico</button>
@@ -80,6 +82,44 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <div class="link-card"><h3>Ponte → A22</h3><p>Integração pendente. Nenhum comando disponível.</p></div>
 </div><p class="tiny" id="links-time">Nenhuma leitura.</p>
 <button type="button" id="links-refresh">Atualizar conexões da S3</button>
+</section></div>
+<div id="page-wifi" role="tabpanel" aria-labelledby="tab-wifi" hidden>
+<section class="panel">
+<h2>Wi-Fi / Conexão atual</h2>
+<p class="muted small">Leitura pontual, sem varredura de redes nem teste ativo. Nenhuma senha é exibida.</p>
+<div class="link-grid">
+<div class="link-card"><h3>Rede (SSID)</h3><p id="wf-ssid">Não consultado</p></div>
+<div class="link-card"><h3>IP da S3</h3><p id="wf-ip">—</p></div>
+<div class="link-card"><h3>Sinal (RSSI)</h3><p id="wf-rssi">—</p></div>
+<div class="link-card"><h3>Canal Wi-Fi</h3><p id="wf-channel">—</p></div>
+<div class="link-card"><h3>Gateway</h3><p id="wf-gateway">—</p></div>
+<div class="link-card"><h3>DNS configurado</h3><p id="wf-dns">—</p></div>
+<div class="link-card"><h3>Nome local (mDNS)</h3><p id="wf-mdns">—</p></div>
+<div class="link-card"><h3>Portal de recuperação</h3><p id="wf-ap">—</p></div>
+</div>
+<div class="buttons">
+<button id="wifi-read" type="button">Consultar Wi-Fi agora</button>
+<button id="wifi-settings" type="button">Trocar rede (autenticado)</button>
+</div>
+<p class="tiny" role="status" aria-live="polite" id="wf-feedback">Aguardando consulta manual. O botão Trocar rede só abre a configuração existente.</p>
+<p class="note">Diagnóstico de gateway, DNS e internet com testes ativos e recuperação automática: planejados, ainda não implementados nesta etapa.</p>
+</section></div>
+<div id="page-resources" role="tabpanel" aria-labelledby="tab-resources" hidden>
+<section class="panel">
+<h2>Recursos e limites / S3</h2>
+<p class="muted small">Snapshot da S3. Não mede custo individual de módulo; para isso serão necessárias compilações e medições comparativas.</p>
+<div class="link-grid">
+<div class="link-card"><h3>RAM interna livre</h3><p id="rs-free">—</p></div>
+<div class="link-card"><h3>Menor RAM livre</h3><p id="rs-min">—</p></div>
+<div class="link-card"><h3>Maior bloco contínuo</h3><p id="rs-largest">—</p></div>
+<div class="link-card"><h3>PSRAM livre</h3><p id="rs-psram">—</p></div>
+<div class="link-card"><h3>Espaço OTA estimado</h3><p id="rs-ota">—</p></div>
+<div class="link-card"><h3>Firmware estimado</h3><p id="rs-firmware">—</p></div>
+<div class="link-card"><h3>Maior intervalo de loop</h3><p id="rs-loop">—</p></div>
+<div class="link-card"><h3>Idade da amostra</h3><p id="rs-sample-age">—</p></div>
+</div>
+<div class="buttons"><button id="resources-read" type="button">Medir recursos agora</button></div>
+<p class="tiny" role="status" aria-live="polite" id="rs-feedback">Aguardando consulta manual. Nenhuma coleta periódica será ativada.</p>
 </section></div>
 <div id="page-events" role="tabpanel" aria-labelledby="tab-events" hidden></div>
 <div id="page-settings" role="tabpanel" aria-labelledby="tab-settings" hidden></div>
@@ -171,6 +211,7 @@ $('page-events').append($('events-panel'));
 $('summary-panels').style.gridTemplateColumns='1fr';
 $('page-settings').append($('controls-panel'));
 $('page-diag').append($('terminal-panel'),$('recovery-panel'));
+// Wi-Fi and Resources tabs deliberately do not start background polling.
 document.querySelectorAll('[data-page]').forEach(button=>button.addEventListener('click',()=>{
  document.querySelectorAll('[data-page]').forEach(b=>{
   const active=b===button;b.setAttribute('aria-selected',String(active));
@@ -193,6 +234,53 @@ async function read(endpoint){
  try{const r=await fetch(endpoint,{cache:'no-store',signal:ctrl.signal,redirect:'error'});if(!r.ok)throw new Error('HTTP '+r.status);return await r.text()}
  finally{clearTimeout(timeout)}
 }
+function showText(id,value){$(id).textContent=String(value)}
+async function loadWifiReadOnly(){
+  const btn=$('wifi-read');btn.disabled=true;
+  showText('wf-feedback','Consultando Wi-Fi local…');
+  try {
+    const x=JSON.parse(await read('/read/wifi'));
+    showText('wf-ssid',x.ssid||'Sem nome');
+    showText('wf-ip',x.ip||'—');
+    showText('wf-rssi',Number.isFinite(x.rssi_dbm)?x.rssi_dbm+' dBm':'—');
+    showText('wf-channel',Number.isFinite(x.channel)?x.channel:'—');
+    showText('wf-gateway',x.gateway||'—');
+    showText('wf-dns',x.dns||'—');
+    showText('wf-mdns',x.mdns_ready?'botizin-s3.local disponível':'Não confirmado');
+    showText('wf-ap',x.recovery_ap_active?'Ativo':'Desligado (normal quando conectado)');
+    showText('wf-feedback','Lido às '+new Date().toLocaleTimeString('pt-BR')+'. Valores desta consulta, não monitoramento contínuo.');
+  }catch(e){
+    showText('wf-feedback','Consulta Wi-Fi indisponível: '+e.message+'. Dados anteriores podem estar desatualizados.');
+  }finally{btn.disabled=false}
+}
+async function loadResourceReadOnly(){
+  const btn=$('resources-read');btn.disabled=true;
+  showText('rs-feedback','Consultando memória…');
+  try {
+    const d=parseStatus(await read('/status'));
+    const bytes=(key)=>{const n=Number(d[key]);return Number.isFinite(n)&&n>=0?n.toLocaleString('pt-BR')+' B':'—'};
+    for(const [id,key] of [
+      ['rs-free','DIAG_FREE'],['rs-min','DIAG_MIN'],['rs-largest','DIAG_LARGEST'],
+      ['rs-psram','DIAG_PSRAM'],['rs-ota','DIAG_OTA_FREE']
+    ])showText(id,bytes(key));
+    const remaining=Number(d.DIAG_OTA_FREE);
+    const slot=3145728; // CORE 0.0.25: OTA slot capacity, NOT total flash size.
+    showText('rs-firmware',Number.isFinite(remaining)&&remaining>=0&&remaining<=slot?
+      (slot-remaining).toLocaleString('pt-BR')+' B (estimado)':'—');
+    const gap=Number(d.DIAG_LOOP_MAX_US);
+    showText('rs-loop',Number.isFinite(gap)&&gap>=0?(gap/1000).toLocaleString('pt-BR')+' ms':'—');
+    showText('rs-sample-age',d.DIAG_SAMPLE_AGE?d.DIAG_SAMPLE_AGE+' s':'—');
+    showText('rs-feedback','Lido às '+new Date().toLocaleTimeString('pt-BR')+'. São contadores e amostras existentes no firmware.');
+  }catch(e){
+    showText('rs-feedback','Consulta de recursos indisponível: '+e.message+'. Dados anteriores podem estar desatualizados.');
+  }finally{btn.disabled=false}
+}
+$('wifi-read').addEventListener('click',loadWifiReadOnly);
+$('resources-read').addEventListener('click',loadResourceReadOnly);
+$('wifi-settings').addEventListener('click',()=>{
+  $('tab-settings').click();
+  $('controlWifiForm').scrollIntoView({block:'center',behavior:'smooth'});
+});
 function renderStatus(txt){
  latestStatus=txt;statusLoaded=true;$('copy').disabled=false;
  const links=parseStatus(txt);
