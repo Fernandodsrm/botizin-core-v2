@@ -10,8 +10,28 @@ page = (ROOT / "firmware/panel_page.h").read_text()
 route = (ROOT / "firmware/wifi_readonly.h").read_text()
 controls = (ROOT / "firmware/control_routes.h").read_text()
 
-assert '#include "wifi_manager.h"\n#include "wifi_readonly.h"' in fw
+assert '#include "wifi_manager.h"\n#include "wifi_trial.h"\n#include "wifi_readonly.h"' in fw
 assert "wifiReadOnlyRegisterRoutes();" in fw
+assert "wifiTrialTick();" in fw
+assert "wifiTrialStatus();" in fw
+trial = (ROOT / "firmware/wifi_trial.h").read_text()
+wifi = (ROOT / "firmware/wifi_manager.h").read_text()
+assert "WIFI_TRIAL_CONFIRM_MS = 120000UL" in trial
+assert "WIFI_TRIAL_CONNECT_MS = 25000UL" in trial
+assert "wifiTrialPhase=WIFI_TRIAL_QUEUED" in trial
+assert "wifiTrialPhase=WIFI_TRIAL_CONFIRM_REQUIRED" in trial
+assert "wifiTrialPhase=WIFI_TRIAL_COMMITTED" in trial
+assert "wifiTrialPhase=WIFI_TRIAL_ROLLED_BACK" in trial
+assert "wifiManagerStoreCredentials(wifiTrialTargetSsid,wifiTrialTargetPassword)" in trial
+assert trial.index("wifiTrialPhase=WIFI_TRIAL_CONFIRM_REQUIRED") < trial.index("wifiManagerStoreCredentials(wifiTrialTargetSsid,wifiTrialTargetPassword)")
+assert "WiFi.persistent(false)" in trial and "WiFi.setAutoReconnect(false)" in trial
+assert "wifiTrialRestore(\"CONFIRM_TIMEOUT\")" in trial
+assert "if(wifiTrialActive()) return;" in wifi
+assert "wifiManagerStoreCredentials(ssid,pass)" not in controls
+for endpoint in ("/control/wifi-test","/control/wifi-confirm","/control/wifi-state","/control/wifi-scan"):
+    assert endpoint in controls, endpoint
+assert "if(!controlRequireAuth())return;" in controls
+assert "controlReply(409,\"WIFI2_USE_TEST_AND_CONFIRM\");" in controls
 policy = (ROOT / "firmware/lab_policy.h").read_text()
 peer = (ROOT / "firmware/peer_ota_server.h").read_text()
 assert "#define BOTIZIN_LAB_OTA_DISABLED 1" in policy
@@ -79,8 +99,16 @@ assert "await read('/read/wifi')" in html
 assert "await read('/status')" in html
 assert "textContent" in html and "innerHTML" not in html
 assert "loadStatus();loadEvents();" in html
-assert "wifi-settings" in html and "$('tab-settings').click()" in html
-assert "controlSession" in html and "runControl('/control/wifi-save'" in html
+assert "wf-admin-login" in c.ids
+assert "wf-change-form" in c.ids and "wf-confirm" in c.ids
+assert "wf-scan" in c.ids and "wf-network-choice" in c.ids
+assert "settingsGotoWifi" in c.ids
+assert "await wifiCommand('/control/wifi-test',{ssid,password})" in html
+assert "await wifiCommand('/control/wifi-confirm')" in html
+assert "await wifiCommand('/control/wifi-state')" in html
+assert "await wifiCommand('/control/wifi-scan')" in html
+assert "controlSession" in html and "controlPost('/control/login',{password:pass},false)" in html
+assert "runControl('/control/wifi-save'" not in html
 for forbidden in ("setInterval(", "WebSocket(", "EventSource(", "location.reload(", "eval("):
     assert forbidden not in html, forbidden
 assert "firmware/firmware.ino" not in html
