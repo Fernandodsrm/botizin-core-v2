@@ -17,6 +17,7 @@
 // initArduino(). Retain bootloader rollback for apps that fail before startup.
 #include "internet_config.h"
 #include "version.h"
+#include "lab_policy.h"
 #define BOTIZIN_LOCAL_NAME "botizin-s3"
 #define BOTIZIN_LOCAL_BOARD "esp32s3-n16r8"
 #include "local_name.h"
@@ -62,6 +63,10 @@ bool manualWindowActive() { return otaManualUntil && (int32_t)(otaManualUntil - 
 bool candidateReady() { return !otaCandidateId.isEmpty() && manualWindowActive() && !otaInstallQueued && !uploadActive && !uploadOK && !rebootScheduled; }
 void clearOtaCandidate() { otaCandidateId = ""; otaTargetVersion = ""; otaTargetURL = ""; otaTargetSHA = ""; otaTargetBytes = 0; }
 bool queueOtaCheck() {
+#if BOTIZIN_LAB_OTA_DISABLED
+  manualOtaStatus = "LAB_OTA_DISABLED";
+  return false;
+#endif
   if (!otaReady || internetStopped || otaCheckQueued || otaInstallQueued || uploadActive || uploadOK || rebootScheduled) return false;
   clearOtaCandidate(); otaManualUntil = millis() + 300000;
   otaCheckQueued = true; manualOtaStatus = "CHECK_QUEUED"; return true;
@@ -161,7 +166,8 @@ String snapshot() {
   s += "WIFI: " + String(WiFi.status() == WL_CONNECTED ? "OK" : "DISCONNECTED") + "\n";
   s += "OTA: " + String(otaReady ? "READY" : "BLOCKED: hardware/partition mismatch") + "\n";
   s += "INTERNET_OTA: " + internetStatus + "\n";
-  s += "OTA_AUTOMATIC_ENABLED: YES\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
+  s += "OTA_AUTOMATIC_ENABLED: NO (LAB)\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
+  s += "OTA_LAB_POLICY: FLASH_WRITES_DISABLED\n";
   s += "PEER_PAIRED: " + String(peerKey.length() == 64 ? "YES" : "NO") + "\n";
   s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
@@ -223,6 +229,12 @@ void failUpload(const String &reason) {
 }
 
 void beginUpload(const String &length, const String &sha) {
+#if BOTIZIN_LAB_OTA_DISABLED
+  (void)length; (void)sha;
+  responseCode = 403; uploadActive = false; uploadOK = false;
+  attempt = "LAB_OTA_DISABLED";
+  return;
+#endif
     uploadOK = false;
     responseCode = 400;
     attempt = "";
@@ -309,6 +321,10 @@ void finishUpload() {
   }
 
 void handleUpload() {
+#if BOTIZIN_LAB_OTA_DISABLED
+  responseCode = 403;
+  return;
+#endif
   if (peerOtaBusy) return;
   HTTPUpload &u = server.upload();
   if (u.status == UPLOAD_FILE_START) beginUpload(server.arg("size"), server.arg("sha256"));
@@ -333,6 +349,12 @@ void stopInternet(const String &reason) {
 }
 
 void checkInternetOTA(bool manual) {
+#if BOTIZIN_LAB_OTA_DISABLED
+  (void)manual;
+  internetStatus = "LAB_OTA_DISABLED";
+  manualOtaStatus = "LAB_OTA_DISABLED";
+  return;
+#endif
   DiagnosticScope diagnosticScope(DIAG_GIT);
   if (manual) { manualOtaStatus = "CHECKING"; showOtaProgress("CONSULTANDO GITHUB"); }
   if (!otaReady) { stopInternet("hardware/partition mismatch"); return; }
@@ -420,6 +442,11 @@ void checkInternetOTA(bool manual) {
 }
 
 void installInternetOTA(const String &targetVersion, const String &targetURL, const String &targetSHA, size_t targetBytes) {
+#if BOTIZIN_LAB_OTA_DISABLED
+  (void)targetVersion; (void)targetURL; (void)targetSHA; (void)targetBytes;
+  manualOtaStatus = "LAB_OTA_DISABLED";
+  return;
+#endif
   if (!otaReady || internetStopped || uploadActive || uploadOK || rebootScheduled || WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000 || !newerVersion(targetVersion)) {
     manualOtaStatus = "INSTALL_REJECTED"; return;
   }
@@ -631,11 +658,17 @@ void setup() {
   wifiManagerRegisterRoutes();
   wifiReadOnlyRegisterRoutes();
   controlRegisterRoutes();
+#if BOTIZIN_LAB_OTA_DISABLED
+  server.on("/update", HTTP_POST, []() {
+    server.send(403, "text/plain; charset=utf-8", "LAB_OTA_DISABLED");
+  });
+#else
   server.on("/update", HTTP_POST, []() {
     if (peerOtaBusy) { server.send(409, "text/plain", "S3 internet OTA busy"); return; }
     if (uploadActive) failUpload("request ended before file completion");
     server.send(responseCode, "text/plain; charset=utf-8", attempt.length() ? attempt : "No firmware uploaded\n");
   }, handleUpload);
+#endif
   server.on("/reboot", HTTP_POST, []() {
     if (peerOtaBusy || !uploadOK) { server.send(409, "text/plain", "No verified OTA pending; STOP\n"); return; }
     logLine("REBOOT_REQUESTED: SOFTWARE"); checkpoint();
@@ -647,6 +680,10 @@ void setup() {
   nextPingPoll = millis() + 30000;
   nextTelemetry = millis() + 20000;
   nextInternetCheck = millis() + 10000;
+#if BOTIZIN_LAB_OTA_DISABLED
+  internetStatus = "LAB_OTA_DISABLED";
+  manualOtaStatus = "LAB_OTA_DISABLED";
+#endif
   server.begin();
   eventHttpServerStarted=true;
   eventRecord(EV_HTTP_STARTED,EV_INFO,"LISTENER_INIT_NOT_REACHABILITY");
@@ -663,6 +700,7 @@ void loop() {
   server.handleClient();
   wifiManagerTick();
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
+#if !BOTIZIN_LAB_OTA_DISABLED
   if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued) {
     String v = otaTargetVersion, u = otaTargetURL, h = otaTargetSHA; size_t n = otaTargetBytes;
     otaInstallQueued = false; clearOtaCandidate(); otaManualUntil = 0;
@@ -678,6 +716,7 @@ void loop() {
     nextInternetCheck = millis() + 60000;
     if (!manualWindowActive()) { clearOtaCandidate(); peerOtaBusy = true; checkInternetOTA(false); peerOtaBusy = false; }
   }
+#endif // BOTIZIN_LAB_OTA_DISABLED
   if (!rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
       (int32_t)(millis() - nextTelemetry) >= 0) {
     nextTelemetry = millis() + 60000;
