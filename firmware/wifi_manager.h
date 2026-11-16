@@ -223,6 +223,8 @@ static void wifiManagerTick() {
   if(wifiRestartAfter && (int32_t)(millis()-wifiRestartAfter)>=0) {
     Serial.flush();ESP.restart();
   }
+  // The staged trial owns STA reconnection until it commits or restores.
+  if(wifiTrialActive()) return;
   if(WiFi.status()==WL_CONNECTED) {
     wifiDisconnectedAt=millis();
     if(wifiPortalOn)wifiPortalStop();
