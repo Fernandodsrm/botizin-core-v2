@@ -12,6 +12,28 @@ controls = (ROOT / "firmware/control_routes.h").read_text()
 
 assert '#include "wifi_manager.h"\n#include "wifi_readonly.h"' in fw
 assert "wifiReadOnlyRegisterRoutes();" in fw
+policy = (ROOT / "firmware/lab_policy.h").read_text()
+peer = (ROOT / "firmware/peer_ota_server.h").read_text()
+assert "#define BOTIZIN_LAB_OTA_DISABLED 1" in policy
+assert '#include "lab_policy.h"' in fw
+for label in (
+    "bool queueOtaCheck()",
+    "void beginUpload(const String &length, const String &sha)",
+    "void handleUpload()",
+    "void checkInternetOTA(bool manual)",
+    "void installInternetOTA(const String &targetVersion, const String &targetURL, const String &targetSHA, size_t targetBytes)",
+):
+    assert label + " {\\n#if BOTIZIN_LAB_OTA_DISABLED" in fw, label
+assert '#if !BOTIZIN_LAB_OTA_DISABLED\\n  if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued)' in fw
+assert 'server.on("/update", HTTP_POST, []() {\\n    server.send(403, "text/plain; charset=utf-8", "LAB_OTA_DISABLED");' in fw
+assert 'OTA_AUTOMATIC_ENABLED: NO (LAB)' in fw
+assert 'OTA_LAB_POLICY: FLASH_WRITES_DISABLED' in fw
+assert 'cJSON_AddBoolToObject(root, "ota_automatic_enabled", false)' in fw
+assert 'cJSON_AddBoolToObject(o,"automatic_enabled",false)' in peer
+assert 'if (action != "status")' in peer and 'LAB_OTA_DISABLED' in peer
+for fn in ("controlCheckOTA", "controlInstallOTA"):
+    assert ("static void " + fn + "() {\\n#if BOTIZIN_LAB_OTA_DISABLED") in controls
+assert 'LAB_OTA_DISABLED' in controls
 assert 'LAB_BUILD: WIFI_RECURSOS_01 (EXPERIMENTAL)' in fw
 assert 'server.on("/read/wifi", HTTP_GET' in route
 assert "WiFi.status() != WL_CONNECTED" in route
@@ -50,6 +72,9 @@ required = {
 assert required <= c.ids, required - c.ids
 assert "async function loadWifiReadOnly()" in html
 assert "async function loadResourceReadOnly()" in html
+assert "LAB 01 · EXPERIMENTAL · SEM OTA" in html
+assert 'id="controlCheckOTA" type="button" disabled' in html
+assert 'id="controlOTAResult" type="button" disabled' in html
 assert "await read('/read/wifi')" in html
 assert "await read('/status')" in html
 assert "textContent" in html and "innerHTML" not in html
