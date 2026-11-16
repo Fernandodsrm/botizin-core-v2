@@ -50,8 +50,8 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 </style></head><body>
 <main>
 <header><div><div class="logo">FERNANDO LAB</div><h1>BOTIZIN / Central da S3</h1></div>
-<div class="flag">LAB 01 · EXPERIMENTAL · SEM OTA</div></header>
-<p class="description">LAB 01 — interface experimental. Consulte conexões, eventos e recursos. Atualizações OTA desabilitadas nesta imagem; nenhuma gravação autorizada.</p>
+<div class="flag">WIFI 2.0 · CORE 0.0.26 CANDIDATA</div></header>
+<p class="description">CORE 0.0.26 candidata: Wi-Fi 2.0 com teste antes de salvar. MQTT, ThingsBoard e OTA herdados; valide estes serviços depois da instalação.</p>
 <div class="state" id="state" role="status" aria-live="polite">Nenhum diagnóstico recebido.</div>
 <div class="g" id="metrics">
 <div class="metric"><div class="k">Firmware / slot</div><div class="v" id="firmware">—</div></div>
@@ -180,13 +180,13 @@ Digite ajuda para listar comandos.</pre>
 <button id="controlLogin" type="button">Desbloquear comandos</button>
 </div>
 <div id="controlAuthStatus" class="tiny" role="status">Bloqueado. Sessão de 10 minutos após autenticar; não fica salva no navegador.</div>
-<div id="controlActions" hidden><p class="note">SEGURANÇA LAB: instalação e verificação de OTA bloqueadas nesta imagem experimental. O firmware 0.0.25 estável não foi alterado.</p>
+<div id="controlActions" hidden><p class="note">IMAGEM CANDIDATA 0.0.26: verificação e instalação OTA existentes foram restauradas. O manifesto de produção continua em 0.0.25; não publicar este firmware automaticamente antes de testar.</p>
 <div class="buttons">
 <button id="controlConnections" type="button">Verificar conexões</button>
-<button id="controlCheckOTA" type="button" disabled title="Bloqueado na imagem LAB">Consultar OTA (bloqueado na LAB)</button>
-<button id="controlOTAResult" type="button" disabled title="Bloqueado na imagem LAB">Resultado OTA (bloqueado)</button>
+<button id="controlCheckOTA" type="button">Consultar OTA agora</button>
+<button id="controlOTAResult" type="button">Resultado da consulta OTA</button>
 <button id="controlInstall" type="button" disabled>Instalar atualização confirmada</button>
-<button id="controlCancel" type="button" disabled title="Bloqueado na imagem LAB">Cancelar OTA (bloqueado)</button>
+<button id="controlCancel" type="button">Cancelar consulta OTA</button>
 </div>
 <div class="control-grid" style="margin-top:13px">
 <div class="panel">
