@@ -23,7 +23,8 @@ assert "wifiTrialPhase=WIFI_TRIAL_CONFIRM_REQUIRED" in trial
 assert "wifiTrialPhase=WIFI_TRIAL_COMMITTED" in trial
 assert "wifiTrialPhase=WIFI_TRIAL_ROLLED_BACK" in trial
 assert "wifiManagerStoreCredentials(wifiTrialTargetSsid,wifiTrialTargetPassword)" in trial
-assert "if(wifiTrialPhase!=WIFI_TRIAL_CONFIRM_REQUIRED ||" in trial\nassert "wifiManagerStoreCredentials(wifiTrialTargetSsid,wifiTrialTargetPassword)" in trial
+assert "if(wifiTrialPhase!=WIFI_TRIAL_CONFIRM_REQUIRED ||" in trial
+assert "wifiManagerStoreCredentials(wifiTrialTargetSsid,wifiTrialTargetPassword)" in trial
 assert "WiFi.persistent(false)" in trial and "WiFi.setAutoReconnect(false)" in trial
 assert "wifiTrialRestore(\"CONFIRM_TIMEOUT\")" in trial
 assert "if(wifiTrialActive()) return;" in wifi
