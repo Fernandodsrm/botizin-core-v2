@@ -1,7 +1,7 @@
-name: S3 Wi-Fi + Recursos LAB (sem publicar)
+name: Wi-Fi 2.0 CORE 0.0.26 Candidate (sem publicar)
 on:
   push:
-    branches: ['lab/s3-wifi-recursos-readonly-01']
+    branches: ['candidate/wifi2-core-0.0.26']
     paths:
       - 'firmware/**'
       - 'tests/s3_wifi_recursos_lab_test.py'
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-and-compare:
-    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/lab/s3-wifi-recursos-readonly-01'
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/candidate/wifi2-core-0.0.26'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -66,7 +66,7 @@ jobs:
           baseline = json.loads(pathlib.Path('/tmp/botizin-report/baseline.json').read_text())
           lab = json.loads(pathlib.Path('dist/build-record.json').read_text())
           assert lab['published'] is False and lab['publishable'] is False
-          assert baseline['version'] == lab['version'] == '0.0.25'
+          assert baseline['version'] == '0.0.25' and lab['version'] == '0.0.26'
           delta = lab['bytes'] - baseline['bytes']
           report = ('COMPILACAO LAB SEM PUBLICACAO\n'
                     f'BASE: {baseline["bytes"]} bytes\n'
@@ -88,15 +88,15 @@ jobs:
           image=Path('dist/firmware.bin').read_bytes()
           assert record['published'] is False and record['publishable'] is False
           assert record['device_token_compiled'] is False
-          assert b'LAB_BUILD: WIFI_RECURSOS_01 (EXPERIMENTAL)' in image
-          assert b'OTA_LAB_POLICY: FLASH_WRITES_DISABLED' in image
+          assert b'CANDIDATE_BUILD: WIFI2_CORE_026 (EXPERIMENTAL)' in image
+          assert b'OTA_CANDIDATE_POLICY: OTA_ORIGINAL_RESTORED' in image
           assert image.startswith(b'\xe9') and len(image)<=3145728
-          print('WIFI2_LAB_TEST_ONLY_IMAGE_OK',len(image))
+          print('WIFI2_CORE_026_TEST_ONLY_IMAGE_OK',len(image))
           PY
       - name: Save isolated LAB test image (NOT a release)
         uses: actions/upload-artifact@v4
         with:
-          name: WIFI2-LAB-TEST-NOT-PRODUCTION
+          name: WIFI2-CORE-026-TEST-CANDIDATE
           path: |
             dist/firmware.bin
             dist/firmware.bin.sha256
