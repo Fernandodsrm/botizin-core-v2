@@ -549,7 +549,7 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "reset_reason", resetText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_state", stateText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_journal", evidence.c_str()) &&
-    cJSON_AddBoolToObject(root, "ota_automatic_enabled", true) &&
+    cJSON_AddBoolToObject(root, "ota_automatic_enabled", false) &&
     cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str()) &&
     cJSON_AddBoolToObject(root, "peer_paired", peerKey.length() == 64);
   ok = ok && diagnosticJSON(root);
