@@ -46,3 +46,19 @@ Referências oficiais:
 - https://docs.espressif.com/projects/esptool/en/latest/esp32s3/esptool/basic-commands.html
 
 **Proibição atual:** não escrever/alternar qualquer partição da S3 até a pré-verificação ser concluída e o usuário aprovar um teste específico.
+
+## Resultado físico da Fase A — 16/11/2026
+
+**VALIDADO — SOMENTE LEITURA.** Saída do PowerShell fornecida pelo usuário:
+
+- `BACKUP_PRIVADO_64KB: HASH_CONFERE`
+- `PARTICOES_OK: app0=0x10000/3MiB; app1=0x310000/3MiB; otadata=0xE000/8KiB`
+- `PLACA_CONFIRMADA: COM5 | ESP32-S3 | 16MB | MAC_CONFERE`
+- `APP0_ORIGINAL_025_OK: SHA256_CONFERE` (imagem de **1.259.872 bytes** idêntica ao SHA-256 registrado no release oficial)
+- `COPIA_APP0_PRIVADA_OK: 1259872 bytes`
+- `RETORNO_APP0_PREPARADO_PARA_PLANEJAMENTO`
+- `NENHUMA_GRAVACAO: SIM`
+
+**Conseguimos confirmar que `app0` ainda possui o aplicativo original da CORE 0.0.25**, e que os primeiros 64 KB (incluindo NVS, boot e otadata conforme o layout) possuem backup privado validado. O próprio procedimento declara que **não executou nem testou retorno ou rollback**. Nenhum dos binários privados ou credenciais foi transferido para GitHub.
+
+**Próximo critério antes de qualquer gravação:** revisar a forma de selecionar `app1` sem escrever no `app0`, especificar com precisão como recuperar a seleção de boot em caso de falha e realizar revisão do plano de contingência. A aprovação da CI e desta leitura NÃO autoriza instalar LAB. `main/manifest.json` e a imagem 0.0.25 seguem intocados.
