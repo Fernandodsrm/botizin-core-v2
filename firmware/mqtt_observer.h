@@ -34,7 +34,7 @@ static void botizinMqttLoop() {
     // No continuous MQTT TCP session and no retries within this cycle.
     // Avoid TLS competing with ongoing firmware downloads and recovery.
     botizinMqttNextAt = millis() + 90000;
-    if (uploadActive || uploadOK || rebootScheduled || peerOtaBusy ||
+    if (wifiTrialActive() || uploadActive || uploadOK || rebootScheduled || peerOtaBusy ||
         otaCheckQueued || otaInstallQueued) return;
     if (WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000) {
         botizinMqttLast = "NO_WIFI_OR_NTP"; return;
