@@ -62,3 +62,35 @@ Referências oficiais:
 **Conseguimos confirmar que `app0` ainda possui o aplicativo original da CORE 0.0.25**, e que os primeiros 64 KB (incluindo NVS, boot e otadata conforme o layout) possuem backup privado validado. O próprio procedimento declara que **não executou nem testou retorno ou rollback**. Nenhum dos binários privados ou credenciais foi transferido para GitHub.
 
 **Próximo critério antes de qualquer gravação:** revisar a forma de selecionar `app1` sem escrever no `app0`, especificar com precisão como recuperar a seleção de boot em caso de falha e realizar revisão do plano de contingência. A aprovação da CI e desta leitura NÃO autoriza instalar LAB. `main/manifest.json` e a imagem 0.0.25 seguem intocados.
+
+
+## Kit de retorno com trava dupla — 16/11/2026
+
+**Preparado e validado estaticamente, SEM execução na S3**: arquivo privado `Kit-Retorno-S3-025-v1.ps1`. O arquivo de recuperação é entregue ao operador e NÃO é publicado no repositório porque contém o identificador físico da placa. O backup e a imagem original continuam privados.
+
+### Modo padrão (único recomendado agora)
+
+Rodar em PowerShell 5.1, sem `-AplicarRetorno`. Verifica:
+
+- Python 3.11/esptool 5.1.0; existência e SHA-256 do backup 64 KiB e de cópia privada app0;
+- identidade da ESP32-S3 pelo MAC físico, 16 MB e porta serial; modelo e flash;
+- tabela de partições **lida diretamente da placa**, igual à cópia privada, sem partição `factory`, com `app0`, `app1` e `otadata` nos offsets e tamanhos aprovados;
+- imagem real em `app0` lida na hora, tamanho 1.259.872 bytes e SHA-256 igual ao release oficial;
+- leitura de `otadata` (0xE000, 8192 bytes), preservando snapshot com hash em pasta privada; sem envio do binário nem tokens;
+- termina indicando `PRECHECK_RETORNO_OK: SOMENTE_LEITURA`, `NENHUMA_GRAVACAO_NA_S3: SIM`, `RETORNO_NAO_EXECUTADO: SIM`. Pode ocasionar reboot USB temporário.
+
+### Modo de EMERGÊNCIA futura: bloqueado operacionalmente
+
+O mesmo arquivo contém opção `-AplicarRetorno`, que **NÃO deve ser executada agora**. Ela exige repetir as verificações anteriores e responder **duas confirmações interativas exatas** antes de chamar exclusivamente `esptool erase-region 0xE000 0x2000`. Não contém `write-flash` ou `erase-flash`. Se o erase for iniciado e houver erro, não afirmar que nada foi alterado: o estado de `otadata` pode ser incerto, exigindo inspeção por USB.
+
+A limpeza de `otadata` é uma mudança física, não rollback comprovado no hardware. Em layout sem `factory`, a documentação Espressif prevê boot no primeiro slot OTA disponível (geralmente `ota_0`), desde que a imagem seja válida. O usuário deve verificar posteriormente pelo `/status`: versão 0.0.25, `app0`, estado `VALID`, Wi-Fi e HTTP.
+
+Referências: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/system/ota.html e https://docs.espressif.com/projects/esptool/en/latest/esp32s3/esptool/basic-commands.html
+
+### Validações realizadas sem hardware
+
+- O Python embutido passou `compile()`/AST; checagem estática confirmou que o caminho de apagamento fica atrás de `-AplicarRetorno` e das duas confirmações;
+- o parser de partições foi testado com dados sintéticos: layout esperado aceito, `factory` e endereço `otadata` divergente rejeitados;
+- sintaxe específica do PowerShell 5.1, comportamento do esptool no Windows e recuperação real **ainda dependem de teste físico**. Não considerar esse kit prova de recuperação.
+
+**Próximo passo autorizado na rotina de trabalho:** apenas executar o modo padrão em leitura. A S3 CORE 0.0.25 instalada, a WROOM e os manifestos OTA continuam intactos.
