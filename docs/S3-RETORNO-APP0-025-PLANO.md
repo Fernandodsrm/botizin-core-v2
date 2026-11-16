@@ -94,3 +94,34 @@ Referências: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-re
 - sintaxe específica do PowerShell 5.1, comportamento do esptool no Windows e recuperação real **ainda dependem de teste físico**. Não considerar esse kit prova de recuperação.
 
 **Próximo passo autorizado na rotina de trabalho:** apenas executar o modo padrão em leitura. A S3 CORE 0.0.25 instalada, a WROOM e os manifestos OTA continuam intactos.
+
+## Checkpoint do kit de retorno — pré-verificação física aprovada
+
+**Log de execução física fornecido em 16/11/2026 — SOMENTE LEITURA:**
+
+- `FERRAMENTAS_OK 5.1.0`
+- `BACKUP_64KB_PRIVADO_OK: SHA_CONFERE`
+- `COPIA_APP0_PRIVADA_OK: SHA_CONFERE`
+- `PORTAS_CANDIDATAS: COM5, COM6`
+- **COM6:** esptool reconheceu um dispositivo `ESP32` (não `ESP32-S3`); foi corretamente ignorado. Não usar COM6 para os procedimentos da S3.
+- `PLACA_CONFIRMADA: COM5 | ESP32-S3 | 16MB | MAC_CONFERE`
+- `PARTICOES_REAL_OK: app0=0x10000 app1=0x310000 otadata=0xE000`
+- `APP0_REAL_025_OK: SHA256_CONFERE` (1.259.872 bytes do firmware original)
+- `COPIA_OTADATA_ATUAL_OK: 8192 bytes | HASH_SHA256_VERIFICADO`
+- `PRECHECK_RETORNO_OK: SOMENTE_LEITURA`
+- `COMANDO_ERASE_SIMULADO: erase-region 0xE000 0x2000` **(apenas texto; não foi executado)**
+- `NENHUMA_GRAVACAO_NA_S3: SIM`
+- `RETORNO_NAO_EXECUTADO: SIM`
+
+**Conclusão:** a integridade do slot estável `app0`, a identificação da placa e a disponibilidade de cópias privadas estão verificadas. **Não foi realizado teste de alternância entre slots, escrita em app1, erase de otadata, reinicialização de emergência ou rollback físico.** O snapshot de `otadata` é privado, não deve ser publicado.
+
+### Porta de aprovação para testar o app1 (ainda não liberada)
+
+1. **Inventariar app1 existente antes de sobrescrever:** confirmar se contém firmware útil, coletar identidade, estado e cópia privada recuperável; nenhum `write-flash` enquanto o conteúdo anterior estiver desconhecido.
+2. Validar de forma estática o pacote binário LAB exato (nome de build/versão, SHA-256, core, esquema de partições, credenciais de teste), sem confundi-lo com a CORE 0.0.25 publicada.
+3. Desenhar instalação em `app1` que nunca escreve nos endereços de `app0`, bootloader, tabela de partições ou NVS, com duas barreiras independentes antes da seleção de boot.
+4. Planejar seleção `otadata` conforme algoritmo do bootloader realmente presente; **não improvisar bytes de seleção OTA** nem usar apenas a ordem dos slots como prova de fallback.
+5. Não mudar manifesto de produção, não executar a opção `-AplicarRetorno` e não acionar a OTA antiga pela LAN.
+6. Autorizar qualquer teste de escrita somente após inventário e plano reversível, com verificação de RAM/PSRAM, tempo de inicialização e serviços após boot.
+
+**Estado nesta data:** PRÉ-CHECK APROVADO; INSTALAÇÃO LAB NÃO AUTORIZADA, NENHUMA GRAVAÇÃO REALIZADA.
