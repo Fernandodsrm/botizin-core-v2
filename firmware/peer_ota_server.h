@@ -15,7 +15,7 @@ static String peerOtaReply(const String &id,const String &result) {
     cJSON_AddStringToObject(o,"running_partition",run.c_str()) && cJSON_AddStringToObject(o,"boot_partition",boot.c_str()) &&
     cJSON_AddStringToObject(o,"manual_status",manualOtaStatus.c_str()) &&
     cJSON_AddStringToObject(o,"internet_status",internetStatus.c_str()) && cJSON_AddStringToObject(o,"phase",s3OtaPhase.c_str()) &&
-    cJSON_AddBoolToObject(o,"automatic_enabled",false) && cJSON_AddBoolToObject(o,"candidate_ready",candidateReady()) &&
+    cJSON_AddBoolToObject(o,"automatic_enabled",true) && cJSON_AddBoolToObject(o,"candidate_ready",candidateReady()) &&
     cJSON_AddStringToObject(o,"candidate_id",otaCandidateId.c_str()) && cJSON_AddStringToObject(o,"target_version",otaTargetVersion.c_str()) &&
     cJSON_AddStringToObject(o,"sha256",otaTargetSHA.c_str()) && cJSON_AddNumberToObject(o,"size",otaTargetBytes) &&
     cJSON_AddNumberToObject(o,"expires_in_seconds",manualWindowActive()?(otaManualUntil-millis())/1000:0) &&
