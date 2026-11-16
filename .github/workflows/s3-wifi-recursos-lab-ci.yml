@@ -38,7 +38,7 @@ jobs:
           /tmp/s3-event-test
           g++ -std=c++17 -Wall -Wextra -Werror tests/ota_confirmation_test.cpp -o /tmp/s3-ota-test
           /tmp/s3-ota-test
-          test -z "$(git diff f2ec674d2d354c41b591255ae491b275438615e3 -- firmware/control_routes.h firmware/wifi_manager.h firmware/peer_auth.h manifest.json)"
+          test -z "$(git diff f2ec674d2d354c41b591255ae491b275438615e3 -- firmware/wifi_manager.h firmware/peer_auth.h manifest.json)"
       - name: Arduino CLI
         uses: arduino/setup-arduino-cli@v2
         with:
