@@ -84,7 +84,7 @@ c = Check()
 c.feed(html)
 assert not c.duplicate_ids, c.duplicate_ids
 required = {
-    "page-wifi", "tab-wifi", "wifi-read", "wifi-settings", "wf-ssid",
+    "page-wifi", "tab-wifi", "wifi-read", "wf-scan", "wf-ssid",
     "wf-ip", "wf-rssi", "wf-gateway", "wf-dns", "wf-mdns",
     "wf-ap", "wf-feedback", "page-resources", "tab-resources",
     "resources-read", "rs-free", "rs-min", "rs-largest", "rs-psram",
