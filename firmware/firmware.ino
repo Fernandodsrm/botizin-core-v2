@@ -45,6 +45,7 @@ String telemetryStatus = "WAITING";
 // MQTT counters are declared in mqtt_observer.h after the core OTA functions.
 static String mqttStatusSnapshot();
 static String wifiManagerStatus();
+static String wifiTrialStatus();
 uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
 bool telemetryStopped = false;
@@ -174,6 +175,7 @@ String snapshot() {
   s += "TELEMETRY: " + telemetryStatus + "\n";
   s += mqttStatusSnapshot();
   s += wifiManagerStatus();
+  s += wifiTrialStatus();
   s += eventJournalStatus();
   s += diagnosticText();
   if (priorAttempt.length()) s += "\nLAST_PERSISTED_OTA_ATTEMPT:\n" + priorAttempt;
@@ -600,6 +602,7 @@ void __attribute__((noinline)) sendTelemetry() {
 #include "mqtt_observer.h"
 #include "panel_page.h"
 #include "wifi_manager.h"
+#include "wifi_trial.h"
 #include "wifi_readonly.h"
 #include "control_routes.h"
 
@@ -698,6 +701,7 @@ void loop() {
   diagnosticLoopTick();
   if (!uploadActive && !uploadOK && !rebootScheduled) sampleDiagnostics();
   server.handleClient();
+  wifiTrialTick();
   wifiManagerTick();
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
 #if !BOTIZIN_LAB_OTA_DISABLED
