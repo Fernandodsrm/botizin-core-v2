@@ -571,6 +571,7 @@ void __attribute__((noinline)) sendTelemetry() {
 #include "mqtt_observer.h"
 #include "panel_page.h"
 #include "wifi_manager.h"
+#include "wifi_readonly.h"
 #include "control_routes.h"
 
 void printPartitionTable() {
@@ -626,6 +627,7 @@ void setup() {
   eventJournalRegisterRoute(server);
   beginPeerOtaServer();
   wifiManagerRegisterRoutes();
+  wifiReadOnlyRegisterRoutes();
   controlRegisterRoutes();
   server.on("/update", HTTP_POST, []() {
     if (peerOtaBusy) { server.send(409, "text/plain", "S3 internet OTA busy"); return; }
