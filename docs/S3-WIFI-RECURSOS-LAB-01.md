@@ -30,3 +30,17 @@ Workflow `.github/workflows/s3-wifi-recursos-lab-ci.yml`:
 - Revisar com o usuário o novo painel e confirmar que as ações perigosas continuam bloqueadas.
 - Planejar teste físico somente depois de preparar retorno à base, preservar `app0`, conferir `app1` e backup/recuperação de NVS sem exposição de segredos.
 - Não promover esta branch para `main` nem modificar `manifest.json` para anunciar uma versão LAB.
+
+## Resultado da primeira CI (16/11/2026)
+
+**Aprovada:** [GitHub Actions #43830699345](https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43830699345). Testes estáticos, sintaxe JavaScript, testes unitários existentes e as duas compilações Arduino 3.3.12 foram concluídos com sucesso, sem publicar release.
+
+| Compilação, mesmo ambiente | Tamanho |
+|---|---:|
+| Base histórica compilada com token de teste | 1.264.224 bytes |
+| LAB Wi-Fi + Recursos com token de teste | 1.271.568 bytes |
+| **Crescimento da imagem** | **+7.344 bytes** |
+| Espaço restante estimado no slot LAB de 3 MiB | 1.874.160 bytes |
+
+A comparação em CI emprega o mesmo compilador, flags e token de teste nas duas imagens. **Não comparar diretamente os 1.264.224 bytes desta compilação-base com os 1.259.872 bytes do binário de produção e atribuir a diferença ao módulo.** O custo adicional de RAM, PSRAM e latência na S3 permanece desconhecido até medições físicas. Esta aprovação é de compilação/estática, não de funcionamento em placa.
+
