@@ -78,6 +78,31 @@ jobs:
           assert delta <= 65536, 'Excedeu o teto provisório de crescimento de 64 KiB'
           assert lab['bytes'] <= 3145728
           PY
+      - name: Check LAB image identity before exporting test candidate
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          record=json.loads(Path('dist/build-record.json').read_text())
+          image=Path('dist/firmware.bin').read_bytes()
+          assert record['published'] is False and record['publishable'] is False
+          assert record['device_token_compiled'] is False
+          assert b'LAB_BUILD: WIFI_RECURSOS_01 (EXPERIMENTAL)' in image
+          assert b'OTA_LAB_POLICY: FLASH_WRITES_DISABLED' in image
+          assert image.startswith(b'\xe9') and len(image)<=3145728
+          print('WIFI2_LAB_TEST_ONLY_IMAGE_OK',len(image))
+          PY
+      - name: Save isolated LAB test image (NOT a release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: WIFI2-LAB-TEST-NOT-PRODUCTION
+          path: |
+            dist/firmware.bin
+            dist/firmware.bin.sha256
+            dist/build-record.json
+          retention-days: 7
+          if-no-files-found: error
       - name: Save report only (never firmware for deployment)
         if: always()
         uses: actions/upload-artifact@v4
