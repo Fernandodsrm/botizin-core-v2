@@ -48,3 +48,16 @@ O portal físico de recuperação `/wifi/save` continua disponível **apenas no 
 ## Próximo objetivo
 
 Após CI verde, preparar pacote de teste específico para a LAB e ensaiar rede nova/reversão. **Não repetir backup ou inventariar o outro slot sem uma necessidade surgida no teste.**
+
+## Primeira CI verde — código Wi-Fi 2.0 (16/11/2026)
+
+[Execução GitHub Actions #43959690703](https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43959690703): **SUCCESS**. Asserções sobre o gerenciador por estados, leitura local, autenticação de rotas, ausência de polling e script JavaScript passaram. Compilações da fonte-base e da LAB com `esp32:esp32@3.3.12` e `PubSubClient@2.8` concluíram.
+
+| Imagem compilada na mesma CI | Tamanho |
+|---|---:|
+| CORE 0.0.25 de referência (recompilada com token fictício) | 1.264.224 bytes |
+| LAB com Wi-Fi 2.0, Recursos e bloqueio OTA | 1.262.688 bytes |
+| Delta líquido | **−1.536 bytes** |
+| Margem em slot 3 MiB | 1.883.040 bytes |
+
+A economia líquida **não** é o custo isolado do Wi-Fi, pois também envolve alterações de política OTA na LAB. O RAM/PSRAM extra, queda de pacotes, retorno automático e confirmação ainda não foram medidos em hardware. **Nenhuma atualização foi publicada ou instalada**; os arquivos `main/manifest.json` e `releases/0.0.25/firmware.bin` estão fora desta branch.
