@@ -35,7 +35,7 @@ assert "if(!controlRequireAuth())return;" in controls
 assert "controlReply(409,\"WIFI2_USE_TEST_AND_CONFIRM\");" in controls
 policy = (ROOT / "firmware/lab_policy.h").read_text()
 peer = (ROOT / "firmware/peer_ota_server.h").read_text()
-assert "#define BOTIZIN_LAB_OTA_DISABLED 1" in policy
+assert "#define BOTIZIN_LAB_OTA_DISABLED 0" in policy
 assert '#include "lab_policy.h"' in fw
 for label in (
     "bool queueOtaCheck()",
@@ -47,15 +47,15 @@ for label in (
     assert label + " {\n#if BOTIZIN_LAB_OTA_DISABLED" in fw, label
 assert '#if !BOTIZIN_LAB_OTA_DISABLED\n  if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued)' in fw
 assert 'server.on("/update", HTTP_POST, []() {\n    server.send(403, "text/plain; charset=utf-8", "LAB_OTA_DISABLED");' in fw
-assert 'OTA_AUTOMATIC_ENABLED: NO (LAB)' in fw
-assert 'OTA_LAB_POLICY: FLASH_WRITES_DISABLED' in fw
-assert 'cJSON_AddBoolToObject(root, "ota_automatic_enabled", false)' in fw
-assert 'cJSON_AddBoolToObject(o,"automatic_enabled",false)' in peer
+assert 'OTA_AUTOMATIC_ENABLED: YES' in fw
+assert 'OTA_CANDIDATE_POLICY: OTA_ORIGINAL_RESTORED' in fw
+assert 'cJSON_AddBoolToObject(root, "ota_automatic_enabled", true)' in fw
+assert 'cJSON_AddBoolToObject(o,"automatic_enabled",true)' in peer
 assert 'if (action != "status")' in peer and 'LAB_OTA_DISABLED' in peer
 for fn in ("controlCheckOTA", "controlInstallOTA"):
     assert ("static void " + fn + "() {\n#if BOTIZIN_LAB_OTA_DISABLED") in controls
 assert 'LAB_OTA_DISABLED' in controls
-assert 'LAB_BUILD: WIFI_RECURSOS_01 (EXPERIMENTAL)' in fw
+assert 'CANDIDATE_BUILD: WIFI2_CORE_026 (EXPERIMENTAL)' in fw
 assert 'server.on("/read/wifi", HTTP_GET' in route
 assert "WiFi.status() != WL_CONNECTED" in route
 assert "server.client().localIP() != WiFi.localIP()" in route
@@ -93,9 +93,9 @@ required = {
 assert required <= c.ids, required - c.ids
 assert "async function loadWifiReadOnly()" in html
 assert "async function loadResourceReadOnly()" in html
-assert "LAB 01 · EXPERIMENTAL · SEM OTA" in html
-assert 'id="controlCheckOTA" type="button" disabled' in html
-assert 'id="controlOTAResult" type="button" disabled' in html
+assert "WIFI 2.0 · CORE 0.0.26 CANDIDATA" in html
+assert 'id="controlCheckOTA" type="button"' in html
+assert 'id="controlOTAResult" type="button"' in html
 assert "await read('/read/wifi')" in html
 assert "await read('/status')" in html
 assert "textContent" in html and "innerHTML" not in html
@@ -114,3 +114,13 @@ for forbidden in ("setInterval(", "WebSocket(", "EventSource(", "location.reload
     assert forbidden not in html, forbidden
 assert "firmware/firmware.ino" not in html
 print("S3_WIFI_RECURSOS_READONLY_STATIC_OK", len(html), "HTML bytes")
+
+// Candidate build must restore the original OTA execution on purpose.
+assert '#define BOTIZIN_VERSION "0.0.26"' in (ROOT/"firmware/version.h").read_text()
+assert '#if !BOTIZIN_LAB_OTA_DISABLED' in fw
+assert 'checkInternetOTA(false);' in fw
+assert 'installInternetOTA(v,u,h,n)' in fw
+assert 'server.on("/update", HTTP_POST' in fw
+assert "botizinMqttLoop();" in fw
+assert "sendTelemetry();" in fw
+assert "wifiTrialTick();" in fw
