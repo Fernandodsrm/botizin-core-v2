@@ -136,6 +136,8 @@ String snapshot() {
   const esp_partition_t *run = esp_ota_get_running_partition();
   String s = "BOTIZIN CORE V" + String(BOTIZIN_VERSION) + "\n";
   s += "TEST_RESULT: Deu certo na atualização\n";
+  // LAB marker: this image MUST NOT be confused with the protected 0.0.25 release.
+  s += "LAB_BUILD: WIFI_RECURSOS_01 (EXPERIMENTAL)\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
   s += "LOCAL_NAME: " BOTIZIN_LOCAL_NAME ".local\n";
   s += "MDNS: " + String(localNameReady ? "READY" : "WAITING") + "\n";
