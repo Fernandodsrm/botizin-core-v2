@@ -23,16 +23,16 @@ for label in (
     "void checkInternetOTA(bool manual)",
     "void installInternetOTA(const String &targetVersion, const String &targetURL, const String &targetSHA, size_t targetBytes)",
 ):
-    assert label + " {\\n#if BOTIZIN_LAB_OTA_DISABLED" in fw, label
-assert '#if !BOTIZIN_LAB_OTA_DISABLED\\n  if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued)' in fw
-assert 'server.on("/update", HTTP_POST, []() {\\n    server.send(403, "text/plain; charset=utf-8", "LAB_OTA_DISABLED");' in fw
+    assert label + " {\n#if BOTIZIN_LAB_OTA_DISABLED" in fw, label
+assert '#if !BOTIZIN_LAB_OTA_DISABLED\n  if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued)' in fw
+assert 'server.on("/update", HTTP_POST, []() {\n    server.send(403, "text/plain; charset=utf-8", "LAB_OTA_DISABLED");' in fw
 assert 'OTA_AUTOMATIC_ENABLED: NO (LAB)' in fw
 assert 'OTA_LAB_POLICY: FLASH_WRITES_DISABLED' in fw
 assert 'cJSON_AddBoolToObject(root, "ota_automatic_enabled", false)' in fw
 assert 'cJSON_AddBoolToObject(o,"automatic_enabled",false)' in peer
 assert 'if (action != "status")' in peer and 'LAB_OTA_DISABLED' in peer
 for fn in ("controlCheckOTA", "controlInstallOTA"):
-    assert ("static void " + fn + "() {\\n#if BOTIZIN_LAB_OTA_DISABLED") in controls
+    assert ("static void " + fn + "() {\n#if BOTIZIN_LAB_OTA_DISABLED") in controls
 assert 'LAB_OTA_DISABLED' in controls
 assert 'LAB_BUILD: WIFI_RECURSOS_01 (EXPERIMENTAL)' in fw
 assert 'server.on("/read/wifi", HTTP_GET' in route
