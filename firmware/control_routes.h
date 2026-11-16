@@ -119,21 +119,71 @@ static void controlConnectivity() {
   s+="OTA: "+internetStatus+"\n";
   controlReply(200,s);
 }
-static void controlSaveWiFi() {
+// Wi-Fi 2.0: connected STA + admin session required for every action.
+static void controlWifiTest() {
   if(!controlRequireAuth())return;
   if(rebootScheduled || uploadActive || uploadOK || peerOtaBusy || otaInstallQueued ||
-     !wifiManagerReady || !wifiOnValidCredentials(server.arg("ssid"),server.arg("password"))){
-    controlReply(409,"WIFI_CHANGE_BLOCKED_OR_INVALID");return;
+     wifiTrialActive()) {controlReply(409,"WIFI_TEST_BUSY");return;}
+  if(!server.hasArg("ssid") || !server.hasArg("password") ||
+     !wifiOnValidCredentials(server.arg("ssid"),server.arg("password"))) {
+    controlReply(400,"WIFI_CREDENTIALS_INVALID");return;
   }
-  const String ssid=server.arg("ssid"), pass=server.arg("password");
-  // Do not log either field; existing NVS namespace already used by setup portal.
-  if(!wifiManagerStoreCredentials(ssid,pass)){controlReply(500,"NVS_SAVE_FAILED");return;}
-  controlReply(202,"WIFI_SAVED_REBOOTING. Wrong network? Recovery AP opens after disconnect.");
-  wifiRestartAfter=millis()+2600UL;
+  if(!wifiTrialStage(server.arg("ssid"),server.arg("password"))) {
+    controlReply(409,String("WIFI_TEST_BLOCKED: ")+wifiTrialOutcome);return;
+  }
+  controlReply(202,"WIFI_TEST_QUEUED. Conexao antiga nao foi apagada. Aguarde e confirme em ate 120 s depois que a nova rede conectar.");
+}
+static void controlWifiConfirm() {
+  if(!controlRequireAuth())return;
+  if(wifiTrialConfirm()) controlReply(200,"WIFI_CONFIRMED_AND_SAVED");
+  else controlReply(409,"WIFI_CONFIRM_UNAVAILABLE_OR_FAILED");
+}
+static void controlWifiTrialState() {
+  if(!controlRequireAuth())return;
+  controlReply(200,wifiTrialStatus());
+}
+static void controlWifiScan() {
+  if(!controlRequireAuth())return;
+  if(wifiTrialActive() || rebootScheduled || uploadActive || uploadOK || peerOtaBusy) {
+    controlReply(409,"WIFI_SCAN_BUSY");return;
+  }
+  // Explicit request only; synchronous scan is bounded by the Wi-Fi driver.
+  // Never return credentials or trigger scans from the main loop.
+  const int count=WiFi.scanNetworks(false,true);
+  if(count<0) {WiFi.scanDelete();controlReply(503,"WIFI_SCAN_FAILED");return;}
+  cJSON *root=cJSON_CreateObject(), *list=cJSON_CreateArray();
+  bool ok=root && list;
+  if(ok) cJSON_AddItemToObject(root,"networks",list);
+  if(ok) for(int i=0;i<count && i<20;i++) {
+    String name=WiFi.SSID(i);
+    if(name.isEmpty())continue;
+    cJSON *item=cJSON_CreateObject();
+    if(!item) {ok=false;break;}
+    ok=cJSON_AddStringToObject(item,"ssid",name.c_str()) &&
+       cJSON_AddNumberToObject(item,"rssi_dbm",WiFi.RSSI(i)) &&
+       cJSON_AddNumberToObject(item,"channel",WiFi.channel(i)) &&
+       cJSON_AddNumberToObject(item,"auth",WiFi.encryptionType(i));
+    if(!ok) {cJSON_Delete(item);break;}
+    cJSON_AddItemToArray(list,item);
+  }
+  WiFi.scanDelete();
+  char *json=ok?cJSON_PrintUnformatted(root):nullptr;
+  if(root)cJSON_Delete(root);
+  else if(list)cJSON_Delete(list);
+  if(!json) {controlReply(503,"NO_MEMORY");return;}
+  server.sendHeader("Cache-Control","no-store");
+  server.sendHeader("X-Content-Type-Options","nosniff");
+  server.send(200,"application/json; charset=utf-8",json);
+  cJSON_free(json);
+}
+static void controlSaveWiFi() {
+  // Legacy immediate NVS/reboot path deliberately disabled in LAB.
+  if(!controlRequireAuth())return;
+  controlReply(409,"WIFI2_USE_TEST_AND_CONFIRM");
 }
 static void controlReboot() {
   if(!controlRequireAuth())return;
-  if(rebootScheduled || peerOtaBusy || uploadActive || uploadOK ||
+  if(rebootScheduled || peerOtaBusy || uploadActive || uploadOK || wifiTrialActive() ||
      otaCheckQueued || otaInstallQueued) {controlReply(409,"REBOOT_BLOCKED_BUSY");return;}
   controlReply(202,"REBOOT_SCHEDULED_IN_2_SECONDS");
   eventRecord(EV_OTA_REBOOT,EV_INFO,"PANEL_USER_REBOOT");
@@ -152,5 +202,9 @@ static void controlRegisterRoutes() {
   server.on("/control/cancel-ota",HTTP_POST,controlCancelOTA);
   server.on("/control/connections",HTTP_POST,controlConnectivity);
   server.on("/control/wifi-save",HTTP_POST,controlSaveWiFi);
+  server.on("/control/wifi-test",HTTP_POST,controlWifiTest);
+  server.on("/control/wifi-confirm",HTTP_POST,controlWifiConfirm);
+  server.on("/control/wifi-state",HTTP_POST,controlWifiTrialState);
+  server.on("/control/wifi-scan",HTTP_POST,controlWifiScan);
   server.on("/control/reboot",HTTP_POST,controlReboot);
 }
