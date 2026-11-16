@@ -61,3 +61,9 @@ Após CI verde, preparar pacote de teste específico para a LAB e ensaiar rede n
 | Margem em slot 3 MiB | 1.883.040 bytes |
 
 A economia líquida **não** é o custo isolado do Wi-Fi, pois também envolve alterações de política OTA na LAB. O RAM/PSRAM extra, queda de pacotes, retorno automático e confirmação ainda não foram medidos em hardware. **Nenhuma atualização foi publicada ou instalada**; os arquivos `main/manifest.json` e `releases/0.0.25/firmware.bin` estão fora desta branch.
+
+## Artefato LAB de teste (sem publicação OTA)
+
+[GitHub Actions #43960474030](https://github.com/Fernandodsrm/botizin-core-v2/actions/runs/43960474030): **SUCCESS**. Artefato disponível pelo GitHub Actions como `WIFI2-LAB-TEST-NOT-PRODUCTION`, incluindo `firmware.bin`, `firmware.bin.sha256` e `build-record.json`. CI verificou marcador de imagem LAB e política `OTA_LAB_POLICY: FLASH_WRITES_DISABLED`. Não foi criado release nem atualizado `main/manifest.json`.
+
+**Condições de uso:** imagem criada com **token de validação não funcional** para ThingsBoard. É um firmware de ensaio de Wi-Fi/recursos, não uma atualização de produção. A instalação não ocorreu nesta etapa e exige procedimento específico para imagem experimental. O código continua preservando o firmware 0.0.25 original em `app0`.
