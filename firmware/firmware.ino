@@ -259,7 +259,7 @@ void beginUpload(const String &length, const String &sha) {
     for (size_t i = 0; i < expectedSha.length(); ++i) validSha = validSha && (isxdigit((unsigned char)expectedSha[i]) != 0);
     logLine("EXPECTED_BYTES: " + String(expectedBytes));
     logLine("SHA_EXPECTED: " + expectedSha);
-    if (!otaReady || rebootScheduled || !destination || !validSha || expectedBytes == 0 ||
+    if (wifiTrialActive() || !otaReady || rebootScheduled || !destination || !validSha || expectedBytes == 0 ||
         expectedBytes > destination->size) {
       failUpload("invalid metadata, hardware, partitions or pending reboot; Update.begin NOT CALLED"); return;
     }
@@ -352,6 +352,7 @@ void stopInternet(const String &reason) {
 }
 
 void checkInternetOTA(bool manual) {
+  if (wifiTrialActive()) { internetStatus="WIFI_TRIAL_IN_PROGRESS"; return; }
 #if BOTIZIN_LAB_OTA_DISABLED
   (void)manual;
   internetStatus = "LAB_OTA_DISABLED";
@@ -450,7 +451,7 @@ void installInternetOTA(const String &targetVersion, const String &targetURL, co
   manualOtaStatus = "LAB_OTA_DISABLED";
   return;
 #endif
-  if (!otaReady || internetStopped || uploadActive || uploadOK || rebootScheduled || WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000 || !newerVersion(targetVersion)) {
+  if (wifiTrialActive() || !otaReady || internetStopped || uploadActive || uploadOK || rebootScheduled || WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000 || !newerVersion(targetVersion)) {
     manualOtaStatus = "INSTALL_REJECTED"; return;
   }
   eventRecord(EV_OTA_START,EV_INFO,"HTTPS_DOWNLOAD");
@@ -722,7 +723,7 @@ void loop() {
     if (!manualWindowActive()) { clearOtaCandidate(); peerOtaBusy = true; checkInternetOTA(false); peerOtaBusy = false; }
   }
 #endif // BOTIZIN_LAB_OTA_DISABLED
-  if (!rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
+  if (!wifiTrialActive() && !rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
       (int32_t)(millis() - nextTelemetry) >= 0) {
     nextTelemetry = millis() + 60000;
     sendTelemetry();
