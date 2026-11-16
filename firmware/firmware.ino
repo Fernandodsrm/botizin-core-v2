@@ -144,7 +144,7 @@ String snapshot() {
   String s = "BOTIZIN CORE V" + String(BOTIZIN_VERSION) + "\n";
   s += "TEST_RESULT: Deu certo na atualização\n";
   // LAB marker: this image MUST NOT be confused with the protected 0.0.25 release.
-  s += "LAB_BUILD: WIFI_RECURSOS_01 (EXPERIMENTAL)\n";
+  s += "CANDIDATE_BUILD: WIFI2_CORE_026 (EXPERIMENTAL)\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
   s += "LOCAL_NAME: " BOTIZIN_LOCAL_NAME ".local\n";
   s += "MDNS: " + String(localNameReady ? "READY" : "WAITING") + "\n";
@@ -168,8 +168,8 @@ String snapshot() {
   s += "WIFI: " + String(WiFi.status() == WL_CONNECTED ? "OK" : "DISCONNECTED") + "\n";
   s += "OTA: " + String(otaReady ? "READY" : "BLOCKED: hardware/partition mismatch") + "\n";
   s += "INTERNET_OTA: " + internetStatus + "\n";
-  s += "OTA_AUTOMATIC_ENABLED: NO (LAB)\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
-  s += "OTA_LAB_POLICY: FLASH_WRITES_DISABLED\n";
+  s += "OTA_AUTOMATIC_ENABLED: YES\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
+  s += "OTA_CANDIDATE_POLICY: OTA_ORIGINAL_RESTORED\n";
   s += "PEER_PAIRED: " + String(peerKey.length() == 64 ? "YES" : "NO") + "\n";
   s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
   s += "CHECK_INTERVAL_SECONDS: 60\n";
@@ -552,7 +552,7 @@ void __attribute__((noinline)) sendTelemetry() {
     cJSON_AddStringToObject(root, "reset_reason", resetText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_state", stateText.c_str()) &&
     cJSON_AddStringToObject(root, "ota_journal", evidence.c_str()) &&
-    cJSON_AddBoolToObject(root, "ota_automatic_enabled", false) &&
+    cJSON_AddBoolToObject(root, "ota_automatic_enabled", true) &&
     cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str()) &&
     cJSON_AddBoolToObject(root, "peer_paired", peerKey.length() == 64);
   ok = ok && diagnosticJSON(root);
