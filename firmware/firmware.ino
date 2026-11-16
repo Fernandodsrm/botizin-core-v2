@@ -46,6 +46,7 @@ String telemetryStatus = "WAITING";
 static String mqttStatusSnapshot();
 static String wifiManagerStatus();
 static String wifiTrialStatus();
+static bool wifiTrialActive();
 uint32_t nextTelemetry = 0, telemetrySequence = 0;
 uint8_t telemetryFailures = 0;
 bool telemetryStopped = false;
