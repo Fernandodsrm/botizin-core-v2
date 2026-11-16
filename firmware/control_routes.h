@@ -64,6 +64,10 @@ static void controlLogout() {
   controlReply(200,"LOGGED_OUT");
 }
 static void controlCheckOTA() {
+#if BOTIZIN_LAB_OTA_DISABLED
+  controlReply(403, "LAB_OTA_DISABLED");
+  return;
+#endif
   if(!controlRequireAuth())return;
   if(!queueOtaCheck()){controlReply(409,"OTA_BUSY_OR_BLOCKED");return;}
   controlReply(202,"OTA_CHECK_QUEUED. Consult result manually.");
@@ -80,6 +84,10 @@ static void controlOTAResult() {
   } else controlReply(200,String("NO_CANDIDATE|")+manualOtaStatus+"|"+internetStatus);
 }
 static void controlInstallOTA() {
+#if BOTIZIN_LAB_OTA_DISABLED
+  controlReply(403, "LAB_OTA_DISABLED");
+  return;
+#endif
   if(!controlRequireAuth())return;
   if(server.arg("candidate_id").length()>100 ||server.arg("target_version").length()>32 ||
      server.arg("sha256").length()!=64 ||server.arg("boot_id").length()>40) {
