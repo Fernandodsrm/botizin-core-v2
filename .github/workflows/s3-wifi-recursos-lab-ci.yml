@@ -1,4 +1,4 @@
-name: Wi-Fi 2.0 CORE 0.0.26 Candidate (sem publicar)
+name: Wi-Fi 2.0 CORE 0.0.26 (binario na branch candidata)
 on:
   push:
     branches: ['candidate/wifi2-core-0.0.26']
@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-and-compare:
@@ -17,11 +17,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
-      - name: Checkout branch (sem credenciais de push)
+      - name: Checkout branch (publicacao apenas no branch candidato)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: false
+          persist-credentials: true
       - name: Static invariants and JS syntax (sem placa)
         run: |
           set -euo pipefail
@@ -49,14 +49,14 @@ jobs:
           arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli lib install 'PubSubClient@2.8'
-      - name: Build original baseline with test-only token
+      - name: Build baseline historica somente para comparar tamanho
         run: |
           set -euo pipefail
           mkdir -p /tmp/botizin-report
           git worktree add --detach /tmp/botizin-base f2ec674d2d354c41b591255ae491b275438615e3
           (cd /tmp/botizin-base && unset BOTIZIN_TB_DEVICE_TOKEN && python3 ci/build.py)
           cp /tmp/botizin-base/dist/build-record.json /tmp/botizin-report/baseline.json
-      - name: Build LAB with same toolchain (no publish)
+      - name: Build CORE 0.0.26 sem ThingsBoard
         run: |
           set -euo pipefail
           unset BOTIZIN_TB_DEVICE_TOKEN
@@ -78,7 +78,7 @@ jobs:
           assert delta <= 65536, 'Excedeu o teto provisório de crescimento de 64 KiB'
           assert lab['bytes'] <= 3145728
           PY
-      - name: Check LAB image identity before exporting test candidate
+      - name: Verificar identidade e ausencia ThingsBoard
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -87,12 +87,30 @@ jobs:
           record=json.loads(Path('dist/build-record.json').read_text())
           image=Path('dist/firmware.bin').read_bytes()
           assert record['published'] is False and record['publishable'] is False
-          assert record['device_token_compiled'] is False
+          assert record['device_token_compiled'] is False and record['thingsboard_enabled'] is False
+          assert b'thingsboard.cloud' not in image
+          assert b'VALIDATION_ONLY_NOT_A_DEVICE_TOKEN' not in image
           assert b'CANDIDATE_BUILD: WIFI2_CORE_026 (EXPERIMENTAL)' in image
           assert b'OTA_CANDIDATE_POLICY: OTA_ORIGINAL_RESTORED' in image
           assert image.startswith(b'\xe9') and len(image)<=3145728
           print('WIFI2_CORE_026_TEST_ONLY_IMAGE_OK',len(image))
           PY
+      - name: Publicar BIN de teste somente na branch candidata (main intocada)
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = 'refs/heads/candidate/wifi2-core-0.0.26'
+          test "$(git branch --show-current)" = 'candidate/wifi2-core-0.0.26'
+          mkdir -p packages/wifi2-0.0.26
+          cp dist/firmware.bin packages/wifi2-0.0.26/firmware.bin
+          cp dist/firmware.bin.sha256 packages/wifi2-0.0.26/firmware.bin.sha256
+          cp dist/build-record.json packages/wifi2-0.0.26/build-record.json
+          git add -f packages/wifi2-0.0.26/firmware.bin packages/wifi2-0.0.26/firmware.bin.sha256 packages/wifi2-0.0.26/build-record.json
+          if git diff --cached --quiet; then
+            echo 'BIN candidato ja atualizado'
+          else
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'build(wifi2): candidato 0.0.26 sem ThingsBoard (nao e release)'
+            git push origin HEAD:refs/heads/candidate/wifi2-core-0.0.26
+          fi
       - name: Save isolated LAB test image (NOT a release)
         uses: actions/upload-artifact@v4
         with:
