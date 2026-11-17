@@ -143,7 +143,7 @@ String snapshot() {
   String s = "BOTIZIN CORE V" + String(BOTIZIN_VERSION) + "\n";
   s += "TEST_RESULT: Deu certo na atualização\n";
   // LAB marker: this image MUST NOT be confused with the protected 0.0.25 release.
-  s += "CANDIDATE_BUILD: WIFI2_UX_027 (EXPERIMENTAL)\n";
+  s += "CANDIDATE_BUILD: WIFI2_FINAL_028 (EXPERIMENTAL)\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
   s += "LOCAL_NAME: " BOTIZIN_LOCAL_NAME ".local\n";
   s += "MDNS: " + String(localNameReady ? "READY" : "WAITING") + "\n";
@@ -576,7 +576,7 @@ void setup() {
     wifiManagerConnectKnown();
   }
   uint32_t start = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - start < 30000) delay(100);
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 30000) { wifiManagerTick(); delay(100); }
   eventJournalObserveWiFi();
   Serial.println(snapshot());
   server.on("/", HTTP_GET, wifiPortalRouteHome);
