@@ -250,16 +250,57 @@ static void controlReboot() {
   rebootAt=millis()+2200UL;
   rebootScheduled=true;
 }
+
+/* OTA3 — manual catalog, staging and boot selection. Protected by existing session. */
+static void controlOTA3StartCatalog() {
+  if(!controlRequireAuth())return;
+  if(!ota3Start(1)){controlReply(409,"OTA3_OCUPADO_OU_SEM_WIFI");return;}
+  controlReply(202,"OTA3_CATALOG_QUEUED");
+}
+static void controlOTA3Catalog() {
+  if(!controlRequireAuth())return;
+  if(ota3IsBusy()){controlReply(202,"OTA3_PROCESSING");return;}
+  server.sendHeader("Cache-Control","no-store");
+  server.sendHeader("X-Content-Type-Options","nosniff");
+  server.send(200,"application/json; charset=utf-8",ota3CatalogResponse());
+}
+static void controlOTA3Status() {
+  if(!controlRequireAuth())return;
+  controlReply(200,ota3Status()+ota3SlotSnapshot(0)+ota3SlotSnapshot(1));
+}
+static void controlOTA3Install() {
+  if(!controlRequireAuth())return;
+  String id=server.arg("id");
+  if(id.length()<3||id.length()>40){controlReply(400,"VERSAO_INVALIDA");return;}
+  if(!ota3Start(2,id)){controlReply(409,"OTA3_OCUPADO_OU_CATALOGO_VAZIO");return;}
+  controlReply(202,"OTA3_INSTALL_QUEUED");
+}
+static void controlOTA3Switch() {
+  if(!controlRequireAuth())return;
+  String slot=server.arg("slot");
+  if(slot!="0" && slot!="1"){controlReply(400,"SLOT_INVALIDO");return;}
+  String reason;
+  if(!ota3SelectBoot(slot=="0"?0:1,reason)) {
+    controlReply(409,reason);return;
+  }
+  // Reply first; the event loop performs the reset later.
+  controlReply(202,reason+"; REBOOT_EM_2_SEGUNDOS");
+  eventRecord(EV_OTA_REBOOT,EV_INFO,"OTA3_USER_SWITCH",true);
+  rebootAt=millis()+2200UL;
+  rebootScheduled=true;
+}
+
 static void controlRegisterRoutes() {
   // Header collected only for protected routes, not returned by /status or /events.
   const char *headers[]={"X-Botizin-Nonce","X-Botizin-MAC","X-Botizin-Session","Cookie"};
   server.collectHeaders(headers,4);
   server.on("/control/login",HTTP_POST,controlLogin);
   server.on("/control/logout",HTTP_POST,controlLogout);
-  server.on("/control/check-ota",HTTP_POST,controlCheckOTA);
-  server.on("/control/ota-result",HTTP_POST,controlOTAResult);
-  server.on("/control/install-ota",HTTP_POST,controlInstallOTA);
-  server.on("/control/cancel-ota",HTTP_POST,controlCancelOTA);
+  server.on("/control/ota3/catalog-refresh",HTTP_POST,controlOTA3StartCatalog);
+  server.on("/control/ota3/catalog",HTTP_POST,controlOTA3Catalog);
+  server.on("/control/ota3/status",HTTP_POST,controlOTA3Status);
+  server.on("/control/ota3/install",HTTP_POST,controlOTA3Install);
+  server.on("/control/ota3/boot",HTTP_POST,controlOTA3Switch);
   server.on("/control/connections",HTTP_POST,controlConnectivity);
   server.on("/control/wifi-save",HTTP_POST,controlSaveWiFi);
   server.on("/control/wifi-test",HTTP_POST,controlWifiTest);
