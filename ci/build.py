@@ -24,15 +24,14 @@ def main():
         raise SystemExit("No compiled Wi-Fi credentials allowed in cloud/public builds.")
     if "static uint8_t buffer[4096]" not in sketch:
         raise SystemExit("Validated stack fix is missing. STOP.")
-    token = os.environ.get("BOTIZIN_TB_DEVICE_TOKEN", "").strip()
-    publishable = bool(token)
-    if not token:
-        token = "VALIDATION_ONLY_NOT_A_DEVICE_TOKEN"
-        print("VALIDATION BUILD ONLY: add BOTIZIN_TB_DEVICE_TOKEN secret before release.", flush=True)
-    if not re.fullmatch(r"[A-Za-z0-9_-]{16,128}", token) or token.startswith("tb_"):
-        raise SystemExit("Invalid device credential. Account API keys are forbidden.")
-    (source / "telemetry_config.h").write_text(
-        '#pragma once\n#define BOTIZIN_TB_DEVICE_TOKEN ' + json.dumps(token) + '\n')
+    # Wi-Fi 2.0 only. No ThingsBoard credentials; never request/inject them.
+    if "telemetry_config.h" in sketch or "sendTelemetry(" in sketch or "thingsboard.cloud" in sketch:
+        raise SystemExit("ThingsBoard integration still present: STOP.")
+    publishable = False
+    token_file = source / "telemetry_config.h"
+    if token_file.exists():
+        raise SystemExit("Unexpected secret/token header: STOP.")
+    print("WIFI2_ONLY: legacy ThingsBoard fully disabled; no device token.", flush=True)
     dist = ROOT / "dist"
     dist.mkdir(exist_ok=True)
     cores = subprocess.check_output(["arduino-cli", "core", "list", "--format", "json"], text=True)
@@ -76,7 +75,7 @@ def main():
               "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
               "bytes": len(payload), "sha256": sha, "wifi_credentials_compiled": False,
               "published": False, "publishable": publishable,
-              "device_token_compiled": publishable}
+              "device_token_compiled": False, "thingsboard_enabled": False}
     (dist / "build-record.json").write_text(json.dumps(record, indent=2) + "\n")
     print(json.dumps(record, indent=2), flush=True)
     print("CLOUD COMPILE VERIFIED. No OTA publication. Physical test still required.", flush=True)
