@@ -47,6 +47,7 @@ static String wifiManagerStatus();
 static String wifiTrialStatus();
 static bool wifiTrialActive();
 static bool controlSessionValid();
+static bool controlRequireAuth();
 
 String telemetryBootId;
 #include "diagnostics.h"
