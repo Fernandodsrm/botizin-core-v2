@@ -346,6 +346,7 @@ $('controlLogout').addEventListener('click',async()=>{
  clearControlSession('Comandos bloqueados.');
 });
 $('controlConnections').addEventListener('click',()=>runControl('/control/connections'));
+function showText(id,value){$(id).textContent=String(value)}
 const ota3Output=(message)=>{showText('ota3-output',message);};
 async function ota3GetStatus(){
  const reply=await runControl('/control/ota3/status');
