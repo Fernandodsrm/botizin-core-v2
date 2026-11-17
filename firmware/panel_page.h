@@ -51,7 +51,7 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <main>
 <header><div><div class="logo">FERNANDO LAB</div><h1>BOTIZIN / Central da S3</h1></div>
 <div class="flag">WIFI 2.0 · CORE 0.0.26 CANDIDATA</div></header>
-<p class="description">CORE 0.0.26 candidata: Wi-Fi 2.0 com teste antes de salvar. MQTT, ThingsBoard e OTA herdados; valide estes serviços depois da instalação.</p>
+<p class="description">CORE 0.0.26 candidata: Wi-Fi 2.0 com teste antes de salvar. MQTT e OTA preservados. ThingsBoard e RPC legados desativados nesta candidata.</p>
 <div class="state" id="state" role="status" aria-live="polite">Nenhum diagnóstico recebido.</div>
 <div class="g" id="metrics">
 <div class="metric"><div class="k">Firmware / slot</div><div class="v" id="firmware">—</div></div>
@@ -163,7 +163,7 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 </section>
 <section class="panel" id="terminal-panel">
 <h2>Terminal de diagnóstico · somente leitura</h2>
-<p class="muted small">Comandos permitidos: <code>ajuda</code>, <code>status</code>, <code>eventos</code>, <code>boot</code>, <code>wifi</code>, <code>http</code>, <code>ota</code>, <code>memoria</code>, <code>mqtt</code>, <code>thingsboard</code>, <code>limpar</code>. Nenhum PowerShell é executado.</p>
+<p class="muted small">Comandos permitidos: <code>ajuda</code>, <code>status</code>, <code>eventos</code>, <code>boot</code>, <code>wifi</code>, <code>http</code>, <code>ota</code>, <code>memoria</code>, <code>mqtt</code>, <code>limpar</code>. Nenhum PowerShell é executado.</p>
 <pre class="term-log" id="termOutput" role="log" aria-live="polite">BOTIZIN Console v1 | Somente consulta manual.
 Digite ajuda para listar comandos.</pre>
 <form class="term-form" id="termForm" autocomplete="off">
@@ -315,7 +315,7 @@ function renderStatus(txt){
  ['HTTP atendido',confirmed],
  ['Última requisição',get(d,'HTTP_LAST_REQUEST_AGE_S')+' s atrás'],
  ['Gerenciador Wi-Fi',get(d,'WIFI_SETUP')],
- ['ThingsBoard',get(d,'TELEMETRY')],
+ ['Telemetria legada', 'Desativada'],
  ['MQTT',get(d,'MQTT_LAST')],
  ['Eventos na RAM',get(d,'EVENTS_RAM')],
  ['Eventos perdidos',get(d,'EVENTS_OVERWRITTEN')]
@@ -342,7 +342,7 @@ $('refresh').addEventListener('click',loadStatus);
 $('eventsBtn').addEventListener('click',loadEvents);
 $('copy').addEventListener('click',async()=>{if(!statusLoaded)return;try{await navigator.clipboard.writeText(latestStatus);$('statusTime').textContent='Diagnóstico copiado.'}catch(e){$('statusTime').textContent='Cópia não permitida neste navegador. Use /status.'}});
 // Command allowlist runs INSIDE browser. No eval, shell, hardware writes or control endpoints.
-const allowed=['ajuda','status','eventos','boot','wifi','http','ota','memoria','mqtt','thingsboard','limpar'];
+const allowed=['ajuda','status','eventos','boot','wifi','http','ota','memoria','mqtt','limpar'];
 const termLog=$('termOutput');
 function termWrite(line){
  termLog.textContent+='\n'+line;
@@ -357,8 +357,7 @@ const views={
  ota:[['Versão do manifesto','INTERNET_OTA'],['Estado firmware','RUNNING_OTA_STATE'],['Rodando','RUNNING_PARTITION'],['Próxima gravação','NEXT_UPDATE_PARTITION'],['Confirmação','OTA_CONFIRMATION_MODE'],['OTA disponível','OTA'],['Manual','OTA_MANUAL_STATUS']],
  memoria:[['Heap livre (bytes)','DIAG_FREE'],['Heap mínimo (bytes)','DIAG_MIN'],['Maior bloco (bytes)','DIAG_LARGEST'],['PSRAM livre (bytes)','DIAG_PSRAM'],['Espaço OTA livre (bytes)','DIAG_OTA_FREE']],
  mqtt:[['Última publicação','MQTT_LAST'],['Tentativas','MQTT_ATTEMPTS'],['Sucessos','MQTT_SUCCESSES']],
- thingsboard:[['Telemetria','TELEMETRY'],['Maior tempo de envio (us)','DIAG_TB_MAX_US']]
-};
+ };
 async function terminalCommand(command){
  const cmd=command.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
  if(!cmd)return;
