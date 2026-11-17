@@ -188,7 +188,7 @@ static void wifiPortalRouteHome() {
       server.send_P(200,"text/html; charset=utf-8",kBotizinLoginHTML);
       return;
     }
-    controlSessionUntil=millis()+600000UL;
+    controlRequireAuth(); // validated above; refresh idle timeout
     server.send_P(200,"text/html; charset=utf-8",kBotizinPanelHTML);
   }
 }
