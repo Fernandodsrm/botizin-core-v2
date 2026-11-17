@@ -109,6 +109,11 @@ jobs:
             echo 'BIN candidato ja atualizado'
           else
             git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'build(wifi2): candidato 0.0.27 sem ThingsBoard (nao e release)'
+            # Documentation-only concurrent commits must not break an already verified build.
+            git fetch origin refs/heads/candidate/wifi2-ux-0.0.27:refs/remotes/origin/candidate/wifi2-ux-0.0.27
+            changed=$(git diff --name-only "${GITHUB_SHA}" refs/remotes/origin/candidate/wifi2-ux-0.0.27 -- firmware tests ci .github)
+            test -z "$changed" || { echo "SOURCE_CHANGED_DURING_BUILD"; exit 1; }
+            git rebase refs/remotes/origin/candidate/wifi2-ux-0.0.27
             git push origin HEAD:refs/heads/candidate/wifi2-ux-0.0.27
           fi
       - name: Save isolated LAB test image (NOT a release)
