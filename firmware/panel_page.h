@@ -537,6 +537,45 @@ function startWifiWatch(){
  }
  tick();
 }
+async function refreshKnownNetworks(){
+ const list=$('wf-known-list');
+ const result=await wifiCommand('/control/wifi-known',{},true);
+ if(!result){list.textContent='Sem resposta das redes lembradas.';return}
+ let data;try{data=JSON.parse(result)}catch(e){list.textContent='Erro na lista das redes.';return}
+ list.replaceChildren();
+ const label=document.createElement('p');
+ label.textContent=data.networks.length+' / '+data.capacity+' redes lembradas. Preferida: '+(data.preferred||'nenhuma');
+ list.append(label);
+ if(!data.networks.length){list.append(document.createTextNode('Nenhuma rede cadastrada.'));return}
+ for(const net of data.networks){
+   const row=document.createElement('div');
+   row.className='control-line';row.style.margin='9px 0';
+   const name=document.createElement('span');
+   name.textContent=(net.active?'● ':'○ ')+net.ssid+(net.active?' — conectada':'');
+   row.append(name);
+   if(!net.active){
+     const btn=document.createElement('button');
+     btn.type='button';btn.textContent='Esquecer';btn.style.marginLeft='auto';
+     btn.addEventListener('click',async()=>{
+       if(!window.confirm('Esquecer a rede '+net.ssid+' e sua senha salva?'))return;
+       const r=await wifiCommand('/control/wifi-forget',{ssid:net.ssid});
+       if(r)refreshKnownNetworks();
+     });
+     row.append(btn);
+   }
+   list.append(row);
+ }
+}
+$('wf-known-refresh').addEventListener('click',refreshKnownNetworks);
+$('tab-wifi').addEventListener('click',()=>{loadWifiReadOnly();refreshKnownNetworks()});
+$('wf-copy').addEventListener('click',async()=>{
+ const el=$('wf-tested-address');el.select();el.setSelectionRange(0,el.value.length);
+ try{
+   if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(el.value);
+   else if(!document.execCommand('copy'))throw Error('copy');
+   showText('wf-feedback','Endereço copiado. Entre na rede nova antes de abrir.');
+ }catch(e){showText('wf-feedback','Copie o endereço selecionado usando Ctrl+C.')}
+});
 $('wf-scan').addEventListener('click',async()=>{
   const btn=$('wf-scan');btn.disabled=true;
   wifiFeedback('Procurando redes 2,4 GHz nesta solicitação…');
