@@ -143,7 +143,7 @@ String snapshot() {
   String s = "BOTIZIN CORE V" + String(BOTIZIN_VERSION) + "\n";
   s += "TEST_RESULT: Deu certo na atualização\n";
   // LAB marker: this image MUST NOT be confused with the protected 0.0.25 release.
-  s += "CANDIDATE_BUILD: WIFI2_FINAL_028 (EXPERIMENTAL)\n";
+  s += "CANDIDATE_BUILD: OTA3_CANDIDATE_029 (EXPERIMENTAL)\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
   s += "LOCAL_NAME: " BOTIZIN_LOCAL_NAME ".local\n";
   s += "MDNS: " + String(localNameReady ? "READY" : "WAITING") + "\n";
@@ -167,12 +167,14 @@ String snapshot() {
   s += "WIFI: " + String(WiFi.status() == WL_CONNECTED ? "OK" : "DISCONNECTED") + "\n";
   s += "OTA: " + String(otaReady ? "READY" : "BLOCKED: hardware/partition mismatch") + "\n";
   s += "INTERNET_OTA: " + internetStatus + "\n";
-  s += "OTA_AUTOMATIC_ENABLED: YES\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
+  s += "OTA_AUTOMATIC_ENABLED: NO\nOTA_MANUAL_STATUS: OTA3_ON_DEMAND\n";
   s += "OTA_CANDIDATE_POLICY: OTA_ORIGINAL_RESTORED\n";
   s += "PEER_PAIRED: " + String(peerKey.length() == 64 ? "YES" : "NO") + "\n";
-  s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
-  s += "CHECK_INTERVAL_SECONDS: 60\n";
+  s += "OTA_CATALOG_URL: " + String(OTA3_CATALOG_URL) + "\n";
+  s += "CHECK_INTERVAL_SECONDS: 0\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
+  s += ota3SlotSnapshot(0) + ota3SlotSnapshot(1);
+  s += "OTA3_LAST_RESULT: " + ota3LastResult() + "\n";
   s += mqttStatusSnapshot();
   s += wifiManagerStatus();
   s += wifiTrialStatus();
@@ -530,6 +532,7 @@ void installInternetOTA(const String &targetVersion, const String &targetURL, co
 #include "wifi_manager.h"
 #include "wifi_trial.h"
 #include "wifi_readonly.h"
+#include "ota3_manager.h"
 #include "control_routes.h"
 
 void printPartitionTable() {
@@ -587,9 +590,9 @@ void setup() {
   wifiManagerRegisterRoutes();
   wifiReadOnlyRegisterRoutes();
   controlRegisterRoutes();
-#if BOTIZIN_LAB_OTA_DISABLED
+#if BOTIZIN_LAB_OTA_DISABLED || BOTIZIN_OTA3_ENABLED
   server.on("/update", HTTP_POST, []() {
-    server.send(403, "text/plain; charset=utf-8", "LAB_OTA_DISABLED");
+    server.send(403, "text/plain; charset=utf-8", "OTA3_USE_AUTHENTICATED_PANEL");
   });
 #else
   server.on("/update", HTTP_POST, []() {
@@ -606,7 +609,8 @@ void setup() {
   });
   if (WiFi.status() == WL_CONNECTED) configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
   telemetryBootId = String((unsigned long)esp_random(), HEX) + String((unsigned long)esp_random(), HEX);
-  nextInternetCheck = millis() + 10000;
+  nextInternetCheck = 0;
+  internetStatus = "DISABLED_OTA3_MANUAL";
 #if BOTIZIN_LAB_OTA_DISABLED
   internetStatus = "LAB_OTA_DISABLED";
   manualOtaStatus = "LAB_OTA_DISABLED";
@@ -628,7 +632,7 @@ void loop() {
   wifiTrialTick();
   wifiManagerTick();
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
-#if !BOTIZIN_LAB_OTA_DISABLED
+#if !BOTIZIN_LAB_OTA_DISABLED && !BOTIZIN_OTA3_ENABLED
   if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued) {
     String v = otaTargetVersion, u = otaTargetURL, h = otaTargetSHA; size_t n = otaTargetBytes;
     otaInstallQueued = false; clearOtaCandidate(); otaManualUntil = 0;
