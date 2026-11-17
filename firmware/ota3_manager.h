@@ -291,11 +291,15 @@ static bool ota3IsBusy() {
   return result;
 }
 static String ota3CatalogResponse() {
-  char buffer[OTA3_CATALOG_MAX+1];
+  // Buffer lives temporarily in heap, not the small Arduino loop-task stack.
+  char *buffer=(char*)malloc(OTA3_CATALOG_MAX+1);
+  if(!buffer)return "{\"schema\":1,\"entries\":[]}";
   portENTER_CRITICAL(&ota3Mux);
-  memcpy(buffer,ota3Catalog,sizeof(buffer));
+  memcpy(buffer,ota3Catalog,OTA3_CATALOG_MAX+1);
   portEXIT_CRITICAL(&ota3Mux);
-  return buffer[0]?String(buffer):String("{\"schema\":1,\"entries\":[]}");
+  String out=buffer[0]?String(buffer):String("{\"schema\":1,\"entries\":[]}");
+  free(buffer);
+  return out;
 }
 static bool ota3SelectBoot(int slot,String &reason) {
   if(!otaReady || ota3IsBusy() || rebootScheduled ||
