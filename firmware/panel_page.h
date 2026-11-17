@@ -51,7 +51,7 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <main>
 <header><div><div class="logo">FERNANDO LAB</div><h1>BOTIZIN / Central da S3</h1></div>
 <div class="flag">WIFI 2.2 · CORE 0.0.28 CANDIDATA</div></header>
-<p class="description">CORE 0.0.28 candidata: Wi-Fi 2.2 com até 5 redes lembradas e recuperação orientada. MQTT e OTA preservados. ThingsBoard e RPC legados desativados nesta candidata.</p>
+<p class="description">CORE 0.0.29 candidata: Wi-Fi 2.2 validado e OTA 3.0 manual com catálogo de versões GitHub e dois slots livres.</p>
 <div class="state" id="state" role="status" aria-live="polite">Nenhum diagnóstico recebido.</div>
 <div class="g" id="metrics">
 <div class="metric"><div class="k">Firmware / slot</div><div class="v" id="firmware">—</div></div>
@@ -64,6 +64,7 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <button role="tab" id="tab-home" aria-controls="page-home" aria-selected="true" data-page="home">Visão geral</button>
 <button role="tab" id="tab-links" aria-controls="page-links" aria-selected="false" data-page="links">Conexões</button>
 <button role="tab" id="tab-wifi" aria-controls="page-wifi" aria-selected="false" data-page="wifi">Wi-Fi</button>
+<button role="tab" id="tab-ota3" aria-controls="page-ota3" aria-selected="false" data-page="ota3">OTA 3.0</button>
 <button role="tab" id="tab-resources" aria-controls="page-resources" aria-selected="false" data-page="resources">Recursos</button>
 <button role="tab" id="tab-events" aria-controls="page-events" aria-selected="false" data-page="events">Eventos</button>
 <button role="tab" id="tab-settings" aria-controls="page-settings" aria-selected="false" data-page="settings">Configurações</button>
@@ -82,6 +83,33 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <div class="link-card"><h3>Ponte → A22</h3><p>Integração pendente. Nenhum comando disponível.</p></div>
 </div><p class="tiny" id="links-time">Nenhuma leitura.</p>
 <button type="button" id="links-refresh">Atualizar conexões da S3</button>
+</section></div>
+<div id="page-ota3" role="tabpanel" aria-labelledby="tab-ota3" hidden>
+<section class="panel">
+<h2>OTA 3.0 · Duas partições livres</h2>
+<p class="muted small">As instalações são manuais. O GitHub guarda as versões. A S3 grava somente no slot inativo; a instalação não troca a próxima inicialização.</p>
+<div class="link-grid">
+<div class="link-card"><h3>APP 0</h3><p id="ota3-app0">Consultar status</p></div>
+<div class="link-card"><h3>APP 1</h3><p id="ota3-app1">Consultar status</p></div>
+</div>
+<p class="tiny" id="ota3-feedback" role="status" aria-live="polite">Nenhuma consulta executada.</p>
+<div class="buttons">
+<button type="button" id="ota3-status-btn">Ler partições</button>
+<button type="button" id="ota3-catalog-btn">Consultar catálogo GitHub</button>
+</div>
+<div class="control-form" style="margin-top:16px">
+<label for="ota3-version">Versão aprovada disponível</label>
+<select class="control-input" id="ota3-version" disabled><option>Consulte o catálogo</option></select>
+<div class="buttons">
+<button type="button" id="ota3-install-btn" disabled>Instalar na APP inativa</button>
+</div>
+</div>
+<p class="note">Depois de gravar: você escolhe permanecer na APP atual ou reiniciar no slot instalado. Versões antigas que não têm OTA 3.0 podem exigir recuperação via USB caso o painel não abra.</p>
+<div class="buttons">
+<button type="button" id="ota3-boot0">Iniciar APP 0</button>
+<button type="button" id="ota3-boot1">Iniciar APP 1</button>
+</div>
+<pre id="ota3-output" aria-live="polite">Sem operações. Nenhuma consulta periódica.</pre>
 </section></div>
 <div id="page-wifi" role="tabpanel" aria-labelledby="tab-wifi" hidden>
 <section class="panel">
@@ -192,13 +220,10 @@ Digite ajuda para listar comandos.</pre>
 <button id="controlLogin" type="button">Desbloquear comandos</button>
 </div>
 <div id="controlAuthStatus" class="tiny" role="status">Sessão ativa. Uma senha no início, 10 minutos de inatividade para expirar.</div>
-<div id="controlActions"><p class="note">IMAGEM CANDIDATA 0.0.27: verificação e instalação OTA existentes foram restauradas. O manifesto de produção continua em 0.0.25; não publicar este firmware automaticamente antes de testar.</p>
+<div id="controlActions"><p class="note">OTA 3.0 manual: abra a aba OTA 3.0 para consultar o catálogo, instalar no slot oposto e iniciar o firmware escolhido.</p>
 <div class="buttons">
 <button id="controlConnections" type="button">Verificar conexões</button>
-<button id="controlCheckOTA" type="button">Consultar OTA agora</button>
-<button id="controlOTAResult" type="button">Resultado da consulta OTA</button>
-<button id="controlInstall" type="button" disabled>Instalar atualização confirmada</button>
-<button id="controlCancel" type="button">Cancelar consulta OTA</button>
+<button id="settingsGotoOta" type="button">Abrir OTA 3.0</button>
 </div>
 <div class="control-grid" style="margin-top:13px">
 <div class="panel">
@@ -408,7 +433,6 @@ let currentCandidate=null;
 function controlOutput(message){const e=$('controlOutput');e.textContent=message; e.scrollTop=e.scrollHeight}
 function clearControlSession(message){
  controlSession='';currentCandidate=null;
- $('controlInstall').disabled=true;
  $('controlAuthStatus').textContent=message||'Sessão expirada. Entre novamente.';
  window.location.replace('/');
 }
@@ -437,35 +461,84 @@ $('controlLogout').addEventListener('click',async()=>{
  window.location.replace('/');
 });
 $('controlConnections').addEventListener('click',()=>runControl('/control/connections'));
-$('controlCheckOTA').addEventListener('click',async()=>{
- currentCandidate=null;$('controlInstall').disabled=true;
- const res=await runControl('/control/check-ota');
- if(res)controlOutput(res+'\nA S3 consultará o GitHub uma vez. Clique em "Resultado da consulta OTA" depois.');
-});
-$('controlOTAResult').addEventListener('click',async()=>{
- const r=await runControl('/control/ota-result');
+
+$('settingsGotoOta').addEventListener('click',()=>$('tab-ota3').click());
+const ota3Output=(message)=>{showText('ota3-output',message);};
+async function ota3GetStatus(){
+ const reply=await runControl('/control/ota3/status');
+ if(!reply)return null;
+ const d=parseStatus(reply);
+ function part(n){
+   const id='ota3-app'+n;
+   const version=d['APP'+n+'_VERSION']||'—';
+   showText(id,version+' | '+(d['APP'+n+'_RUNNING']==='YES'?'EXECUTANDO':'Inativa')+
+    ' | proximo boot: '+(d['APP'+n+'_NEXT_BOOT']==='YES'?'SIM':'NAO'));
+ }
+ part(0);part(1);
+ showText('ota3-feedback',(d.STATE||'—')+' · '+(d.MESSAGE||'—')+
+    (d.TOTAL?'': ''));
+ return d;
+}
+async function ota3WatchOperation(seconds){
+ const deadline=Date.now()+seconds*1000;
+ while(Date.now()<deadline){
+  await new Promise(resolve=>setTimeout(resolve,1200));
+  const reply=await controlPost('/control/ota3/status');
+  const d=parseStatus(reply);
+  ota3Output(reply);
+  if(d.BUSY==='NO')return d;
+ }
+ ota3Output('Limite do acompanhamento no navegador. Consulte o estado manualmente.');
+ return null;
+}
+async function ota3LoadCatalog(){
+ const text=await runControl('/control/ota3/catalog');
+ if(!text||!text.startsWith('{'))return;
+ let data;
+ try{data=JSON.parse(text)}catch(e){ota3Output('Catalogo invalido: '+e.message);return}
+ const select=$('ota3-version');
+ select.replaceChildren();
+ const entries=Array.isArray(data.entries)?data.entries:[];
+ for(const item of entries){
+  if(!item.approved)continue;
+  const option=document.createElement('option');
+  option.value=item.id;
+  option.textContent=item.version+' — '+item.label+(item.ota3?'':' [sem OTA3]');
+  select.append(option);
+ }
+ select.disabled=select.options.length===0;
+ $('ota3-install-btn').disabled=select.disabled;
+ ota3Output(select.options.length+' versões autorizadas no catálogo. Selecione uma e escolha instalar.');
+}
+$('tab-ota3').addEventListener('click',()=>ota3GetStatus());
+$('ota3-status-btn').addEventListener('click',()=>ota3GetStatus());
+$('ota3-catalog-btn').addEventListener('click',async()=>{
+ const r=await runControl('/control/ota3/catalog-refresh');
  if(!r)return;
- if(r.startsWith('AVAILABLE|')){
-  const p=r.split('|');
-  if(p.length===6 && /^[0-9a-f]{64}$/.test(p[3])){
-   currentCandidate={candidate_id:p[1],target_version:p[2],sha256:p[3],boot_id:p[4]};
-   $('controlInstall').disabled=false;
-   controlOutput('ATUALIZAÇÃO DISPONÍVEL\nVersão: '+p[2]+'\nTamanho: '+p[5]+' bytes\nSHA-256: '+p[3]+
-     '\nPara instalar, clique no botão de confirmação. Nenhuma instalação começou.');
-  }
- }else{currentCandidate=null;$('controlInstall').disabled=true}
+ const d=await ota3WatchOperation(55);
+ if(d&&d.STATE==='PRONTO'&&d.MESSAGE==='CATALOGO_VALIDADO')await ota3LoadCatalog();
 });
-$('controlInstall').addEventListener('click',async()=>{
- if(!currentCandidate)return;
- const c=currentCandidate;
- if(!window.confirm('Instalar firmware '+c.target_version+' e reiniciar a S3? A instalação só será iniciada após confirmar.'))return;
- currentCandidate=null;$('controlInstall').disabled=true;
- await runControl('/control/install-ota',c);
+$('ota3-install-btn').addEventListener('click',async()=>{
+ const id=$('ota3-version').value;
+ const d=await ota3GetStatus();if(!d||!id)return;
+ const to=d.APP0_RUNNING==='YES'?'APP 1':'APP 0';
+ if(!window.confirm('Instalar '+id+' em '+to+'? A versão existente nesse slot será substituída. A S3 NÃO reinicia automaticamente.'))return;
+ const r=await runControl('/control/ota3/install',{id});if(!r)return;
+ $('ota3-install-btn').disabled=true;
+ try{await ota3WatchOperation(240)}catch(e){ota3Output('Falha ao ler estado: '+e.message)}
+ $('ota3-install-btn').disabled=false;
+ await ota3GetStatus();
 });
-$('controlCancel').addEventListener('click',async()=>{
- currentCandidate=null;$('controlInstall').disabled=true;
- await runControl('/control/cancel-ota');
-});
+async function ota3Boot(slot){
+ const d=await ota3GetStatus();if(!d)return;
+ const version=d['APP'+slot+'_VERSION']||'desconhecida';
+ if(!window.confirm('REINICIAR na APP '+slot+' ('+version+')? Se o firmware não abrir o painel, pode precisar de USB.'))return;
+ const r=await runControl('/control/ota3/boot',{slot:String(slot)});
+ if(r)ota3Output(r+'\nA conexão com o painel será interrompida.');
+}
+$('ota3-boot0').addEventListener('click',()=>ota3Boot(0));
+$('ota3-boot1').addEventListener('click',()=>ota3Boot(1));
+
 // One server-side login; every action uses the same HttpOnly cookie.
 // Retries exist only while a test explicitly started by the user is active.
 let wifiWatchId=0;
