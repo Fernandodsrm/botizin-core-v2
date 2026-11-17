@@ -149,6 +149,19 @@ static void wifiPortalPage() {
     networks+="</select>";
   }
   WiFi.scanDelete();
+  String remembered;
+  if(wifiKnown.count) {
+    remembered="<details><summary>Redes lembradas (até 5)</summary>"
+               "<p>O BOTIZIN tenta redes salvas automaticamente. "
+               "Se precisar cadastrar uma sexta, esqueça uma que não usa.</p>";
+    for(uint8_t i=0;i<wifiKnown.count;i++) {
+      const String ssid=wifiHtmlEscape(String(wifiKnown.entries[i].ssid));
+      remembered+="<form action=\"/wifi/forget\" method=\"post\" style=\"margin-bottom:8px\">"
+                  "<input type=\"hidden\" name=\"ssid\" value=\""+ssid+"\">"
+                  "<button type=\"submit\" style=\"margin:0;background:#6a4747\">Esquecer "+ssid+"</button></form>";
+    }
+    remembered+="</details>";
+  }
   String body=R"HTML(<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BOTIZIN - Configurar Wi-Fi</title><style>
@@ -172,7 +185,7 @@ A rede temporária continua disponível por um curto período. Se a conexão fal
 volte a esta página para corrigir os dados.</small></p>
 </main></body></html>)HTML";
   body.replace("<form action=\"/wifi/save\" method=\"post\">",
-               "<form action=\"/wifi/save\" method=\"post\">"+networks);
+               remembered+"<form action=\"/wifi/save\" method=\"post\">"+networks);
   server.sendHeader("Cache-Control","no-store");
   server.send(200,"text/html; charset=utf-8",body);
 }
@@ -190,6 +203,16 @@ static bool wifiManagerStoreCredentials(const String& proposedSsid,const String&
   return wifiKnownUpsert(proposedSsid,pass,true);
 }
 
+static void wifiPortalForget() {
+  if(!wifiRequestFromSetupAP()){server.send(403,"text/plain","AP_ONLY");return;}
+  if(wifiPortalJoinQueued || wifiPortalJoinActive){server.send(409,"text/plain","WIFI_BUSY");return;}
+  String ssid=server.arg("ssid");ssid.trim();
+  const bool forgotten=ssid.length()>0 && ssid.length()<=32 && wifiKnownForget(ssid);
+  server.sendHeader("Cache-Control","no-store");
+  server.send(forgotten?200:409,"text/html; charset=utf-8",
+     forgotten?"<!doctype html><meta charset='utf-8'><p>Rede esquecida. <a href='/'>Voltar ao portal</a></p>":
+               "<!doctype html><meta charset='utf-8'><p>Não foi possível esquecer essa rede. <a href='/'>Voltar</a></p>");
+}
 static void wifiPortalSave() {
   if(!wifiRequestFromSetupAP()) {
     server.send(403,"text/plain","Only setup AP may change Wi-Fi.");
@@ -279,6 +302,7 @@ static void wifiPortalRouteHome() {
 static void wifiManagerRegisterRoutes() {
   server.on("/wifi",HTTP_GET,wifiPortalPage);
   server.on("/wifi/save",HTTP_POST,wifiPortalSave);
+  server.on("/wifi/forget",HTTP_POST,wifiPortalForget);
   server.on("/wifi/progress",HTTP_GET,wifiPortalProgress);
   // Captive-portal probes; users can always type http://192.168.4.1/.
   server.on("/generate_204",HTTP_GET,wifiPortalPage);
