@@ -17,6 +17,7 @@
 // initArduino(). Retain bootloader rollback for apps that fail before startup.
 #include "internet_config.h"
 #include "version.h"
+#define BOTIZIN_OTA3_ENABLED 1
 #define BOTIZIN_LOCAL_NAME "botizin-s3"
 #define BOTIZIN_LOCAL_BOARD "esp32s3-n16r8"
 #include "local_name.h"
@@ -81,6 +82,10 @@ bool peerOtaBusy = false;
 String s3OtaPhase = "READY";
 void showOtaProgress(const String &phase, size_t done, size_t total) { s3OtaPhase = phase; }
 #include "peer_auth.h"
+// OTA3 supports the historical firmware without changing legacy Wi-Fi logic.
+static bool wifiTrialActive() {return false;}
+bool hashPartition(const esp_partition_t *p,size_t size,String &result);
+#include "ota3_manager.h"
 
 
 String partitionInfo(const esp_partition_t *p) {
@@ -136,6 +141,7 @@ String snapshot() {
   const esp_partition_t *run = esp_ota_get_running_partition();
   String s = "BOTIZIN CORE V" + String(BOTIZIN_VERSION) + "\n";
   s += "TEST_RESULT: Deu certo na atualização\n";
+  s += "CANDIDATE_BUILD: OTA3_025_COMPAT_FROM_ORIGINAL (EXPERIMENTAL)\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
   s += "LOCAL_NAME: " BOTIZIN_LOCAL_NAME ".local\n";
   s += "MDNS: " + String(localNameReady ? "READY" : "WAITING") + "\n";
@@ -159,11 +165,12 @@ String snapshot() {
   s += "WIFI: " + String(WiFi.status() == WL_CONNECTED ? "OK" : "DISCONNECTED") + "\n";
   s += "OTA: " + String(otaReady ? "READY" : "BLOCKED: hardware/partition mismatch") + "\n";
   s += "INTERNET_OTA: " + internetStatus + "\n";
-  s += "OTA_AUTOMATIC_ENABLED: YES\nOTA_MANUAL_STATUS: " + manualOtaStatus + "\n";
+  s += "OTA_AUTOMATIC_ENABLED: NO\nOTA_MANUAL_STATUS: OTA3_ON_DEMAND\n";
   s += "PEER_PAIRED: " + String(peerKey.length() == 64 ? "YES" : "NO") + "\n";
-  s += "MANIFEST_URL: " + String(BOTIZIN_MANIFEST_URL) + "\n";
-  s += "CHECK_INTERVAL_SECONDS: 60\n";
+  s += "OTA_CATALOG_URL: " + String(OTA3_CATALOG_URL) + "\n";
+  s += "CHECK_INTERVAL_SECONDS: 0\n";
   s += "TELEMETRY: " + telemetryStatus + "\n";
+  s += ota3SlotSnapshot(0) + ota3SlotSnapshot(1);
   s += mqttStatusSnapshot();
   s += wifiManagerStatus();
   s += eventJournalStatus();
@@ -628,10 +635,8 @@ void setup() {
   wifiManagerRegisterRoutes();
   controlRegisterRoutes();
   server.on("/update", HTTP_POST, []() {
-    if (peerOtaBusy) { server.send(409, "text/plain", "S3 internet OTA busy"); return; }
-    if (uploadActive) failUpload("request ended before file completion");
-    server.send(responseCode, "text/plain; charset=utf-8", attempt.length() ? attempt : "No firmware uploaded\n");
-  }, handleUpload);
+    server.send(410,"text/plain; charset=utf-8","OTA3_USE_AUTHENTICATED_PANEL");
+  });
   server.on("/reboot", HTTP_POST, []() {
     if (peerOtaBusy || !uploadOK) { server.send(409, "text/plain", "No verified OTA pending; STOP\n"); return; }
     logLine("REBOOT_REQUESTED: SOFTWARE"); checkpoint();
@@ -642,7 +647,8 @@ void setup() {
   telemetryBootId = String((unsigned long)esp_random(), HEX) + String((unsigned long)esp_random(), HEX);
   nextPingPoll = millis() + 30000;
   nextTelemetry = millis() + 20000;
-  nextInternetCheck = millis() + 10000;
+  nextInternetCheck = 0;
+  internetStatus = "DISABLED_OTA3_MANUAL";
   server.begin();
   eventHttpServerStarted=true;
   eventRecord(EV_HTTP_STARTED,EV_INFO,"LISTENER_INIT_NOT_REACHABILITY");
@@ -659,6 +665,7 @@ void loop() {
   server.handleClient();
   wifiManagerTick();
   if (rebootScheduled && (int32_t)(millis() - rebootAt) >= 0) { Serial.flush(); ESP.restart(); }
+#if !BOTIZIN_OTA3_ENABLED
   if (!rebootScheduled && !uploadActive && !uploadOK && otaInstallQueued) {
     String v = otaTargetVersion, u = otaTargetURL, h = otaTargetSHA; size_t n = otaTargetBytes;
     otaInstallQueued = false; clearOtaCandidate(); otaManualUntil = 0;
@@ -674,6 +681,7 @@ void loop() {
     nextInternetCheck = millis() + 60000;
     if (!manualWindowActive()) { clearOtaCandidate(); peerOtaBusy = true; checkInternetOTA(false); peerOtaBusy = false; }
   }
+#endif // !BOTIZIN_OTA3_ENABLED
   if (!rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
       (int32_t)(millis() - nextTelemetry) >= 0) {
     nextTelemetry = millis() + 60000;
