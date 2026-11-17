@@ -50,8 +50,8 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 </style></head><body>
 <main>
 <header><div><div class="logo">FERNANDO LAB</div><h1>BOTIZIN / Central da S3</h1></div>
-<div class="flag">WIFI 2.0 · CORE 0.0.26 CANDIDATA</div></header>
-<p class="description">CORE 0.0.26 candidata: Wi-Fi 2.0 com teste antes de salvar. MQTT e OTA preservados. ThingsBoard e RPC legados desativados nesta candidata.</p>
+<div class="flag">WIFI 2.1 · CORE 0.0.27 CANDIDATA</div></header>
+<p class="description">CORE 0.0.27 candidata: Wi-Fi 2.1 com teste automático e retorno à rede original. MQTT e OTA preservados. ThingsBoard e RPC legados desativados nesta candidata.</p>
 <div class="state" id="state" role="status" aria-live="polite">Nenhum diagnóstico recebido.</div>
 <div class="g" id="metrics">
 <div class="metric"><div class="k">Firmware / slot</div><div class="v" id="firmware">—</div></div>
@@ -100,13 +100,9 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <div class="buttons"><button id="wifi-read" type="button">Consultar Wi-Fi agora</button></div>
 <p class="tiny" role="status" aria-live="polite" id="wf-feedback">Aguardando consulta manual.</p>
 <div class="panel" style="margin-top:14px">
-<h2>Wi-Fi 2.0 · Buscar e trocar rede com segurança</h2>
-<p class="muted small">Teste sem salvar. Se falhar, a S3 retorna à rede antiga. Quando conectar, confirme em até 120 segundos para gravar na NVS.</p>
-<div class="control-line">
-<input class="control-input" type="password" id="wf-admin-pass" maxlength="32" autocomplete="off" placeholder="Senha de administrador da S3" aria-label="Senha de administrador"/>
-<button id="wf-admin-login" type="button">Desbloquear Wi-Fi</button>
-</div>
-<p class="tiny" id="wf-admin-feedback" role="status">É necessário login local para procurar redes ou testar credenciais.</p>
+<h2>Wi-Fi 2.1 · Teste simples, resultado automático</h2>
+<p class="muted small">Escolha a rede e clique em <b>Testar e voltar</b>. A S3 conecta, verifica e retorna à anterior. O resultado aparece aqui, sem trocar o Wi-Fi do notebook nem copiar linhas de /status.</p>
+<p class="tiny" id="wf-admin-feedback" role="status">Acesso liberado pela senha única do painel. Esta aba não pede outra autenticação.</p>
 <div class="buttons"><button id="wf-scan" type="button">Procurar redes 2,4 GHz</button></div>
 <label for="wf-network-choice" class="small muted">Redes encontradas (opcional)</label>
 <select id="wf-network-choice" class="control-input" style="max-width:100%"><option value="">Selecione ou digite o nome abaixo</option></select>
@@ -115,14 +111,11 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <input class="control-input" id="wf-target-ssid" maxlength="32" required autocomplete="off" placeholder="Nome da rede 2,4 GHz"/>
 <label for="wf-target-pass">Senha da nova rede</label>
 <input class="control-input" id="wf-target-pass" type="password" maxlength="63" autocomplete="new-password" placeholder="Senha WPA2 (ou vazio para rede aberta)"/>
-<button type="submit" id="wf-test">Testar conexão (não salvar ainda)</button>
+<button type="submit" id="wf-test">Testar e voltar automaticamente</button>
 </form>
-<div class="buttons">
-<button id="wf-stage-state" type="button">Consultar resultado do teste</button>
-<button id="wf-confirm" type="button" disabled>Confirmar e salvar rede</button>
-</div>
-<pre id="wf-test-result" role="status" aria-live="polite">Nenhum teste iniciado. Sem consultas automáticas.</pre>
-<p class="note">Durante o teste, o navegador pode desconectar. Conecte seu aparelho à rede nova e abra <b>http://botizin-s3.local/</b>; autentique novamente e confirme. Se não confirmar, a S3 tenta voltar à rede antiga automaticamente. Se o painel não abrir, aguarde o retorno e consulte novamente.</p>
+<div class="buttons"><button id="wf-confirm" type="button" disabled>Salvar rede testada para próximo reinício</button></div>
+<div class="state" id="wf-test-result" role="status" aria-live="polite">Nenhum teste iniciado. O resultado aparecerá automaticamente depois de testar.</div>
+<p class="note">Durante o teste, este painel pode ficar temporariamente sem acesso: a S3 tem uma conexão Wi-Fi STA. <b>É esperado.</b> A S3 volta à rede de origem e o painel consulta o resultado por até 90 segundos. Só o botão separado <b>Salvar rede testada</b> grava a nova rede para uso após reiniciar.</p>
 </div>
 </section></div>
 <div id="page-resources" role="tabpanel" aria-labelledby="tab-resources" hidden>
@@ -175,12 +168,12 @@ Digite ajuda para listar comandos.</pre>
 <section class="panel" id="controls-panel">
 <h2>Central de comandos · autenticada</h2>
 <p class="muted small">Ações somente por clique, na rede local. Use a senha individual <b>BOTIZIN-S3-SETUP</b> impressa no USB, criada pela própria S3. Nenhuma senha é enviada ao GitHub.</p>
-<div class="control-line" id="controlLoginBox">
+<div class="control-line" id="controlLoginBox" hidden>
 <input id="controlPassword" type="password" class="control-input" maxlength="32" autocomplete="off" placeholder="Senha da configuração da S3" aria-label="Senha do painel"/>
 <button id="controlLogin" type="button">Desbloquear comandos</button>
 </div>
-<div id="controlAuthStatus" class="tiny" role="status">Bloqueado. Sessão de 10 minutos após autenticar; não fica salva no navegador.</div>
-<div id="controlActions" hidden><p class="note">IMAGEM CANDIDATA 0.0.26: verificação e instalação OTA existentes foram restauradas. O manifesto de produção continua em 0.0.25; não publicar este firmware automaticamente antes de testar.</p>
+<div id="controlAuthStatus" class="tiny" role="status">Sessão ativa. Uma senha no início, 10 minutos de inatividade para expirar.</div>
+<div id="controlActions"><p class="note">IMAGEM CANDIDATA 0.0.27: verificação e instalação OTA existentes foram restauradas. O manifesto de produção continua em 0.0.25; não publicar este firmware automaticamente antes de testar.</p>
 <div class="buttons">
 <button id="controlConnections" type="button">Verificar conexões</button>
 <button id="controlCheckOTA" type="button">Consultar OTA agora</button>
@@ -191,14 +184,14 @@ Digite ajuda para listar comandos.</pre>
 <div class="control-grid" style="margin-top:13px">
 <div class="panel">
 <h2>Wi-Fi 2.0</h2>
-<p class="muted small">A troca imediata foi substituída pelo teste com confirmação. Abra a aba Wi-Fi para procurar redes, testar e salvar sem reinicialização forçada.</p>
+<p class="muted small">O novo teste verifica a rede, retorna sozinho e mostra sucesso ou falha no painel. Salvar é uma ação separada.</p>
 <button id="settingsGotoWifi" type="button">Abrir Wi-Fi 2.0</button>
 </div>
 <div class="panel"><h2>Sistema</h2>
 <p class="muted small">Reinício solicitado, nunca automático pelo painel.</p>
 <button id="controlReboot" type="button">Reiniciar a S3</button>
-<p class="tiny">Após reiniciar, é necessário autenticar de novo. O OTA mantém o rollback original do Arduino.</p>
-<button id="controlLogout" type="button">Bloquear comandos</button>
+<p class="tiny">Após reiniciar, entre com a senha administrativa novamente. O OTA mantém o rollback original do Arduino.</p>
+<button id="controlLogout" type="button">Sair do painel</button>
 </div>
 </div>
 <pre id="controlOutput" role="log" aria-live="polite">Comandos prontos. Somente ações iniciadas por você.</pre>
