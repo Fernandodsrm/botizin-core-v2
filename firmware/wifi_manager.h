@@ -23,6 +23,11 @@ static uint32_t wifiReconnectNextCycleAt=0;
 static uint32_t wifiDisconnectedAt=0;
 static uint32_t wifiRestartAfter=0;
 static bool wifiClockConfigured=false;
+// AP stays up temporarily after a successful recovery join, so the user can
+// copy the assigned STA IP from http://192.168.4.1/.
+static bool wifiPortalJoinQueued=false, wifiPortalJoinActive=false, wifiPortalJoinSuccess=false;
+static uint32_t wifiPortalJoinAt=0, wifiPortalJoinStartedAt=0, wifiPortalCloseAt=0;
+static String wifiPortalTargetSsid;
 static const uint32_t WIFI_RECOVERY_MS=35000UL;
 
 static String wifiHtmlEscape(const String &value) {
@@ -49,9 +54,83 @@ static String wifiManagerStatus() {
          "WIFI_KNOWN_COUNT: "+String(wifiKnown.count)+"\n"+
          "WIFI_FALLBACK: "+String(wifiReconnectTrying?"SEARCHING":"IDLE")+"\n";
 }
+static String wifiPortalSuccessHTML() {
+  const String ip=WiFi.localIP().toString();
+  const String url=String("http://")+ip+"/";
+  String body=R"PAGE(<!doctype html><html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BOTIZIN | Nova rede</title><style>
+body{font:16px system-ui,Arial;background:#eaf2ef;color:#19342e;padding:20px}
+main{max-width:530px;margin:auto;background:#fff;border:1px solid #acc7bd;border-radius:16px;padding:24px}
+h1{font-size:22px}label{display:block;margin:16px 0 8px}input,button,a{font:inherit;padding:12px;border-radius:8px}
+input{width:100%;box-sizing:border-box}button{cursor:pointer;background:#225e4b;color:#fff;border:none}
+a{display:inline-block;background:#eef5f0;color:#1c4536}
+p{line-height:1.5}</style></head><body><main>
+<h1>✅ BOTIZIN conectado!</h1>
+<p>O Wi-Fi novo funcionou. Este portal temporário permanece disponível por cerca de 2 minutos para você copiar o endereço.</p>
+<p><b>Rede:</b> %SSID%</p>
+<label for="address">Endereço da S3 na nova rede</label>
+<input id="address" readonly value="%ADDRESS%">
+<p><button type="button" onclick="copyIP()">Copiar endereço</button>
+<a href="%ADDRESS%">Abrir painel</a></p>
+<p><b>Importante:</b> conecte seu celular ou notebook à rede <b>%SSID%</b> antes de abrir o endereço acima.
+O nome botizin-s3.local também pode funcionar, mas depende do dispositivo e da rede.</p>
+<p><small>Se a conexão mudar de IP no futuro, o endereço antigo poderá deixar de funcionar.</small></p>
+</main><script>
+function copyIP(){const x=document.getElementById('address');x.select();x.setSelectionRange(0,x.value.length);
+if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(x.value).catch(()=>document.execCommand('copy'))}
+else document.execCommand('copy');}
+</script></body></html>)PAGE";
+  body.replace("%SSID%",wifiHtmlEscape(WiFi.SSID()));
+  body.replace("%SSID%",wifiHtmlEscape(WiFi.SSID()));
+  body.replace("%ADDRESS%",wifiHtmlEscape(url));
+  body.replace("%ADDRESS%",wifiHtmlEscape(url));
+  return body;
+}
+static String wifiPortalJoiningHTML() {
+  return R"PAGE(<!doctype html><html lang="pt-BR"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BOTIZIN | Conectando</title><body style="font:16px system-ui;max-width:480px;margin:40px auto;padding:20px">
+<h2>BOTIZIN está conectando à nova rede…</h2>
+<p>Não precisa desligar a placa. É possível que a rede de recuperação desconecte por instantes enquanto a S3 troca o canal Wi-Fi.</p>
+<p>Se a página perder conexão, reconecte à rede BOTIZIN-S3 e abra
+<a href="http://192.168.4.1/">192.168.4.1</a>.</p>
+<p id="result">Consultando a conexão…</p>
+<script>
+const x=document.getElementById('result');
+async function check(){
+try{
+const r=await fetch('/wifi/progress',{cache:'no-store'});
+if(!r.ok)throw Error('sem resposta');
+const j=await r.json();
+if(j.state==='CONNECTED'){window.location.replace('/');return}
+if(j.state==='FAILED'){x.textContent='Não conectou. Abra novamente o portal e corrija a rede ou a senha.';return}
+x.textContent='Tentando a conexão na rede selecionada…';
+}catch(e){x.textContent='Acesso temporariamente interrompido. Reconecte ao BOTIZIN-S3 se necessário.'}
+window.setTimeout(check,2400);
+}
+check();
+</script></body></html>)PAGE";
+}
+static void wifiPortalProgress() {
+  if(!wifiRequestFromSetupAP()){server.send(403,"text/plain","AP_ONLY");return;}
+  const char* state=wifiPortalJoinSuccess?"CONNECTED":
+                    (wifiPortalJoinActive||wifiPortalJoinQueued)?"CONNECTING":"FAILED";
+  server.sendHeader("Cache-Control","no-store");
+  server.send(200,"application/json; charset=utf-8",String("{\"state\":\"")+state+"\"}");
+}
 static void wifiPortalPage() {
   if(!wifiRequestFromSetupAP()) {
     server.send(403,"text/plain","Wi-Fi configuration is available only from setup access point.");
+    return;
+  }
+  if(wifiPortalJoinSuccess && WiFi.status()==WL_CONNECTED) {
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"text/html; charset=utf-8",wifiPortalSuccessHTML());
+    return;
+  }
+  if(wifiPortalJoinActive || wifiPortalJoinQueued) {
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"text/html; charset=utf-8",wifiPortalJoiningHTML());
     return;
   }
   String networks;
@@ -88,8 +167,9 @@ e a senha. Seus dados ficam na propria placa, nao no GitHub.</p>
 <label for="pass">Senha do Wi-Fi</label>
 <input id="pass" name="pass" type="password" maxlength="63" autocomplete="off">
 <button type="submit">Salvar e conectar</button></form>
-<p><small>Depois de salvar a S3 reinicia, tenta o Wi-Fi e desliga esta rede
-temporaria. Se a senha estiver errada, o modo de configuracao reaparece.</small></p>
+<p><small>Depois de salvar, a S3 tenta a rede nova e mostra o IP recebido.
+A rede temporária continua disponível por um curto período. Se a conexão falhar,
+volte a esta página para corrigir os dados.</small></p>
 </main></body></html>)HTML";
   body.replace("<form action=\"/wifi/save\" method=\"post\">",
                "<form action=\"/wifi/save\" method=\"post\">"+networks);
@@ -127,13 +207,19 @@ static void wifiPortalSave() {
   if(!wifiManagerStoreCredentials(ssid,pass)){
     server.send(500,"text/plain","NVS save failed. Retry.");return;
   }
+  // Acknowledge the AP browser BEFORE switching the STA channel.
+  // No forced reboot: keep the recovery AP available for the resulting IP.
+  wifiPortalTargetSsid=ssid;
+  wifiPortalJoinQueued=true;
+  wifiPortalJoinActive=false;
+  wifiPortalJoinSuccess=false;
+  wifiPortalJoinAt=millis()+1800UL;
+  wifiPortalCloseAt=0;
+  wifiReconnectTrying=false;
+  wifiReconnectNextCycleAt=0;
   server.sendHeader("Cache-Control","no-store");
-  server.send(200,"text/html; charset=utf-8",
-      "<!doctype html><html><meta name=\"viewport\" content=\"width=device-width\"><body>"
-      "<h2>Rede salva!</h2><p>BOTIZIN vai reiniciar e conectar. Se nao conseguir,"
-      " esta rede de configuracao volta a aparecer.</p></body></html>");
-  wifiRestartAfter=millis()+1800;
-  // Deliberately avoid printing SSID/pass to serial logs.
+  server.send(200,"text/html; charset=utf-8",wifiPortalJoiningHTML());
+
 }
 // Server-side entry gate: the dashboard HTML is served only after
 // authenticating on the STA network. /status remains available for diagnostics.
@@ -193,6 +279,7 @@ static void wifiPortalRouteHome() {
 static void wifiManagerRegisterRoutes() {
   server.on("/wifi",HTTP_GET,wifiPortalPage);
   server.on("/wifi/save",HTTP_POST,wifiPortalSave);
+  server.on("/wifi/progress",HTTP_GET,wifiPortalProgress);
   // Captive-portal probes; users can always type http://192.168.4.1/.
   server.on("/generate_204",HTTP_GET,wifiPortalPage);
   server.on("/hotspot-detect.html",HTTP_GET,wifiPortalPage);
@@ -207,6 +294,8 @@ static void wifiPortalStart() {
     return;
   }
   wifiPortalOn=true;
+  wifiPortalJoinSuccess=false;
+  wifiPortalCloseAt=0;
   eventRecord(EV_WIFI_SETUP_ON,EV_WARN,"LOCAL_AP_RECOVERY");
   wifiPortalDnsOn=wifiPortalDns.start(53,"*",WiFi.softAPIP());
   Serial.println("WIFI_SETUP: ACTIVE");
@@ -218,6 +307,10 @@ static void wifiPortalStop() {
   if(!wifiPortalOn)return;
   if(wifiPortalDnsOn){wifiPortalDns.stop();wifiPortalDnsOn=false;}
   wifiPortalOn=false;
+  wifiPortalJoinQueued=false;
+  wifiPortalJoinActive=false;
+  wifiPortalJoinSuccess=false;
+  wifiPortalCloseAt=0;
   eventRecord(EV_WIFI_SETUP_OFF,EV_INFO,"STA_RECONNECTED");
   WiFi.softAPdisconnect(true);
   WiFi.mode(WIFI_STA);
@@ -281,6 +374,38 @@ static void wifiManagerTick() {
   if(wifiRestartAfter && (int32_t)(millis()-wifiRestartAfter)>=0) {
     Serial.flush();ESP.restart();
   }
+  // Recovery-portal setup is intentionally independent of the panel login.
+  // Keep the AP for 120 s after obtaining a new IP, including on AP+STA.
+  const uint32_t nowPortal=millis();
+  if(wifiPortalJoinQueued && (int32_t)(nowPortal-wifiPortalJoinAt)>=0) {
+    wifiPortalJoinQueued=false;wifiPortalJoinActive=true;
+    wifiPortalJoinStartedAt=nowPortal;
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.persistent(false);WiFi.setAutoReconnect(false);
+    WiFi.disconnect(false,false);
+    WiFi.begin(wifiPortalTargetSsid.c_str(),wifiKnownPasswordFor(wifiPortalTargetSsid).c_str());
+    wifiDisconnectedAt=nowPortal;
+  }
+  if(wifiPortalJoinActive) {
+    if(WiFi.status()==WL_CONNECTED && WiFi.SSID()==wifiPortalTargetSsid) {
+      wifiPortalJoinActive=false;wifiPortalJoinSuccess=true;
+      wifiPortalCloseAt=nowPortal+120000UL;
+      wifiKnownSelectPreferred(WiFi.SSID());
+    } else if((uint32_t)(nowPortal-wifiPortalJoinStartedAt)>=25000UL) {
+      wifiPortalJoinActive=false;
+      wifiPortalJoinSuccess=false;
+      wifiPortalCloseAt=0;
+    }
+  }
+  if(wifiPortalJoinQueued || wifiPortalJoinActive) {
+    if(wifiPortalOn && wifiPortalDnsOn)wifiPortalDns.processNextRequest();
+    return;
+  }
+  if(wifiPortalJoinSuccess && wifiPortalOn) {
+    if(wifiPortalDnsOn)wifiPortalDns.processNextRequest();
+    if((int32_t)(nowPortal-wifiPortalCloseAt)>=0)wifiPortalStop();
+    else return;
+  }
   // Wi-Fi trial owns STA exclusively; no background credential failover here.
   if(wifiTrialActive())return;
   const uint32_t now=millis();
@@ -291,7 +416,7 @@ static void wifiManagerTick() {
       wifiReconnectNextCycleAt=0;
       wifiKnownSelectPreferred(WiFi.SSID()); // only when failover actually connected
     }
-    if(wifiPortalOn)wifiPortalStop();
+    if(wifiPortalOn && !wifiPortalJoinSuccess)wifiPortalStop();
     if(!wifiClockConfigured) {
       configTime(0,0,"pool.ntp.org","time.cloudflare.com");
       wifiClockConfigured=true;
