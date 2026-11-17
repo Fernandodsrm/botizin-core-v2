@@ -1,7 +1,7 @@
-name: Wi-Fi 2.1 CORE 0.0.27 (binario na branch candidata)
+name: Wi-Fi 2.2 CORE 0.0.28 (binario na branch candidata)
 on:
   push:
-    branches: ['candidate/wifi2-ux-0.0.27']
+    branches: ['candidate/wifi2-ux-0.0.28']
     paths:
       - 'firmware/**'
       - 'tests/s3_wifi_recursos_lab_test.py'
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-and-compare:
-    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/candidate/wifi2-ux-0.0.27'
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/candidate/wifi2-ux-0.0.28'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -56,7 +56,7 @@ jobs:
           git worktree add --detach /tmp/botizin-base f2ec674d2d354c41b591255ae491b275438615e3
           (cd /tmp/botizin-base && unset BOTIZIN_TB_DEVICE_TOKEN && python3 ci/build.py)
           cp /tmp/botizin-base/dist/build-record.json /tmp/botizin-report/baseline.json
-      - name: Build CORE 0.0.27 sem ThingsBoard
+      - name: Build CORE 0.0.28 sem ThingsBoard
         run: |
           set -euo pipefail
           unset BOTIZIN_TB_DEVICE_TOKEN
@@ -66,7 +66,7 @@ jobs:
           baseline = json.loads(pathlib.Path('/tmp/botizin-report/baseline.json').read_text())
           lab = json.loads(pathlib.Path('dist/build-record.json').read_text())
           assert lab['published'] is False and lab['publishable'] is False
-          assert baseline['version'] == '0.0.25' and lab['version'] == '0.0.27'
+          assert baseline['version'] == '0.0.25' and lab['version'] == '0.0.28'
           delta = lab['bytes'] - baseline['bytes']
           report = ('COMPILACAO LAB SEM PUBLICACAO\n'
                     f'BASE: {baseline["bytes"]} bytes\n'
@@ -90,36 +90,36 @@ jobs:
           assert record['device_token_compiled'] is False and record['thingsboard_enabled'] is False
           assert b'thingsboard.cloud' not in image
           assert b'VALIDATION_ONLY_NOT_A_DEVICE_TOKEN' not in image
-          assert b'CANDIDATE_BUILD: WIFI2_UX_027 (EXPERIMENTAL)' in image
+          assert b'CANDIDATE_BUILD: WIFI2_FINAL_028 (EXPERIMENTAL)' in image
           assert b'OTA_CANDIDATE_POLICY: OTA_ORIGINAL_RESTORED' in image
           assert image.startswith(b'\xe9') and len(image)<=3145728
-          print('WIFI2_UX_027_TEST_ONLY_IMAGE_OK',len(image))
+          print('WIFI2_FINAL_028_TEST_ONLY_IMAGE_OK',len(image))
           PY
       - name: Publicar BIN de teste somente na branch candidata (main intocada)
         run: |
           set -euo pipefail
-          test "${GITHUB_REF}" = 'refs/heads/candidate/wifi2-ux-0.0.27'
-          test "$(git branch --show-current)" = 'candidate/wifi2-ux-0.0.27'
-          mkdir -p packages/wifi2-0.0.27
-          cp dist/firmware.bin packages/wifi2-0.0.27/firmware.bin
-          cp dist/firmware.bin.sha256 packages/wifi2-0.0.27/firmware.bin.sha256
-          cp dist/build-record.json packages/wifi2-0.0.27/build-record.json
-          git add -f packages/wifi2-0.0.27/firmware.bin packages/wifi2-0.0.27/firmware.bin.sha256 packages/wifi2-0.0.27/build-record.json
+          test "${GITHUB_REF}" = 'refs/heads/candidate/wifi2-ux-0.0.28'
+          test "$(git branch --show-current)" = 'candidate/wifi2-ux-0.0.28'
+          mkdir -p packages/wifi2-0.0.28
+          cp dist/firmware.bin packages/wifi2-0.0.28/firmware.bin
+          cp dist/firmware.bin.sha256 packages/wifi2-0.0.28/firmware.bin.sha256
+          cp dist/build-record.json packages/wifi2-0.0.28/build-record.json
+          git add -f packages/wifi2-0.0.28/firmware.bin packages/wifi2-0.0.28/firmware.bin.sha256 packages/wifi2-0.0.28/build-record.json
           if git diff --cached --quiet; then
             echo 'BIN candidato ja atualizado'
           else
-            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'build(wifi2): candidato 0.0.27 sem ThingsBoard (nao e release)'
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'build(wifi2): candidato 0.0.28 sem ThingsBoard (nao e release)'
             # Documentation-only concurrent commits must not break an already verified build.
-            git fetch origin refs/heads/candidate/wifi2-ux-0.0.27:refs/remotes/origin/candidate/wifi2-ux-0.0.27
-            changed=$(git diff --name-only "${GITHUB_SHA}" refs/remotes/origin/candidate/wifi2-ux-0.0.27 -- firmware tests ci .github)
+            git fetch origin refs/heads/candidate/wifi2-ux-0.0.28:refs/remotes/origin/candidate/wifi2-ux-0.0.28
+            changed=$(git diff --name-only "${GITHUB_SHA}" refs/remotes/origin/candidate/wifi2-ux-0.0.28 -- firmware tests ci .github)
             test -z "$changed" || { echo "SOURCE_CHANGED_DURING_BUILD"; exit 1; }
-            git rebase refs/remotes/origin/candidate/wifi2-ux-0.0.27
-            git push origin HEAD:refs/heads/candidate/wifi2-ux-0.0.27
+            git rebase refs/remotes/origin/candidate/wifi2-ux-0.0.28
+            git push origin HEAD:refs/heads/candidate/wifi2-ux-0.0.28
           fi
       - name: Save isolated LAB test image (NOT a release)
         uses: actions/upload-artifact@v4
         with:
-          name: WIFI2-UX-027-TEST-CANDIDATE
+          name: WIFI2-FINAL-028-TEST-CANDIDATE
           path: |
             dist/firmware.bin
             dist/firmware.bin.sha256
