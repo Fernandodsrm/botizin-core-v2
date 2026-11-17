@@ -1,0 +1,73 @@
+name: OTA3 CORE 0.0.29 (candidato sem release)
+on:
+  push:
+    branches: ['candidate/ota3-0.0.29']
+    paths:
+      - 'firmware/**'
+      - 'ota3/**'
+      - 'tests/ota3_invariants_test.py'
+      - '.github/workflows/ota3-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/candidate/ota3-0.0.29'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Invariantes do OTA3 e sintaxe do painel
+        run: |
+          set -euo pipefail
+          python3 tests/ota3_invariants_test.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s = Path('firmware/panel_page.h').read_text()
+          html = re.search(r'R"BTZN\((.*?)\)BTZN"', s, re.S).group(1)
+          Path('/tmp/ota3-panel.js').write_text(re.search(r'<script>(.*?)</script>', html, re.S).group(1))
+          PY
+          node --check /tmp/ota3-panel.js
+      - name: Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: Core ESP32 fixo e MQTT
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install 'PubSubClient@2.8'
+      - name: Compilar OTA3 sem publicacao
+        run: |
+          set -euo pipefail
+          unset BOTIZIN_TB_DEVICE_TOKEN
+          python3 ci/build.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          d=json.loads(Path('dist/build-record.json').read_text())
+          b=Path('dist/firmware.bin').read_bytes()
+          assert d['version']=='0.0.29'
+          assert d['published'] is False and d['publishable'] is False
+          assert d['device_token_compiled'] is False and d['thingsboard_enabled'] is False
+          assert b'OTA3_CANDIDATE_029' in b
+          assert b'OTA_AUTOMATIC_ENABLED: NO' in b
+          assert b'OTA3_USE_AUTHENTICATED_PANEL' in b
+          assert len(b)<=3145728 and b[:1]==b'\xe9'
+          print('OTA3_COMPILED_VERIFIED',len(b),d['sha256'])
+          PY
+      - name: Guardar BIN somente como artefato de teste (nao release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OTA3-029-CANDIDATE-NOT-RELEASE
+          path: |
+            dist/firmware.bin
+            dist/firmware.bin.sha256
+            dist/build-record.json
+            dist/compile.log
+          retention-days: 14
+          if-no-files-found: error
