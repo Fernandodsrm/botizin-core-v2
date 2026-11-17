@@ -218,6 +218,9 @@ static void wifiPortalSave() {
     server.send(403,"text/plain","Only setup AP may change Wi-Fi.");
     return;
   }
+  if(wifiPortalJoinQueued || wifiPortalJoinActive || wifiPortalJoinSuccess) {
+    server.send(409,"text/plain","WIFI_PORTAL_BUSY");return;
+  }
   if(!server.hasArg("ssid") || !server.hasArg("pass")) {
     server.send(400,"text/plain","Missing Wi-Fi credentials."); return;
   }
@@ -426,9 +429,15 @@ static void wifiManagerTick() {
     return;
   }
   if(wifiPortalJoinSuccess && wifiPortalOn) {
-    if(wifiPortalDnsOn)wifiPortalDns.processNextRequest();
-    if((int32_t)(nowPortal-wifiPortalCloseAt)>=0)wifiPortalStop();
-    else return;
+    if(WiFi.status()!=WL_CONNECTED || WiFi.SSID()!=wifiPortalTargetSsid) {
+      // Never delay failover by two minutes if the just-added Wi-Fi drops.
+      wifiPortalJoinSuccess=false;
+      wifiPortalCloseAt=0;
+    } else {
+      if(wifiPortalDnsOn)wifiPortalDns.processNextRequest();
+      if((int32_t)(nowPortal-wifiPortalCloseAt)>=0)wifiPortalStop();
+      else return;
+    }
   }
   // Wi-Fi trial owns STA exclusively; no background credential failover here.
   if(wifiTrialActive())return;
