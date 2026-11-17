@@ -62,7 +62,8 @@ static bool wifiTrialStage(const String& requestedSsid,const String& requestedPa
      !wifiOnValidCredentials(requestedSsid,requestedPassword)) return false;
   const String connected=WiFi.SSID();
   if(connected.isEmpty()) return false;
-  String rollbackPassword=WiFi.psk();
+  String rollbackPassword=wifiKnownPasswordFor(connected);
+  if(rollbackPassword.isEmpty())rollbackPassword=WiFi.psk();
   if(rollbackPassword.isEmpty() && wifiManagerSavedSsid==connected)
     rollbackPassword=wifiManagerSavedPassword;
   if(rollbackPassword.isEmpty() && wifiManagerSavedSsid!=connected) {
@@ -104,7 +105,8 @@ static bool wifiTrialSave() {
   // Save only for NEXT restart. Stay on original Wi-Fi so browser stays reachable.
   if(!wifiTrialSaveReady()) return false;
   if(!wifiManagerStoreCredentials(wifiTrialTargetSsid,wifiTrialTargetPassword)) {
-    wifiTrialOutcome="NVS_SAVE_FAILED";return false;
+    wifiTrialOutcome=wifiKnown.count==WIFI_KNOWN_MAX && wifiKnownFind(wifiTrialTargetSsid)<0 ?
+      "MAX_FIVE_NETWORKS_FORGET_ONE":"NVS_SAVE_FAILED";return false;
   }
   wifiTrialPhase=WIFI_TRIAL_COMMITTED;
   wifiTrialOutcome="SAVED_FOR_NEXT_RESTART";
