@@ -21,7 +21,6 @@
 #define BOTIZIN_LOCAL_NAME "botizin-s3"
 #define BOTIZIN_LOCAL_BOARD "esp32s3-n16r8"
 #include "local_name.h"
-#include "telemetry_config.h"
 
 WebServer server(80);
 Preferences journal;
@@ -41,15 +40,12 @@ String internetStatus = "WAITING_FOR_FIRST_CHECK";
 bool internetStopped = false;
 uint32_t nextInternetCheck = 0;
 int responseCode = 400;
-String telemetryStatus = "WAITING";
+String telemetryStatus = "DISABLED_LEGACY";
 // MQTT counters are declared in mqtt_observer.h after the core OTA functions.
 static String mqttStatusSnapshot();
 static String wifiManagerStatus();
 static String wifiTrialStatus();
 static bool wifiTrialActive();
-uint32_t nextTelemetry = 0, telemetrySequence = 0;
-uint8_t telemetryFailures = 0;
-bool telemetryStopped = false;
 String telemetryBootId;
 #include "diagnostics.h"
 // Automatic OTA remains enabled. A manual query reserves a bounded confirmation window.
@@ -440,7 +436,7 @@ void checkInternetOTA(bool manual) {
     otaTargetVersion = targetVersion; otaTargetURL = targetURL; otaTargetSHA = targetSHA; otaTargetBytes = targetBytes;
     otaCandidateId = telemetryBootId + "-" + String((unsigned long)esp_random(), HEX);
     otaManualUntil = millis() + 300000; manualOtaStatus = "AVAILABLE";
-    nextTelemetry = millis(); showOtaProgress("VERSAO DISPONIVEL"); return;
+ showOtaProgress("VERSAO DISPONIVEL"); return;
   }
   installInternetOTA(targetVersion, targetURL, targetSHA, targetBytes);
 }
@@ -522,82 +518,8 @@ void installInternetOTA(const String &targetVersion, const String &targetURL, co
   rebootScheduled = true;
 }
 
-// Separate diagnostic sender: no Update, NVS write, boot change or Wi-Fi reconfiguration.
-// Called sequentially AFTER the existing OTA check has returned and freed its TLS clients.
-void __attribute__((noinline)) sendTelemetry() {
-  if (telemetryStopped || rebootScheduled || uploadActive || uploadOK ||
-      WiFi.status() != WL_CONNECTED || time(nullptr) < 1700000000) return;
-  if (ESP.getFreeHeap() < 80000) { telemetryStatus = "SKIPPED_LOW_HEAP"; return; }
-  DiagnosticScope diagnosticScope(DIAG_TB);
-  cJSON *root = cJSON_CreateObject();
-  if (!root) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
-  const esp_partition_t *run = esp_ota_get_running_partition();
-  String runText = partitionInfo(run);
-  String bootText = partitionInfo(esp_ota_get_boot_partition());
-  String nextText = partitionInfo(esp_ota_get_next_update_partition(nullptr));
-  String resetText = resetInfo(), stateText = stateInfo(run);
-  // Preserve the persisted source version and SHA evidence without rewriting the OTA journal.
-  String evidence = priorAttempt.substring(0, 4096);
-  bool ok = cJSON_AddStringToObject(root, "origin", "ESP32_REAL") &&
-    cJSON_AddBoolToObject(root, "simulated", false) &&
-    cJSON_AddStringToObject(root, "firmware_version", BOTIZIN_VERSION) &&
-    cJSON_AddStringToObject(root,"wifi_ip",WiFi.localIP().toString().c_str()) &&
-    cJSON_AddStringToObject(root,"local_name",BOTIZIN_LOCAL_NAME ".local") &&
-    cJSON_AddBoolToObject(root,"mdns_ready",localNameReady) &&
-    cJSON_AddStringToObject(root, "boot_id", telemetryBootId.c_str()) &&
-    cJSON_AddNumberToObject(root, "sequence", ++telemetrySequence) &&
-    cJSON_AddNumberToObject(root, "uptime_seconds", diagnosticUptime()) &&
-    cJSON_AddStringToObject(root, "running_partition", runText.c_str()) &&
-    cJSON_AddStringToObject(root, "boot_partition", bootText.c_str()) &&
-    cJSON_AddStringToObject(root, "next_update_partition", nextText.c_str()) &&
-    cJSON_AddStringToObject(root, "reset_reason", resetText.c_str()) &&
-    cJSON_AddStringToObject(root, "ota_state", stateText.c_str()) &&
-    cJSON_AddStringToObject(root, "ota_journal", evidence.c_str()) &&
-    cJSON_AddBoolToObject(root, "ota_automatic_enabled", true) &&
-    cJSON_AddStringToObject(root, "ota_manual_status", manualOtaStatus.c_str()) &&
-    cJSON_AddBoolToObject(root, "peer_paired", peerKey.length() == 64);
-  ok = ok && diagnosticJSON(root);
-  char *payload = ok ? cJSON_PrintUnformatted(root) : nullptr;
-  cJSON_Delete(root);
-  if (!payload) { telemetryStatus = "SKIPPED_NO_MEMORY"; return; }
-  size_t length = strlen(payload);
-  int code = -1000;
-  if (length <= 8192) {
-    NetworkClientSecure tls;
-    tls.useBuiltinCACertBundle();
-    tls.setHandshakeTimeout(5);
-    HTTPClient http;
-    http.setConnectTimeout(5000);
-    http.setTimeout(5000);
-    http.useHTTP10(true);
-    http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
-    // Device token only. The account API key is NEVER used by the ESP32.
-    String url = "https://thingsboard.cloud/api/v1/";
-    url += BOTIZIN_TB_DEVICE_TOKEN;
-    url += "/telemetry";
-    if (http.begin(tls, url)) {
-      http.addHeader("Content-Type", "application/json");
-      code = http.POST((uint8_t *)payload, length);
-    }
-    http.end();
-    tls.stop();
-  }
-  diagnosticScope.failed = code != 200;
-  cJSON_free(payload);
-  telemetryStatus = "HTTP_" + String(code);
-  if (code < 200 || code >= 300) {
-    char shortCode[20];snprintf(shortCode,sizeof(shortCode),"HTTP_%d",code);
-    eventRecord(EV_TB_ERROR,EV_WARN,shortCode);
-  }
-  Serial.println("TELEMETRY: " + telemetryStatus);
-  if (code >= 200 && code < 300) telemetryFailures = 0;
-  else if (++telemetryFailures >= 3) {
-    telemetryStopped = true;
-    telemetryStatus = "PAUSED_AFTER_3_FAILURES_UNTIL_REBOOT";
-    eventRecord(EV_TB_PAUSED,EV_ERROR,"THREE_SEND_FAILURES",true);
-    Serial.println("TELEMETRY: " + telemetryStatus);
-  }
-}
+// Legacy ThingsBoard sender removed in Wi-Fi-only candidate.
+// telemetryBootId remains as a nonce for existing OTA confirmation.
 
 #include "ping_rpc.h"
 #include "peer_ota_server.h"
@@ -683,7 +605,6 @@ void setup() {
   if (WiFi.status() == WL_CONNECTED) configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
   telemetryBootId = String((unsigned long)esp_random(), HEX) + String((unsigned long)esp_random(), HEX);
   nextPingPoll = millis() + 30000;
-  nextTelemetry = millis() + 20000;
   nextInternetCheck = millis() + 10000;
 #if BOTIZIN_LAB_OTA_DISABLED
   internetStatus = "LAB_OTA_DISABLED";
@@ -715,7 +636,7 @@ void loop() {
   if (!rebootScheduled && !uploadActive && !uploadOK && otaCheckQueued) {
     otaCheckQueued = false; checkInternetOTA(true);
     if (manualOtaStatus == "CHECKING") manualOtaStatus = internetStatus;
-    nextTelemetry = millis();
+
   }
   if (!rebootScheduled && !uploadActive && !uploadOK && !internetStopped &&
       (int32_t)(millis() - nextInternetCheck) >= 0) {
@@ -723,11 +644,6 @@ void loop() {
     if (!manualWindowActive()) { clearOtaCandidate(); peerOtaBusy = true; checkInternetOTA(false); peerOtaBusy = false; }
   }
 #endif // BOTIZIN_LAB_OTA_DISABLED
-  if (!wifiTrialActive() && !rebootScheduled && !uploadActive && !uploadOK && !telemetryStopped &&
-      (int32_t)(millis() - nextTelemetry) >= 0) {
-    nextTelemetry = millis() + 60000;
-    sendTelemetry();
-  }
   if (!rebootScheduled && !uploadActive && !uploadOK && !pingStopped &&
       (int32_t)(millis() - nextPingPoll) >= 0) {
     nextPingPoll = millis() + 15000;
