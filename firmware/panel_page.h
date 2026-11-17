@@ -443,32 +443,73 @@ $('controlCancel').addEventListener('click',async()=>{
  currentCandidate=null;$('controlInstall').disabled=true;
  await runControl('/control/cancel-ota');
 });
-// All Wi-Fi 2.0 actions use the existing volatile admin session.
-function wifiFeedback(message){showText('wf-test-result',message)}
-async function wifiCommand(path,fields={}){
-  if(!controlSession){wifiFeedback('Bloqueado: autentique no Wi-Fi 2.0 antes de usar.');return null}
-  try {return await controlPost(path,fields)}
-  catch(e){
-    wifiFeedback('Falha: '+e.message+'. O teste pode ter mudado de rede: atualize o painel após reconectar.');
-    if(String(e.message).includes('AUTH_REQUIRED_OR_EXPIRED'))clearControlSession('Sessão expirada.');
-    return null;
-  }
+// One server-side login; every action uses the same HttpOnly cookie.
+// Retries exist only while a test explicitly started by the user is active.
+let wifiWatchId=0;
+function wifiFeedback(message){showText('wf-test-result',message);$('wf-test-result').style.whiteSpace='pre-line'}
+function renderWifiTrial(d){
+ const st=d.WIFI_TRIAL_STATE;
+ if(!st||st==='IDLE')return;
+ const target=d.WIFI_TRIAL_TARGET||'rede escolhida';
+ const original=d.WIFI_TRIAL_RETURNED_WIFI||'rede anterior';
+ let msg='';
+ if(st==='TEST_OK'){
+   msg='✅ TESTE APROVADO!\nConectou a '+target+
+   (d.WIFI_TRIAL_TARGET_IP?' (IP: '+d.WIFI_TRIAL_TARGET_IP+')':'')+
+   '.\nRetornou automaticamente a '+original+'.\nA nova rede NÃO foi salva.';
+ }else if(st==='TEST_FAILED'){
+   msg='❌ NÃO CONECTOU à rede '+target+'.\nMotivo: '+(d.WIFI_TRIAL_REASON||'desconhecido')+
+   '.\nConexão original recuperada: '+original+'.';
+ }else if(st==='RECOVERY_FAILED'){
+   msg='⚠️ A S3 NÃO CONFIRMOU o retorno à rede antiga. Use o portal de recuperação se necessário.';
+ }else if(st==='SAVED_FOR_NEXT_RESTART'){
+   msg='✅ REDE SALVA para o próximo reinício.\nA S3 ainda está conectada à rede atual.';
+ }else{
+   const stage={QUEUED:'Preparando o teste',CONNECTING:'Conectando à rede nova',
+     OBSERVING:'Conectou! Verificando estabilidade',RETURNING:'Voltando à rede anterior'};
+   msg='⏳ '+(stage[st]||st)+'…\nAguarde: o painel pode perder acesso temporariamente.';
+ }
+ wifiFeedback(msg);
+ $('wf-confirm').disabled=st!=='TEST_OK'||d.WIFI_TRIAL_CAN_SAVE!=='YES';
 }
-$('wf-admin-login').addEventListener('click',async()=>{
-  const pass=$('wf-admin-pass').value;
-  if(!pass){showText('wf-admin-feedback','Informe a senha de administrador.');return}
-  $('wf-admin-login').disabled=true;
-  try{
-    const token=await controlPost('/control/login',{password:pass},false);
-    if(!/^[0-9a-f]{32}$/.test(token))throw new Error('Token inválido');
-    controlSession=token;
-    $('wf-admin-pass').value='';
-    $('controlLoginBox').hidden=true;$('controlActions').hidden=false;
-    showText('controlAuthStatus','Sessão administrativa ativa (10 minutos).');
-    showText('wf-admin-feedback','Desbloqueado. Use os botões de Wi-Fi sob demanda.');
-  }catch(e){showText('wf-admin-feedback','Erro ao autenticar: '+e.message)}
-  finally{$('wf-admin-login').disabled=false}
-});
+async function wifiCommand(path,fields={},quiet=false){
+ try{return await controlPost(path,fields)}
+ catch(e){
+   if(String(e.message).includes('AUTH_REQUIRED_OR_EXPIRED')){
+     clearControlSession('Sessão expirada. Entre novamente.');
+     return null;
+   }
+   if(!quiet)wifiFeedback('Não foi possível realizar a ação: '+e.message);
+   return null;
+ }
+}
+function startWifiWatch(){
+ if(wifiWatchId)return;
+ const watch=++wifiWatchId, started=Date.now();
+ $('wf-test').disabled=true;
+ async function tick(){
+   if(watch!==wifiWatchId)return;
+   const result=await wifiCommand('/control/wifi-state',{},true);
+   if(watch!==wifiWatchId)return;
+   if(result){
+     const d=parseStatus(result);
+     renderWifiTrial(d);
+     if(['TEST_OK','TEST_FAILED','RECOVERY_FAILED','SAVED_FOR_NEXT_RESTART'].includes(d.WIFI_TRIAL_STATE)){
+       wifiWatchId=0;$('wf-test').disabled=false;
+       if(d.WIFI_TRIAL_STATE!=='RECOVERY_FAILED')loadWifiReadOnly();
+       return;
+     }
+   }else{
+     wifiFeedback('⏳ A S3 está trocando de rede. Sem acesso temporário. O painel tentará novamente sozinho…');
+   }
+   if(Date.now()-started<90000)window.setTimeout(tick,2400);
+   else{
+     wifiWatchId=0;$('wf-test').disabled=false;
+     wifiFeedback('⚠️ Não foi possível confirmar o resultado em 90 segundos. Confira a rede original e abra novamente o painel.');
+   }
+ }
+ tick();
+}
 $('wf-scan').addEventListener('click',async()=>{
   const btn=$('wf-scan');btn.disabled=true;
   wifiFeedback('Procurando redes 2,4 GHz nesta solicitação…');
@@ -490,30 +531,25 @@ $('wf-network-choice').addEventListener('change',()=>{
   if($('wf-network-choice').value) $('wf-target-ssid').value=$('wf-network-choice').value;
 });
 $('wf-change-form').addEventListener('submit',async e=>{
-  e.preventDefault();
-  const ssid=$('wf-target-ssid').value.trim(),password=$('wf-target-pass').value;
-  if(!ssid || (password.length>0 && password.length<8)){wifiFeedback('Nome ou senha inválida.');return}
-  if(!window.confirm('Testar a rede "'+ssid+'" sem salvar? A conexão atual será interrompida; sem confirmação a S3 tentará voltar à rede antiga.'))return;
-  const btn=$('wf-test');btn.disabled=true;
-  const result=await wifiCommand('/control/wifi-test',{ssid,password});
-  $('wf-target-pass').value='';
-  $('wf-confirm').disabled=true;
-  wifiFeedback(result?result+'\nConsulte o resultado manualmente depois de conectar ao Wi-Fi da S3.':'Teste não iniciado.');
-  btn.disabled=false;
-});
-$('wf-stage-state').addEventListener('click',async()=>{
-  const result=await wifiCommand('/control/wifi-state');
-  if(!result)return;
-  wifiFeedback(result);
-  const d=parseStatus(result);
-  $('wf-confirm').disabled=d.WIFI_TRIAL_STATE!=='CONFIRM_REQUIRED';
+ e.preventDefault();
+ if(wifiWatchId)return;
+ const ssid=$('wf-target-ssid').value.trim(),password=$('wf-target-pass').value;
+ if(!ssid||(password.length>0&&password.length<8)){wifiFeedback('Nome da rede ou senha inválidos.');return}
+ $('wf-test').disabled=true;$('wf-confirm').disabled=true;
+ wifiFeedback('Iniciando teste na rede '+ssid+'…');
+ const result=await wifiCommand('/control/wifi-test',{ssid,password});
+ $('wf-target-pass').value='';
+ if(result){
+   wifiFeedback('⏳ Testando '+ssid+'. A S3 voltará sozinha à rede anterior e mostrará o resultado.');
+   startWifiWatch();
+ }else $('wf-test').disabled=false;
 });
 $('wf-confirm').addEventListener('click',async()=>{
-  if(!window.confirm('Confirmar esta conexão e gravar a nova rede na S3?'))return;
-  const result=await wifiCommand('/control/wifi-confirm');
-  wifiFeedback(result||'Não confirmado. Consulte o estado do teste.');
-  $('wf-confirm').disabled=true;
-  if(result)loadWifiReadOnly();
+ if($('wf-confirm').disabled)return;
+ if(!window.confirm('Salvar a rede testada para o PRÓXIMO REINÍCIO? A S3 permanece na rede atual até reiniciar.'))return;
+ const result=await wifiCommand('/control/wifi-confirm');
+ $('wf-confirm').disabled=true;
+ if(result)wifiFeedback('✅ Rede salva para o próximo reinício. A S3 continua na rede atual.');
 });
 $('settingsGotoWifi').addEventListener('click',()=>{$('tab-wifi').click()});
 $('controlReboot').addEventListener('click',async()=>{
