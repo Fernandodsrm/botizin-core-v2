@@ -1,4 +1,19 @@
-# BOTIZIN — Central do projeto (atualizada em 11/11/2026)
+# BOTIZIN — Central do projeto (atualizada em 17/11/2026)
+
+## Wi-Fi 2.2 — CORE 0.0.28 ACEITA EM TESTES REAIS (17/11/2026)
+
+**Estado atual da S3:** firmware `0.0.28` rodando em `app1`/ `ota_1`. Cinco testes principais e o fallback automático entre **Thor** e **Fernando's Galaxy A22** foram observados fisicamente. Depois de desligar o hotspot, a placa retornou sozinha à Thor, **sem redigitar senha, sem usar F5 e sem nova configuração**. Painel HTTP, teste sem salvar, cópia do IP recebido, duas redes lembradas (2/5), lista e login funcionaram.
+
+**Checkpoint congelado:** [`checkpoint/wifi-0.0.28-validado-2026-11-17`](https://github.com/Fernandodsrm/botizin-core-v2/tree/checkpoint/wifi-0.0.28-validado-2026-11-17). Relatório e evidências: [ACEITE Wi-Fi 0.0.28](https://github.com/Fernandodsrm/botizin-core-v2/blob/checkpoint/wifi-0.0.28-validado-2026-11-17/docs/WIFI-028-ACEITE-TESTES-2026-11-17.md). Manual de recuperação: [WIFI22-FECHAMENTO-028.md](https://github.com/Fernandodsrm/botizin-core-v2/blob/checkpoint/wifi-0.0.28-validado-2026-11-17/docs/WIFI22-FECHAMENTO-028.md).
+
+**Limite do aceite:** a nova página de recuperação que mostra o IP *depois* de cadastrar uma rede pelo AP ainda não foi ensaiada em placa nesta versão; o portal de recuperação básico já funcionara na 0.0.27. O mDNS pode falhar em hotspot; abrir pelo IP é alternativa, mas DHCP não garante IP permanente.
+
+**Preservação:** `main/manifest.json` permanece em `0.0.25`; a conhecida CORE `0.0.25` deve continuar preservada em `app0`. A 0.0.28 é um checkpoint **funcional aprovado**, não foi transformada em release automática. Não modificar Wi-Fi para iniciar os próximos módulos sem justificar regressão.
+
+**Próximo setor sugerido:** Recursos e Limites, seguido da revisão transversal de Segurança/HTTP. Registrar baseline de memória, tarefas, tempo de loop, serviços e limites OTA da 0.0.28 antes de expandir firmware, sem recomeçar do zero.
+
+---
+
 
 ## Checkpoint de recuperação S3 — 15/11/2026
 
