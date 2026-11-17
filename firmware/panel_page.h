@@ -50,8 +50,8 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 </style></head><body>
 <main>
 <header><div><div class="logo">FERNANDO LAB</div><h1>BOTIZIN / Central da S3</h1></div>
-<div class="flag">WIFI 2.1 · CORE 0.0.27 CANDIDATA</div></header>
-<p class="description">CORE 0.0.27 candidata: Wi-Fi 2.1 com teste automático e retorno à rede original. MQTT e OTA preservados. ThingsBoard e RPC legados desativados nesta candidata.</p>
+<div class="flag">WIFI 2.2 · CORE 0.0.28 CANDIDATA</div></header>
+<p class="description">CORE 0.0.28 candidata: Wi-Fi 2.2 com até 5 redes lembradas e recuperação orientada. MQTT e OTA preservados. ThingsBoard e RPC legados desativados nesta candidata.</p>
 <div class="state" id="state" role="status" aria-live="polite">Nenhum diagnóstico recebido.</div>
 <div class="g" id="metrics">
 <div class="metric"><div class="k">Firmware / slot</div><div class="v" id="firmware">—</div></div>
@@ -88,19 +88,23 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <h2>Wi-Fi / Conexão atual</h2>
 <p class="muted small">Leitura pontual, sem varredura de redes nem teste ativo. Nenhuma senha é exibida.</p>
 <div class="link-grid">
-<div class="link-card"><h3>Rede (SSID)</h3><p id="wf-ssid">Não consultado</p></div>
-<div class="link-card"><h3>IP da S3</h3><p id="wf-ip">—</p></div>
-<div class="link-card"><h3>Sinal (RSSI)</h3><p id="wf-rssi">—</p></div>
-<div class="link-card"><h3>Canal Wi-Fi</h3><p id="wf-channel">—</p></div>
-<div class="link-card"><h3>Gateway</h3><p id="wf-gateway">—</p></div>
-<div class="link-card"><h3>DNS configurado</h3><p id="wf-dns">—</p></div>
-<div class="link-card"><h3>Nome local (mDNS)</h3><p id="wf-mdns">—</p></div>
-<div class="link-card"><h3>Portal de recuperação</h3><p id="wf-ap">—</p></div>
+<div class="link-card"><h3>Rede conectada</h3><p id="wf-ssid">Não consultado</p></div>
+<div class="link-card"><h3>IP atual da S3</h3><p id="wf-ip">—</p></div>
+<div class="link-card"><h3>Qualidade do sinal</h3><p id="wf-quality">—</p></div>
+<div class="link-card"><h3>Endereço local (mDNS)</h3><p id="wf-mdns">—</p></div>
 </div>
+<p class="note" id="wf-ap">Recuperação Wi-Fi preparada.</p>
+<details class="note"><summary>Detalhes técnicos: canal, RSSI, gateway, DNS</summary>
+<div class="link-grid">
+<div><b>RSSI:</b> <span id="wf-rssi">—</span></div>
+<div><b>Canal:</b> <span id="wf-channel">—</span></div>
+<div><b>Gateway:</b> <span id="wf-gateway">—</span></div>
+<div><b>DNS:</b> <span id="wf-dns">—</span></div>
+</div><p class="tiny">Gateway e DNS podem ter o mesmo IP. mDNS iniciado não garante que Windows ou hotspot encontrem o nome .local.</p></details>
 <div class="buttons"><button id="wifi-read" type="button">Consultar Wi-Fi agora</button></div>
 <p class="tiny" role="status" aria-live="polite" id="wf-feedback">Aguardando consulta manual.</p>
 <div class="panel" style="margin-top:14px">
-<h2>Wi-Fi 2.1 · Teste simples, resultado automático</h2>
+<h2>Wi-Fi 2.2 · Teste simples, resultado automático</h2>
 <p class="muted small">Escolha a rede e clique em <b>Testar e voltar</b>. A S3 conecta, verifica e retorna à anterior. O resultado aparece aqui, sem trocar o Wi-Fi do notebook nem copiar linhas de /status.</p>
 <p class="tiny" id="wf-admin-feedback" role="status">Acesso liberado pela senha única do painel. Esta aba não pede outra autenticação.</p>
 <div class="buttons"><button id="wf-scan" type="button">Procurar redes 2,4 GHz</button></div>
@@ -115,8 +119,23 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 </form>
 <div class="buttons"><button id="wf-confirm" type="button" disabled>Salvar rede testada para próximo reinício</button></div>
 <div class="state" id="wf-test-result" role="status" aria-live="polite">Nenhum teste iniciado. O resultado aparecerá automaticamente depois de testar.</div>
+<div id="wf-tested-link" class="note" hidden><b>Endereço recebido pela S3 na rede testada:</b>
+<input class="control-input" id="wf-tested-address" type="text" readonly/>
+<div class="buttons"><button id="wf-copy" type="button">Copiar endereço</button>
+<a id="wf-open" class="action" target="_blank" rel="noopener">Abrir painel pelo IP</a></div>
+<p class="tiny">Antes de abrir, conecte o notebook ou celular à mesma rede testada. Este IP pode mudar futuramente.</p></div>
 <p class="note">Durante o teste, este painel pode ficar temporariamente sem acesso: a S3 tem uma conexão Wi-Fi STA. <b>É esperado.</b> A S3 volta à rede de origem e o painel consulta o resultado por até 90 segundos. Só o botão separado <b>Salvar rede testada</b> grava a nova rede para uso após reiniciar.</p>
-</div>
+<div class="panel" style="margin-top:14px"><h2>Redes conhecidas (até 5)</h2>
+<p class="muted small">A S3 não muda de rede por sinal mais forte. Só tenta outra rede lembrada se a atual cair. Nenhuma senha é exibida aqui.</p>
+<div class="buttons"><button id="wf-known-refresh" type="button">Atualizar redes lembradas</button></div>
+<div id="wf-known-list" class="note" role="status">Ainda não consultado.</div></div>
+<details class="note"><summary>Guia de recuperação — se não conseguir abrir a S3</summary>
+<p><b>Normal:</b> use http://botizin-s3.local/ na mesma rede. Se o nome falhar, tente o IP mostrado no teste de Wi-Fi.</p>
+<p><b>Sem rede conhecida:</b> a S3 abre uma rede temporária BOTIZIN-S3-XXXX após cerca de 35 segundos sem Wi-Fi. Conecte-se a ela e abra http://192.168.4.1/.</p>
+<p><b>Após configurar:</b> a página de recuperação informa o IP da rede nova, com opção de copiar. Conecte-se à nova rede antes de abrir o endereço.</p>
+<p><b>Se está conectada mas perdeu o IP:</b> consulte os clientes do roteador ou recupere via USB. O portal não liga apenas porque mDNS deixou de funcionar.</p>
+<p><b>Senha da rede de emergência:</b> gerada pela S3 e mostrada na USB, deve ser guardada em local seguro.</p>
+</details>
 </section></div>
 <div id="page-resources" role="tabpanel" aria-labelledby="tab-resources" hidden>
 <section class="panel">
