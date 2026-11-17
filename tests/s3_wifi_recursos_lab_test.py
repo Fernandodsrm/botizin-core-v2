@@ -49,7 +49,11 @@ assert '#if !BOTIZIN_LAB_OTA_DISABLED\n  if (!rebootScheduled && !uploadActive &
 assert 'server.on("/update", HTTP_POST, []() {\n    server.send(403, "text/plain; charset=utf-8", "LAB_OTA_DISABLED");' in fw
 assert 'OTA_AUTOMATIC_ENABLED: YES' in fw
 assert 'OTA_CANDIDATE_POLICY: OTA_ORIGINAL_RESTORED' in fw
-assert 'cJSON_AddBoolToObject(root, "ota_automatic_enabled", true)' in fw
+assert 'thingsboard.cloud' not in fw
+assert 'BOTIZIN_TB_DEVICE_TOKEN' not in fw
+assert 'telemetry_config.h' not in fw
+assert 'sendTelemetry(' not in fw
+assert 'TELEMETRY: ' in fw and 'DISABLED_LEGACY' in fw
 assert 'cJSON_AddBoolToObject(o,"automatic_enabled",true)' in peer
 assert 'if (action != "status")' in peer and 'LAB_OTA_DISABLED' in peer
 for fn in ("controlCheckOTA", "controlInstallOTA"):
@@ -122,5 +126,5 @@ assert 'checkInternetOTA(false);' in fw
 assert 'installInternetOTA(v,u,h,n)' in fw
 assert 'server.on("/update", HTTP_POST' in fw
 assert "botizinMqttLoop();" in fw
-assert "sendTelemetry();" in fw
+assert "sendTelemetry();" not in fw
 assert "wifiTrialTick();" in fw
