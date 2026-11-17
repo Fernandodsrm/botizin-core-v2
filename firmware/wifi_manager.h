@@ -14,6 +14,12 @@ static String wifiPortalName;
 static String wifiPortalPassword;
 static String wifiManagerSavedSsid;
 static String wifiManagerSavedPassword;
+static bool wifiOnValidCredentials(const String&,const String&);
+#include "wifi_known.h"
+static uint8_t wifiReconnectOrdinal=0;
+static bool wifiReconnectTrying=false;
+static uint32_t wifiReconnectAttemptAt=0;
+static uint32_t wifiReconnectNextCycleAt=0;
 static uint32_t wifiDisconnectedAt=0;
 static uint32_t wifiRestartAfter=0;
 static bool wifiClockConfigured=false;
@@ -39,7 +45,9 @@ static bool wifiRequestFromSetupAP() {
 static String wifiManagerStatus() {
   return String("WIFI_SETUP: ")+(wifiPortalOn?"ACTIVE":"OFF")+"\n"+
          "WIFI_SETUP_SSID: "+(wifiPortalOn?wifiPortalName:String("NOT_ACTIVE"))+"\n"+
-         "WIFI_SETUP_URL: "+(wifiPortalOn?"http://192.168.4.1/":String("NOT_ACTIVE"))+"\n";
+         "WIFI_SETUP_URL: "+(wifiPortalOn?"http://192.168.4.1/":String("NOT_ACTIVE"))+"\n"+
+         "WIFI_KNOWN_COUNT: "+String(wifiKnown.count)+"\n"+
+         "WIFI_FALLBACK: "+String(wifiReconnectTrying?"SEARCHING":"IDLE")+"\n";
 }
 static void wifiPortalPage() {
   if(!wifiRequestFromSetupAP()) {
@@ -96,20 +104,10 @@ static bool wifiOnValidCredentials(const String& proposedSsid,const String& prop
          (proposedPassword.length()==0 || proposedPassword.length()>=8);
 }
 static bool wifiManagerStoreCredentials(const String& proposedSsid,const String& pass) {
-  if(!wifiManagerReady || !wifiOnValidCredentials(proposedSsid,pass))return false;
-  String ssid=proposedSsid;ssid.trim();
-  // Preserve previously configured values in RAM until BOTH writes complete.
-  String oldSsid=wifiManagerPrefs.getString("ssid","");
-  String oldPass=wifiManagerPrefs.getString("pass","");
-  if(wifiManagerPrefs.putString("ssid",ssid)!=ssid.length() ||
-     wifiManagerPrefs.putString("pass",pass)!=pass.length()) {
-    wifiManagerPrefs.putString("ssid",oldSsid);
-    wifiManagerPrefs.putString("pass",oldPass);
-    return false;
-  }
-  wifiManagerSavedSsid=ssid;
-  wifiManagerSavedPassword=pass;
-  return true;
+  // Explicit save: upsert in 5-network atomic list, prefer on next restart.
+  // No change to the current station/STA. Full list refuses safely.
+  if(!wifiManagerReady)return false;
+  return wifiKnownUpsert(proposedSsid,pass,true);
 }
 
 static void wifiPortalSave() {
@@ -244,36 +242,55 @@ static bool wifiManagerInit() {
   char suffix[6];
   snprintf(suffix,sizeof(suffix),"%04X",(unsigned)(ESP.getEfuseMac()&0xffffu));
   wifiPortalName=String("BOTIZIN-S3-")+suffix;
-  wifiManagerSavedSsid=wifiManagerPrefs.getString("ssid","");
-  wifiManagerSavedPassword=wifiManagerPrefs.getString("pass","");
+  wifiKnownLoad(); // migrates existing 0.0.27 saved Thor in RAM, no erasure
+  wifiManagerSavedSsid=wifiKnownPreferred();
+  wifiManagerSavedPassword=wifiKnownPasswordFor(wifiManagerSavedSsid);
   wifiManagerReady=true;
   // Show locally over USB: the device has no screen and no public password.
   Serial.println("WIFI_SETUP_SSID_USB_ONLY: "+wifiPortalName);
   Serial.println("WIFI_SETUP_PASSWORD_USB_ONLY: "+wifiPortalPassword);
   return true;
 }
+static bool wifiManagerConnectOrdinal(uint8_t ordinal) {
+  const int ix=wifiKnownIndexByOrdinal(ordinal);
+  if(ix<0)return false;
+  // Keep recovery AP online if already started (AP+STA).
+  WiFi.mode(wifiPortalOn?WIFI_AP_STA:WIFI_STA);
+  WiFi.persistent(false);
+  WiFi.setAutoReconnect(false);
+  WiFi.disconnect(false,false);
+  WiFi.begin(wifiKnown.entries[ix].ssid,wifiKnown.entries[ix].password);
+  wifiReconnectTrying=true;
+  wifiReconnectOrdinal=ordinal;
+  wifiReconnectAttemptAt=millis();
+  return true;
+}
 static void wifiManagerConnectKnown() {
-  WiFi.mode(WIFI_STA);
-  WiFi.setAutoReconnect(true);
-  if(!wifiManagerSavedSsid.isEmpty()) {
-    // Keep original Arduino Wi-Fi NVS creds as fallback; our saved network
-    // lives in botizin-net/ssid+pass instead.
-    WiFi.persistent(false);
-    WiFi.begin(wifiManagerSavedSsid.c_str(),wifiManagerSavedPassword.c_str());
-  } else {
-    // Backward compatible with S3 0.0.17 provisioning.
-    WiFi.begin();
-  }
   wifiDisconnectedAt=millis();
+  wifiReconnectTrying=false;
+  wifiReconnectNextCycleAt=0;
+  if(wifiKnown.count>0) {
+    wifiManagerConnectOrdinal(0);
+  } else {
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(); // backward compatible with firmware before 0.0.21
+  }
 }
 static void wifiManagerTick() {
   if(wifiRestartAfter && (int32_t)(millis()-wifiRestartAfter)>=0) {
     Serial.flush();ESP.restart();
   }
-  // The staged trial owns STA reconnection until it commits or restores.
-  if(wifiTrialActive()) return;
+  // Wi-Fi trial owns STA exclusively; no background credential failover here.
+  if(wifiTrialActive())return;
+  const uint32_t now=millis();
   if(WiFi.status()==WL_CONNECTED) {
-    wifiDisconnectedAt=millis();
+    wifiDisconnectedAt=now;
+    if(wifiReconnectTrying){
+      wifiReconnectTrying=false;
+      wifiReconnectNextCycleAt=0;
+      wifiKnownSelectPreferred(WiFi.SSID()); // only when failover actually connected
+    }
     if(wifiPortalOn)wifiPortalStop();
     if(!wifiClockConfigured) {
       configTime(0,0,"pool.ntp.org","time.cloudflare.com");
@@ -282,8 +299,23 @@ static void wifiManagerTick() {
     return;
   }
   if(wifiPortalOn && wifiPortalDnsOn)wifiPortalDns.processNextRequest();
-  if(!wifiDisconnectedAt)wifiDisconnectedAt=millis();
-  if(!wifiPortalOn && (uint32_t)(millis()-wifiDisconnectedAt)>=WIFI_RECOVERY_MS) {
-    wifiPortalStart();
+  if(!wifiDisconnectedAt)wifiDisconnectedAt=now;
+  if(wifiKnown.count>0) {
+    if(wifiReconnectTrying && (uint32_t)(now-wifiReconnectAttemptAt)>=11000UL) {
+      if(wifiReconnectOrdinal+1<wifiKnown.count)
+        wifiManagerConnectOrdinal(wifiReconnectOrdinal+1);
+      else {
+        wifiReconnectTrying=false;
+        wifiReconnectNextCycleAt=now+45000UL;
+      }
+    } else if(!wifiReconnectTrying &&
+              (wifiReconnectNextCycleAt==0
+                ? (uint32_t)(now-wifiDisconnectedAt)>=5000UL
+                : (int32_t)(now-wifiReconnectNextCycleAt)>=0)) {
+      wifiReconnectNextCycleAt=0;
+      wifiManagerConnectOrdinal(0);
+    }
   }
+  if(!wifiPortalOn && (uint32_t)(now-wifiDisconnectedAt)>=WIFI_RECOVERY_MS)
+    wifiPortalStart();
 }
