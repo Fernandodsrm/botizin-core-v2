@@ -57,6 +57,7 @@ assert '"Cookie"' in controls
 assert 'server.header("Cookie")' in controls
 assert 'HttpOnly; SameSite=Strict' in controls
 assert 'controlSessionUntil=millis()+600000UL' in controls
+assert 'controlRequireAuth(); // validated above' in wifi
 assert 'server.client().remoteIP()!=controlSessionIP' in controls
 assert '"AUTH_OK"' in controls
 assert 'if(!controlRequireAuth())return;' in controls
