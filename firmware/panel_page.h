@@ -318,6 +318,8 @@ function renderStatus(txt){
    const label=document.createElement('b');label.textContent=key+': ';p.append(label,document.createTextNode(val));div.append(p)}
  $('statusTime').textContent='Última leitura manual ou inicial: '+new Date().toLocaleTimeString('pt-BR');
  setState('HTTP respondeu. Dados desta leitura; sem monitoramento contínuo.','ok');
+ renderWifiTrial(d);
+ if(['QUEUED','CONNECTING','OBSERVING','RETURNING'].includes(d.WIFI_TRIAL_STATE))startWifiWatch();
 }
 async function loadStatus(){
  const btn=$('refresh');btn.disabled=true;setState('Consultando S3 uma única vez…','warn');
@@ -378,22 +380,22 @@ $('termForm').addEventListener('submit',e=>{
 // No periodic terminal polls: network reads require a human command.
 // Protected controls: all network calls below require a deliberate click/submit.
 // Session is volatile in this browser tab; never localStorage/cookies.
-let controlSession='';
+let controlSession='cookie';
 let currentCandidate=null;
 function controlOutput(message){const e=$('controlOutput');e.textContent=message; e.scrollTop=e.scrollHeight}
 function clearControlSession(message){
  controlSession='';currentCandidate=null;
- $('controlActions').hidden=true;$('controlLoginBox').hidden=false;
  $('controlInstall').disabled=true;
- $('controlAuthStatus').textContent=message||'Sessão bloqueada.';
+ $('controlAuthStatus').textContent=message||'Sessão expirada. Entre novamente.';
+ window.location.replace('/');
 }
 async function controlPost(path,fields={},authentication=true){
  const params=new URLSearchParams(fields);
  const headers={'Content-Type':'application/x-www-form-urlencoded'};
- if(authentication)headers['X-Botizin-Session']=controlSession;
+ if(authentication && /^[0-9a-f]{32}$/.test(controlSession))headers['X-Botizin-Session']=controlSession;
  const ctrl=new AbortController(),timeout=setTimeout(()=>ctrl.abort(),13000);
  try {
-  const r=await fetch(path,{method:'POST',headers,body:params.toString(),cache:'no-store',
+  const r=await fetch(path,{method:'POST',headers,body:params.toString(),cache:'no-store',credentials:'same-origin',
                             redirect:'error',signal:ctrl.signal});
   const body=await r.text();
   if(!r.ok)throw new Error('HTTP '+r.status+': '+body);
@@ -407,23 +409,9 @@ async function runControl(path,fields={}){
    if(String(e.message).includes('AUTH_REQUIRED_OR_EXPIRED'))clearControlSession('Sessão expirada. Autentique novamente.');
    return null}
 }
-$('controlLogin').addEventListener('click',async()=>{
- const btn=$('controlLogin'),password=$('controlPassword').value;
- if(!password){$('controlAuthStatus').textContent='Digite a senha individual da S3.';return}
- btn.disabled=true;
- try{
-  const token=await controlPost('/control/login',{password},false);
-  if(!/^[0-9a-f]{32}$/.test(token))throw new Error('Resposta de autenticação inválida');
-  controlSession=token;$('controlPassword').value='';
-  $('controlLoginBox').hidden=true;$('controlActions').hidden=false;
-  $('controlAuthStatus').textContent='Comandos desbloqueados temporariamente. Sem consultas automáticas.';
-  controlOutput('Autenticado. Os botões funcionam sob demanda.');
- }catch(e){$('controlAuthStatus').textContent='Não foi possível autenticar: '+e.message}
- finally{btn.disabled=false}
-});
 $('controlLogout').addEventListener('click',async()=>{
  if(controlSession)try{await controlPost('/control/logout')}catch(e){}
- clearControlSession('Comandos bloqueados.');
+ window.location.replace('/');
 });
 $('controlConnections').addEventListener('click',()=>runControl('/control/connections'));
 $('controlCheckOTA').addEventListener('click',async()=>{
@@ -533,8 +521,7 @@ $('controlReboot').addEventListener('click',async()=>{
  const result=await runControl('/control/reboot');
  if(result)clearControlSession('Reinício solicitado. A conexão será interrompida.');
 });
-// No automatic control actions, timers or polling.
-// Exactly one startup read of each resource. No interval, socket or background probes.
+// No polling while idle; bounded retries only after a user-initiated Wi-Fi test.
 loadStatus();loadEvents();
 </script>
 </body></html>)BTZN";
