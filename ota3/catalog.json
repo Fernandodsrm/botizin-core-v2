@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "board": "esp32s3-n16r8",
+  "entries": [
+    {
+      "id": "0.0.28-wifi2",
+      "version": "0.0.28",
+      "label": "Wi-Fi 2.2 validado",
+      "board": "esp32s3-n16r8",
+      "size": 1292560,
+      "sha256": "2e6269f79f559a63f36d7c3f225832dbb62bcf255eb57da764958eeb5edeb624",
+      "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/ca401dd87d152d1404f9273caf088b02c5575c4b/packages/wifi2-0.0.28/firmware.bin",
+      "ota3": false,
+      "approved": true
+    },
+    {
+      "id": "0.0.25-original",
+      "version": "0.0.25",
+      "label": "CORE 0.0.25 original - OTA3 indisponivel",
+      "board": "esp32s3-n16r8",
+      "size": 1259872,
+      "sha256": "bc68a1c45c43f4b0e63d40767521b50290a664725568cd0e6acfae24c37e049a",
+      "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/main/releases/0.0.25/firmware.bin",
+      "ota3": false,
+      "approved": true
+    }
+  ]
+}
