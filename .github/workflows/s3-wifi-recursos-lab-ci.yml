@@ -1,7 +1,7 @@
 name: Wi-Fi 2.2 CORE 0.0.28 (binario na branch candidata)
 on:
   push:
-    branches: ['candidate/wifi2-ux-0.0.28']
+    branches: ['candidate/wifi2-final-0.0.28']
     paths:
       - 'firmware/**'
       - 'tests/s3_wifi_recursos_lab_test.py'
@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-and-compare:
-    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/candidate/wifi2-ux-0.0.28'
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/candidate/wifi2-final-0.0.28'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -98,8 +98,8 @@ jobs:
       - name: Publicar BIN de teste somente na branch candidata (main intocada)
         run: |
           set -euo pipefail
-          test "${GITHUB_REF}" = 'refs/heads/candidate/wifi2-ux-0.0.28'
-          test "$(git branch --show-current)" = 'candidate/wifi2-ux-0.0.28'
+          test "${GITHUB_REF}" = 'refs/heads/candidate/wifi2-final-0.0.28'
+          test "$(git branch --show-current)" = 'candidate/wifi2-final-0.0.28'
           mkdir -p packages/wifi2-0.0.28
           cp dist/firmware.bin packages/wifi2-0.0.28/firmware.bin
           cp dist/firmware.bin.sha256 packages/wifi2-0.0.28/firmware.bin.sha256
@@ -110,11 +110,11 @@ jobs:
           else
             git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'build(wifi2): candidato 0.0.28 sem ThingsBoard (nao e release)'
             # Documentation-only concurrent commits must not break an already verified build.
-            git fetch origin refs/heads/candidate/wifi2-ux-0.0.28:refs/remotes/origin/candidate/wifi2-ux-0.0.28
-            changed=$(git diff --name-only "${GITHUB_SHA}" refs/remotes/origin/candidate/wifi2-ux-0.0.28 -- firmware tests ci .github)
+            git fetch origin refs/heads/candidate/wifi2-final-0.0.28:refs/remotes/origin/candidate/wifi2-final-0.0.28
+            changed=$(git diff --name-only "${GITHUB_SHA}" refs/remotes/origin/candidate/wifi2-final-0.0.28 -- firmware tests ci .github)
             test -z "$changed" || { echo "SOURCE_CHANGED_DURING_BUILD"; exit 1; }
-            git rebase refs/remotes/origin/candidate/wifi2-ux-0.0.28
-            git push origin HEAD:refs/heads/candidate/wifi2-ux-0.0.28
+            git rebase refs/remotes/origin/candidate/wifi2-final-0.0.28
+            git push origin HEAD:refs/heads/candidate/wifi2-final-0.0.28
           fi
       - name: Save isolated LAB test image (NOT a release)
         uses: actions/upload-artifact@v4
