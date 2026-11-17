@@ -7,6 +7,7 @@
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
 #include <mbedtls/sha256.h>
+#include <strings.h>
 
 static constexpr size_t OTA3_CATALOG_MAX = 4096;
 static constexpr size_t OTA3_BIN_MAX = 3145728;
@@ -38,6 +39,7 @@ static void ota3Finish(bool success, const char *message) {
   }
   portENTER_CRITICAL(&ota3Mux);
   ota3Busy = false;
+  peerOtaBusy = false;
   portEXIT_CRITICAL(&ota3Mux);
 }
 static String ota3Status() {
@@ -273,6 +275,7 @@ static bool ota3Start(uint8_t kind,const String &id="") {
   portENTER_CRITICAL(&ota3Mux);
   if(ota3Busy){portEXIT_CRITICAL(&ota3Mux);return false;}
   ota3Busy=true;
+  peerOtaBusy=true;
   snprintf(ota3Selected,sizeof(ota3Selected),"%s",id.c_str());
   portEXIT_CRITICAL(&ota3Mux);
   ota3Progress("AGUARDANDO","Preparando tarefa");
@@ -288,10 +291,11 @@ static bool ota3IsBusy() {
   return result;
 }
 static String ota3CatalogResponse() {
+  char buffer[OTA3_CATALOG_MAX+1];
   portENTER_CRITICAL(&ota3Mux);
-  String result=ota3Catalog[0]?String(ota3Catalog):String("{\"schema\":1,\"entries\":[]}");
+  memcpy(buffer,ota3Catalog,sizeof(buffer));
   portEXIT_CRITICAL(&ota3Mux);
-  return result;
+  return buffer[0]?String(buffer):String("{\"schema\":1,\"entries\":[]}");
 }
 static bool ota3SelectBoot(int slot,String &reason) {
   if(!otaReady || ota3IsBusy() || rebootScheduled ||
