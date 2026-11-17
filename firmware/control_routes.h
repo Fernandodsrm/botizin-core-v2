@@ -1,8 +1,8 @@
 #pragma once
-// BOTIZIN S3 local-only control UI. No background checks, polling, or remote shell.
+// BOTIZIN S3 local-only control UI. No remote shell; status retries only during a user-started Wi-Fi test.
 // Uses the existing per-device SoftAP setup password, stored in device NVS.
 // Local HTTP is not end-to-end encrypted: do not port-forward this endpoint.
-// Sessions exist only in RAM, limited to same LAN client and ten minutes.
+// Sessions in RAM, pinned to same LAN client; ten minute idle timeout; host-only HttpOnly cookie.
 static String controlSession;
 static IPAddress controlSessionIP;
 static uint32_t controlSessionUntil=0;
@@ -21,14 +21,33 @@ static bool controlConstantEqual(const String &a,const String &b) {
   return diff==0;
 }
 static bool controlSessionValid() {
-  const String provided=server.header("X-Botizin-Session");
-  if(!controlOnStaInterface() || provided.length()!=32 ||
-     controlSession.length()!=32 || (int32_t)(controlSessionUntil-millis())<=0 ||
+  if(!controlOnStaInterface() || controlSession.length()!=32 ||
+     (int32_t)(controlSessionUntil-millis())<=0 ||
      server.client().remoteIP()!=controlSessionIP) return false;
-  return controlConstantEqual(provided,controlSession);
+  const String provided=server.header("X-Botizin-Session");
+  if(provided.length()==32 && controlConstantEqual(provided,controlSession)) return true;
+  // Browser normal navigation cannot attach custom headers. HttpOnly cookie
+  // allows one login for every tab/action without exposing token in JS.
+  const String cookies=server.header("Cookie");
+  const String name="BotizinSession=";
+  int from=0;
+  while(from<cookies.length()) {
+    while(from<cookies.length() && (cookies[from]==' ' || cookies[from]==';'))++from;
+    int end=cookies.indexOf(';',from);
+    if(end<0) end=cookies.length();
+    if(cookies.substring(from,from+name.length())==name) {
+      String token=cookies.substring(from+name.length(),end);
+      return token.length()==32 && controlConstantEqual(token,controlSession);
+    }
+    from=end+1;
+  }
+  return false;
 }
 static bool controlRequireAuth() {
-  if(controlSessionValid()) return true;
+  if(controlSessionValid()) {
+    controlSessionUntil=millis()+600000UL; // 10 minutes of inactivity, not since login.
+    return true;
+  }
   server.sendHeader("Cache-Control","no-store");
   server.send(403,"text/plain; charset=utf-8","AUTH_REQUIRED_OR_EXPIRED");
   return false;
@@ -56,11 +75,13 @@ static void controlLogin() {
   controlSessionUntil=millis()+600000UL;
   server.sendHeader("Cache-Control","no-store");
   server.sendHeader("X-Content-Type-Options","nosniff");
-  server.send(200,"text/plain; charset=utf-8",controlSession);
+  server.sendHeader("Set-Cookie","BotizinSession="+controlSession+"; Path=/; Max-Age=3600; HttpOnly; SameSite=Strict");
+  server.send(200,"text/plain; charset=utf-8","AUTH_OK");
 }
 static void controlLogout() {
   if(!controlRequireAuth())return;
   controlSession="";controlSessionUntil=0;
+  server.sendHeader("Set-Cookie","BotizinSession=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict");
   controlReply(200,"LOGGED_OUT");
 }
 static void controlCheckOTA() {
@@ -115,7 +136,6 @@ static void controlConnectivity() {
   s+="HTTP_SERVER: "+String(eventHttpServerStarted?"STARTED":"NOT_STARTED")+"\n";
   s+="HTTP_REQUESTS: "+String(eventHttpGetCount)+"\n";
   s+="MQTT_LAST: "+botizinMqttLast+"\n";
-  s+="THINGSBOARD: "+telemetryStatus+"\n";
   s+="OTA: "+internetStatus+"\n";
   controlReply(200,s);
 }
@@ -131,12 +151,12 @@ static void controlWifiTest() {
   if(!wifiTrialStage(server.arg("ssid"),server.arg("password"))) {
     controlReply(409,String("WIFI_TEST_BLOCKED: ")+wifiTrialOutcome);return;
   }
-  controlReply(202,"WIFI_TEST_QUEUED. Conexao antiga nao foi apagada. Aguarde e confirme em ate 120 s depois que a nova rede conectar.");
+  controlReply(202,"WIFI_TEST_STARTED. A S3 testara a nova rede, voltara para a original e registrara o resultado. Nenhuma rede sera salva.");
 }
 static void controlWifiConfirm() {
   if(!controlRequireAuth())return;
-  if(wifiTrialConfirm()) controlReply(200,"WIFI_CONFIRMED_AND_SAVED");
-  else controlReply(409,"WIFI_CONFIRM_UNAVAILABLE_OR_FAILED");
+  if(wifiTrialSave()) controlReply(200,"WIFI_SAVED_FOR_NEXT_RESTART");
+  else controlReply(409,"WIFI_SAVE_NOT_AVAILABLE_TEST_FIRST_OR_EXPIRED");
 }
 static void controlWifiTrialState() {
   if(!controlRequireAuth())return;
@@ -192,8 +212,8 @@ static void controlReboot() {
 }
 static void controlRegisterRoutes() {
   // Header collected only for protected routes, not returned by /status or /events.
-  const char *headers[]={"X-Botizin-Nonce","X-Botizin-MAC","X-Botizin-Session"};
-  server.collectHeaders(headers,3);
+  const char *headers[]={"X-Botizin-Nonce","X-Botizin-MAC","X-Botizin-Session","Cookie"};
+  server.collectHeaders(headers,4);
   server.on("/control/login",HTTP_POST,controlLogin);
   server.on("/control/logout",HTTP_POST,controlLogout);
   server.on("/control/check-ota",HTTP_POST,controlCheckOTA);
