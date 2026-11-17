@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""BOTIZIN Wi-Fi 2.1: validate one-login panel, test-and-return, separate save, OTA and MQTT."""
+"""BOTIZIN Wi-Fi 2.2: validate one-login panel, test-and-return, separate save, OTA and MQTT."""
 from html.parser import HTMLParser
 from pathlib import Path
 import re
@@ -14,9 +14,9 @@ trial = read("firmware/wifi_trial.h")
 route = read("firmware/wifi_readonly.h")
 policy = read("firmware/lab_policy.h")
 
-assert '#define BOTIZIN_VERSION "0.0.27"' in read("firmware/version.h")
+assert '#define BOTIZIN_VERSION "0.0.28"' in read("firmware/version.h")
 assert "#define BOTIZIN_LAB_OTA_DISABLED 0" in policy
-assert 'CANDIDATE_BUILD: WIFI2_UX_027 (EXPERIMENTAL)' in fw
+assert 'CANDIDATE_BUILD: WIFI2_FINAL_028 (EXPERIMENTAL)' in fw
 assert 'OTA_AUTOMATIC_ENABLED: YES' in fw
 assert 'OTA_CANDIDATE_POLICY: OTA_ORIGINAL_RESTORED' in fw
 assert 'botizinMqttLoop();' in fw
@@ -47,7 +47,7 @@ assert 'wifiTrialSaveReady()' in trial and 'wifiTrialSave()' in trial
 assert 'wifiManagerStoreCredentials(wifiTrialTargetSsid,wifiTrialTargetPassword)' in trial
 assert trial.index('static bool wifiTrialSave()') < trial.index('static void wifiTrialTick()')
 assert 'wifiTrialPhase=WIFI_TRIAL_COMMITTED' in trial
-assert 'if(wifiTrialActive()) return;' in wifi
+assert 'if(wifiTrialActive())return;' in wifi
 
 # The server sends actual dashboard HTML only after a valid browser cookie.
 assert "kBotizinLoginHTML" in wifi
@@ -101,7 +101,7 @@ for required in ("page-wifi", "tab-wifi", "wf-ssid", "wf-ip",
 assert "wf-stage-state" not in c.ids
 assert "wf-admin-login" not in c.ids
 assert "wf-admin-pass" not in c.ids
-assert "WIFI 2.1 · CORE 0.0.27 CANDIDATA" in html
+assert "WIFI 2.1 · CORE 0.0.28 CANDIDATA" in html
 assert "function renderWifiTrial(d)" in html
 assert "function startWifiWatch()" in html
 assert "window.setTimeout(tick,2400)" in html
@@ -115,4 +115,36 @@ assert "setInterval(" not in html
 assert "WebSocket(" not in html
 assert "EventSource(" not in html
 assert "eval(" not in html
-print("WIFI21_STATIC_OK", len(html), "HTML bytes")
+
+# Wi-Fi 2.2 independently stores five networks, tests and fallback by priority.
+known=read("firmware/wifi_known.h")
+assert 'WIFI_KNOWN_MAX=5' in known
+assert 'getBytes("known_v1"' in known and 'putBytes("known_v1"' in known
+assert 'static bool wifiKnownForget(' in known
+assert 'static bool wifiKnownUpsert(' in known
+assert 'wifiKnownLoad();' in wifi
+assert 'wifiKnownSelectPreferred(WiFi.SSID())' in wifi
+assert 'wifiReconnectTrying' in wifi
+assert 'wifiManagerConnectOrdinal(wifiReconnectOrdinal+1)' in wifi
+assert 'if(wifiTrialActive())return;' in wifi
+assert 'wifiPortalJoinSuccess' in wifi
+assert 'wifiPortalSuccessHTML()' in wifi
+assert 'wifiPortalCloseAt=nowPortal+120000UL;' in wifi
+assert 'wifiPortalProgress()' in wifi
+assert 'server.on("/wifi/forget",HTTP_POST,wifiPortalForget);' in wifi
+assert 'controlWifiKnown()' in controls
+assert 'controlWifiForget()' in controls
+assert 'server.on("/control/wifi-known",HTTP_POST' in controls
+assert 'server.on("/control/wifi-forget",HTTP_POST' in controls
+assert 'WIFI_KNOWN_COUNT: ' in wifi
+assert 'WIFI_FALLBACK: ' in wifi
+assert "wf-tested-link" in c.ids and "wf-tested-address" in c.ids
+assert "wf-known-list" in c.ids and "wf-known-refresh" in c.ids
+assert "wf-copy" in c.ids and "wf-open" in c.ids
+assert "function refreshKnownNetworks()" in html
+assert "wifiCommand('/control/wifi-known',{},true)" in html
+assert "wifiCommand('/control/wifi-forget',{ssid:net.ssid})" in html
+assert "botizin-s3.local (anunciado)" in html
+assert "WIFI 2.2 · CORE 0.0.28 CANDIDATA" in html
+
+print("WIFI22_STATIC_OK", len(html), "HTML bytes")
