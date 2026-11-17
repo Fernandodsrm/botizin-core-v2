@@ -162,6 +162,46 @@ static void controlWifiTrialState() {
   if(!controlRequireAuth())return;
   controlReply(200,wifiTrialStatus());
 }
+// Saved SSIDs only; never expose passwords in UI, logs, /status or network JSON.
+static void controlWifiKnown() {
+  if(!controlRequireAuth())return;
+  cJSON *root=cJSON_CreateObject(),*networks=cJSON_CreateArray();
+  bool ok=root && networks;
+  if(ok) {
+    cJSON_AddItemToObject(root,"networks",networks);
+    ok=cJSON_AddNumberToObject(root,"capacity",WIFI_KNOWN_MAX) &&
+       cJSON_AddStringToObject(root,"preferred",wifiKnown.preferred);
+  }
+  if(ok)for(uint8_t i=0;i<wifiKnown.count;i++){
+    cJSON *item=cJSON_CreateObject();
+    if(!item){ok=false;break;}
+    const String ssid=wifiKnown.entries[i].ssid;
+    ok=cJSON_AddStringToObject(item,"ssid",ssid.c_str()) &&
+       cJSON_AddBoolToObject(item,"active",WiFi.status()==WL_CONNECTED && WiFi.SSID()==ssid);
+    if(!ok){cJSON_Delete(item);break;}
+    cJSON_AddItemToArray(networks,item);
+  }
+  char *payload=ok?cJSON_PrintUnformatted(root):nullptr;
+  if(root)cJSON_Delete(root); else if(networks)cJSON_Delete(networks);
+  if(!payload){controlReply(503,"NO_MEMORY");return;}
+  server.sendHeader("Cache-Control","no-store");
+  server.sendHeader("X-Content-Type-Options","nosniff");
+  server.send(200,"application/json; charset=utf-8",payload);
+  cJSON_free(payload);
+}
+static void controlWifiForget() {
+  if(!controlRequireAuth())return;
+  if(wifiTrialActive() || rebootScheduled || wifiPortalOn){
+    controlReply(409,"WIFI_BUSY");return;
+  }
+  String ssid=server.arg("ssid");ssid.trim();
+  if(ssid.isEmpty() || ssid.length()>32){controlReply(400,"SSID_INVALID");return;}
+  if(WiFi.status()==WL_CONNECTED && WiFi.SSID()==ssid) {
+    controlReply(409,"CANNOT_FORGET_CURRENT_WIFI");return;
+  }
+  if(!wifiKnownForget(ssid)){controlReply(409,"WIFI_NOT_FOUND_OR_NVS_FAILED");return;}
+  controlReply(200,"WIFI_FORGOTTEN");
+}
 static void controlWifiScan() {
   if(!controlRequireAuth())return;
   if(wifiTrialActive() || rebootScheduled || uploadActive || uploadOK || peerOtaBusy) {
@@ -226,5 +266,7 @@ static void controlRegisterRoutes() {
   server.on("/control/wifi-confirm",HTTP_POST,controlWifiConfirm);
   server.on("/control/wifi-state",HTTP_POST,controlWifiTrialState);
   server.on("/control/wifi-scan",HTTP_POST,controlWifiScan);
+  server.on("/control/wifi-known",HTTP_POST,controlWifiKnown);
+  server.on("/control/wifi-forget",HTTP_POST,controlWifiForget);
   server.on("/control/reboot",HTTP_POST,controlReboot);
 }
