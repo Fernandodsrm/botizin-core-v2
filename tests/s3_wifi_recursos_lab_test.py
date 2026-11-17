@@ -101,7 +101,7 @@ for required in ("page-wifi", "tab-wifi", "wf-ssid", "wf-ip",
 assert "wf-stage-state" not in c.ids
 assert "wf-admin-login" not in c.ids
 assert "wf-admin-pass" not in c.ids
-assert "WIFI 2.1 · CORE 0.0.28 CANDIDATA" in html
+assert "WIFI 2.2 · CORE 0.0.28 CANDIDATA" in html
 assert "function renderWifiTrial(d)" in html
 assert "function startWifiWatch()" in html
 assert "window.setTimeout(tick,2400)" in html
