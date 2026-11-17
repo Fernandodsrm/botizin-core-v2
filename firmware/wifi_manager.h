@@ -137,11 +137,58 @@ static void wifiPortalSave() {
   wifiRestartAfter=millis()+1800;
   // Deliberately avoid printing SSID/pass to serial logs.
 }
+// Server-side entry gate: the dashboard HTML is served only after
+// authenticating on the STA network. /status remains available for diagnostics.
+static const char kBotizinLoginHTML[] PROGMEM=R"BTLOGIN(<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BOTIZIN | Entrar</title><style>
+:root{font-family:system-ui,Segoe UI,sans-serif;color:#e4f2ed;background:#0d1918}
+*{box-sizing:border-box}body{min-height:100vh;margin:0;display:grid;place-items:center;padding:16px}
+main{width:min(440px,100%);background:#132522;border:1px solid #315046;border-radius:16px;padding:28px}
+h1{margin:0 0 12px;font-size:1.4rem}.small{color:#b8d0c7;font-size:.89rem;line-height:1.6}
+input,button{width:100%;padding:13px;font:inherit;border-radius:9px}
+input{color:#fff;background:#081512;border:1px solid #436856;margin:14px 0}
+button{cursor:pointer;border:1px solid #527765;background:#1b4538;color:#fff;font-weight:700}
+button:disabled{opacity:.6}#result{min-height:22px;color:#ffd59b;font-size:.9rem}
+</style></head><body><main>
+<h1>BOTIZIN / Central da S3</h1>
+<p class="small">Uma senha para abrir o painel inteiro e usar as suas funções. Sessão local de 10 minutos de inatividade, sem guardar senha no navegador.</p>
+<form id="login" autocomplete="off"><label for="password">Senha administrativa da S3</label>
+<input id="password" type="password" maxlength="32" required autocomplete="off" autofocus>
+<button id="enter" type="submit">Entrar no BOTIZIN</button></form>
+<p id="result" role="status" aria-live="polite"></p>
+<p class="small">Use apenas sua rede local confiável: este painel usa HTTP, não HTTPS.</p>
+</main><script>
+document.getElementById('login').addEventListener('submit',async e=>{
+e.preventDefault();
+const btn=document.getElementById('enter'),result=document.getElementById('result');
+btn.disabled=true;result.textContent='Autenticando…';
+const p=document.getElementById('password');
+const password=p.value;p.value='';
+const ctrl=new AbortController(),timeout=setTimeout(()=>ctrl.abort(),9000);
+try{
+const r=await fetch('/control/login',{method:'POST',
+headers:{'Content-Type':'application/x-www-form-urlencoded'},
+body:new URLSearchParams({password}),cache:'no-store',credentials:'same-origin',
+redirect:'error',signal:ctrl.signal});
+if(!r.ok)throw new Error('Senha ou sessão recusada (HTTP '+r.status+')');
+if((await r.text()).trim()!=='AUTH_OK')throw new Error('Resposta de login inesperada');
+window.location.replace('/');
+}catch(err){result.textContent=err.message;btn.disabled=false}
+finally{clearTimeout(timeout)}
+});
+</script></body></html>)BTLOGIN";
 static void wifiPortalRouteHome() {
   if(wifiRequestFromSetupAP())wifiPortalPage();
   else {
     eventJournalHttpReceived();
     server.sendHeader("Cache-Control","no-store");
+    server.sendHeader("X-Content-Type-Options","nosniff");
+    if(!controlSessionValid()) {
+      server.send_P(200,"text/html; charset=utf-8",kBotizinLoginHTML);
+      return;
+    }
+    controlSessionUntil=millis()+600000UL;
     server.send_P(200,"text/html; charset=utf-8",kBotizinPanelHTML);
   }
 }
