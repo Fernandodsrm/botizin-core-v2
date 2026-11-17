@@ -270,11 +270,15 @@ async function loadWifiReadOnly(){
     showText('wf-ssid',x.ssid||'Sem nome');
     showText('wf-ip',x.ip||'—');
     showText('wf-rssi',Number.isFinite(x.rssi_dbm)?x.rssi_dbm+' dBm':'—');
+    const rssi=Number(x.rssi_dbm);
+    showText('wf-quality',Number.isFinite(rssi)?
+      (rssi>=-60?'Bom':rssi>=-75?'Regular':'Fraco')+' ('+rssi+' dBm)':'—');
     showText('wf-channel',Number.isFinite(x.channel)?x.channel:'—');
     showText('wf-gateway',x.gateway||'—');
     showText('wf-dns',x.dns||'—');
-    showText('wf-mdns',x.mdns_ready?'botizin-s3.local disponível':'Não confirmado');
-    showText('wf-ap',x.recovery_ap_active?'Ativo':'Desligado (normal quando conectado)');
+    showText('wf-mdns',x.mdns_ready?'botizin-s3.local (anunciado)':'mDNS não iniciado');
+    showText('wf-ap',x.recovery_ap_active?'Recuperação ativa: use a rede BOTIZIN-S3 e abra http://192.168.4.1/':
+'Recuperação preparada. A rede de emergência fica desligada quando não é necessária.');
     showText('wf-feedback','Lido às '+new Date().toLocaleTimeString('pt-BR')+'. Valores desta consulta, não monitoramento contínuo.');
   }catch(e){
     showText('wf-feedback','Consulta Wi-Fi indisponível: '+e.message+'. Dados anteriores podem estar desatualizados.');
@@ -490,6 +494,10 @@ function renderWifiTrial(d){
  }
  wifiFeedback(msg);
  $('wf-confirm').disabled=st!=='TEST_OK'||d.WIFI_TRIAL_CAN_SAVE!=='YES';
+ const ip=d.WIFI_TRIAL_TARGET_IP||'';
+ const validIp=/^\d{1,3}(\.\d{1,3}){3}$/.test(ip);
+ $('wf-tested-link').hidden=!validIp;
+ if(validIp){const url='http://'+ip+'/';$('wf-tested-address').value=url;$('wf-open').href=url;}
 }
 async function wifiCommand(path,fields={},quiet=false){
  try{return await controlPost(path,fields)}
@@ -568,7 +576,10 @@ $('wf-confirm').addEventListener('click',async()=>{
  if(!window.confirm('Salvar a rede testada para o PRÓXIMO REINÍCIO? A S3 permanece na rede atual até reiniciar.'))return;
  const result=await wifiCommand('/control/wifi-confirm');
  $('wf-confirm').disabled=true;
- if(result)wifiFeedback('✅ Rede salva para o próximo reinício. A S3 continua na rede atual.');
+ if(result){
+  wifiFeedback('✅ Rede salva entre as redes lembradas. A S3 continua na rede atual até reiniciar.');
+  refreshKnownNetworks();
+ }
 });
 $('settingsGotoWifi').addEventListener('click',()=>{$('tab-wifi').click()});
 $('controlReboot').addEventListener('click',async()=>{
