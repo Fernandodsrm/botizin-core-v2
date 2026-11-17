@@ -521,7 +521,6 @@ void installInternetOTA(const String &targetVersion, const String &targetURL, co
 // Legacy ThingsBoard sender removed in Wi-Fi-only candidate.
 // telemetryBootId remains as a nonce for existing OTA confirmation.
 
-#include "ping_rpc.h"
 #include "peer_ota_server.h"
 #include "mqtt_observer.h"
 #include "panel_page.h"
@@ -604,7 +603,6 @@ void setup() {
   });
   if (WiFi.status() == WL_CONNECTED) configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
   telemetryBootId = String((unsigned long)esp_random(), HEX) + String((unsigned long)esp_random(), HEX);
-  nextPingPoll = millis() + 30000;
   nextInternetCheck = millis() + 10000;
 #if BOTIZIN_LAB_OTA_DISABLED
   internetStatus = "LAB_OTA_DISABLED";
@@ -644,11 +642,6 @@ void loop() {
     if (!manualWindowActive()) { clearOtaCandidate(); peerOtaBusy = true; checkInternetOTA(false); peerOtaBusy = false; }
   }
 #endif // BOTIZIN_LAB_OTA_DISABLED
-  if (!rebootScheduled && !uploadActive && !uploadOK && !pingStopped &&
-      (int32_t)(millis() - nextPingPoll) >= 0) {
-    nextPingPoll = millis() + 15000;
-    pollPing();
-  }
   botizinMqttLoop();
   delay(2);
 }
