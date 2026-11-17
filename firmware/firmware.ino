@@ -87,6 +87,9 @@ bool peerOtaBusy = false;
 String s3OtaPhase = "READY";
 void showOtaProgress(const String &phase, size_t done, size_t total) { s3OtaPhase = phase; }
 #include "peer_auth.h"
+// OTA3 is defined before snapshot(); hashPartition is implemented below.
+bool hashPartition(const esp_partition_t *p, size_t size, String &result);
+#include "ota3_manager.h"
 
 
 String partitionInfo(const esp_partition_t *p) {
@@ -532,7 +535,6 @@ void installInternetOTA(const String &targetVersion, const String &targetURL, co
 #include "wifi_manager.h"
 #include "wifi_trial.h"
 #include "wifi_readonly.h"
-#include "ota3_manager.h"
 #include "control_routes.h"
 
 void printPartitionTable() {
