@@ -178,6 +178,7 @@ String snapshot() {
   s += "TELEMETRY: " + telemetryStatus + "\n";
   s += ota3SlotSnapshot(0) + ota3SlotSnapshot(1);
   s += "OTA3_LAST_RESULT: " + ota3LastResult() + "\n";
+  s += ota3LastInstallProof();
   s += mqttStatusSnapshot();
   s += wifiManagerStatus();
   s += wifiTrialStatus();
