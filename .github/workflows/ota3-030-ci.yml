@@ -77,6 +77,9 @@ jobs:
           cp dist/firmware.bin.sha256 packages/ota3-0.0.30/firmware.bin.sha256
           cp dist/build-record.json packages/ota3-0.0.30/build-record.json
           git add -f packages/ota3-0.0.30/firmware.bin packages/ota3-0.0.30/firmware.bin.sha256 packages/ota3-0.0.30/build-record.json
+          # ci/build.py generates a temporary image fingerprint header for this build.
+          # Rebase requires a clean worktree; restore the tracked fallback only AFTER compilation.
+          git restore -- firmware/ota3_known_ids.h
           if ! git diff --cached --quiet; then
             git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'build(ota3): 0.0.30 candidata CI, sem release'
             git fetch origin refs/heads/candidate/ota3-0.0.30:refs/remotes/origin/candidate/ota3-0.0.30
