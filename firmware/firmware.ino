@@ -146,7 +146,7 @@ String snapshot() {
   String s = "BOTIZIN CORE V" + String(BOTIZIN_VERSION) + "\n";
   s += "TEST_RESULT: Deu certo na atualização\n";
   // LAB marker: this image MUST NOT be confused with the protected 0.0.25 release.
-  s += "CANDIDATE_BUILD: OTA3_CANDIDATE_029 (EXPERIMENTAL)\n";
+  s += "CANDIDATE_BUILD: OTA3_CANDIDATE_030 (EXPERIMENTAL)\n";
   s += "IP: " + WiFi.localIP().toString() + "\n";
   s += "LOCAL_NAME: " BOTIZIN_LOCAL_NAME ".local\n";
   s += "MDNS: " + String(localNameReady ? "READY" : "WAITING") + "\n";
