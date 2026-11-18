@@ -19,6 +19,8 @@ def main():
     if not m:
         raise SystemExit("Invalid firmware version. Nothing published.")
     version = m.group(1)
+    # Extract display fingerprints from published historical BINs (never firmware code).
+    subprocess.run([sys.executable, str(ROOT / "ci" / "ota3_image_ids.py")],check=True)
     sketch = (source / "firmware.ino").read_text()
     if (source / "secrets.h").exists() or '#include "secrets.h"' in sketch:
         raise SystemExit("No compiled Wi-Fi credentials allowed in cloud/public builds.")
