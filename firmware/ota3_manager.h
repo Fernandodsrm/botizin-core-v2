@@ -173,19 +173,24 @@ static bool ota3ShaValid(const char *sha) {
   return true;
 }
 struct Ota3Entry {
-  char id[42]={0}, url[256]={0}, sha[65]={0};
+  char id[42]={0}, version[32]={0}, url[256]={0}, sha[65]={0};
   size_t size=0;
+  bool compatible=false;
 };
 static bool ota3ParseEntry(cJSON *o, Ota3Entry &out) {
   if(!cJSON_IsObject(o))return false;
   cJSON *id=cJSON_GetObjectItemCaseSensitive(o,"id");
+  cJSON *version=cJSON_GetObjectItemCaseSensitive(o,"version");
+  cJSON *compat=cJSON_GetObjectItemCaseSensitive(o,"ota3");
   cJSON *url=cJSON_GetObjectItemCaseSensitive(o,"url");
   cJSON *sha=cJSON_GetObjectItemCaseSensitive(o,"sha256");
   cJSON *size=cJSON_GetObjectItemCaseSensitive(o,"size");
   cJSON *board=cJSON_GetObjectItemCaseSensitive(o,"board");
-  if(!cJSON_IsString(id)||!cJSON_IsString(url)||!cJSON_IsString(sha)||
+  if(!cJSON_IsString(id)||!cJSON_IsString(version)||!cJSON_IsBool(compat)||
+     !cJSON_IsString(url)||!cJSON_IsString(sha)||
      !cJSON_IsNumber(size)||!cJSON_IsString(board))return false;
   if(strlen(id->valuestring)<3 || strlen(id->valuestring)>=sizeof(out.id) ||
+     strlen(version->valuestring)<3 || strlen(version->valuestring)>=sizeof(out.version) ||
      strlen(url->valuestring)>=sizeof(out.url) ||
      strcmp(board->valuestring,"esp32s3-n16r8")!=0 ||
      size->valuedouble<4096 || size->valuedouble>OTA3_BIN_MAX ||
@@ -193,7 +198,10 @@ static bool ota3ParseEntry(cJSON *o, Ota3Entry &out) {
      strncmp(url->valuestring, OTA3_BIN_ORIGIN, strlen(OTA3_BIN_ORIGIN))!=0 ||
      !ota3ShaValid(sha->valuestring))return false;
   for(const char *c=id->valuestring;*c;c++)if(!(isalnum((unsigned char)*c)||*c=='.'||*c=='-'||*c=='_'))return false;
+  for(const char *c=version->valuestring;*c;c++)if(!(isalnum((unsigned char)*c)||*c=='.'||*c=='-'||*c=='_'))return false;
   snprintf(out.id,sizeof(out.id),"%s",id->valuestring);
+  snprintf(out.version,sizeof(out.version),"%s",version->valuestring);
+  out.compatible=cJSON_IsTrue(compat);
   snprintf(out.url,sizeof(out.url),"%s",url->valuestring);
   snprintf(out.sha,sizeof(out.sha),"%s",sha->valuestring);
   out.size=(size_t)size->valueint;
@@ -335,7 +343,14 @@ static bool ota3StageImage(const char *selected) {
   const esp_partition_t *bootAfter=esp_ota_get_boot_partition();
   success=success && bootAfter && bootAfter->address==bootBefore->address;
   if(!success){ota3Finish(false,"FLASH_OU_BOOT_NAO_CONFEREM");return false;}
-  ota3Finish(true,running==0?"APP1_GRAVADA_SEM_TROCAR_BOOT":"APP0_GRAVADA_SEM_TROCAR_BOOT");
+  bool metadataSaved=ota3StoreSlotMetadata(running==0?1:0,desc,
+                                          entry.version,entry.compatible);
+  portENTER_CRITICAL(&ota3Mux);
+  snprintf(ota3VerifiedSha,sizeof(ota3VerifiedSha),"%s",entry.sha);
+  portEXIT_CRITICAL(&ota3Mux);
+  ota3Finish(true,metadataSaved?
+    (running==0?"APP1_GRAVADA_SEM_TROCAR_BOOT":"APP0_GRAVADA_SEM_TROCAR_BOOT"):
+    "FLASH_OK_METADADOS_NVS_NAO_SALVOS");
   return true;
 }
 static void ota3Worker(void *param) {
@@ -359,6 +374,8 @@ static bool ota3Start(uint8_t kind,const String &id="") {
   if(ota3Busy){portEXIT_CRITICAL(&ota3Mux);return false;}
   ota3Busy=true;
   peerOtaBusy=true;
+  ota3CurrentKind=kind;
+  ota3VerifiedSha[0]=0;
   snprintf(ota3Selected,sizeof(ota3Selected),"%s",id.c_str());
   portEXIT_CRITICAL(&ota3Mux);
   ota3Progress("AGUARDANDO","Preparando tarefa");
