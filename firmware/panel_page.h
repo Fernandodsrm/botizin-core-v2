@@ -47,6 +47,22 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 @media(max-width:720px){.control-grid{grid-template-columns:1fr}}
 @media(max-width:720px){main{padding:12px}.g{grid-template-columns:repeat(2,minmax(0,1fr))}.pair{grid-template-columns:1fr}header{align-items:flex-start}h1{font-size:1.4rem}}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}.tabs button[aria-selected="true"]{background:#91fac9;color:#08261c}.link-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.lamp{display:inline-block;width:10px;height:10px;border-radius:50%;background:#7b8b85;margin-right:7px}.lamp.ok{background:#65e8a6}.lamp.warn{background:#e5b35c}.lamp.bad{background:#ef8c81}.link-card{padding:16px;background:#102d27;border:1px solid #315046;border-radius:12px}.link-card h3{margin:0 0 12px;font-size:1rem}.link-card p{font-size:.85rem}.tabs button:focus-visible{outline:3px solid #91fac9}details summary{cursor:pointer;padding:8px;font-weight:650}
+.ota-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:15px 0 12px}
+.ota-card{background:#102e28;border:1px solid #355849;border-radius:13px;padding:17px;min-width:0}
+.ota-card.is-running{border-color:#6cdaaa;background:#133b2f}
+.ota-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:15px}
+.ota-card-head b{font-size:.9rem}.ota-muted{font-size:.78rem;color:#a8bfb6}
+.ota-tag{font-size:.73rem;font-weight:750;color:#bdd6cc;border:1px solid #517366;padding:5px 8px;border-radius:99px}
+.ota-tag.is-on{background:#235d42;border-color:#71d7a0;color:#d4ffe8}
+.ota-version{font-size:1.55rem;font-weight:800;letter-spacing:-.04em;overflow-wrap:anywhere;line-height:1.3}
+.ota-detail{display:flex;gap:7px;flex-wrap:wrap;font-size:.78rem;color:#c0dcd0;margin-top:12px}
+.ota-detail span{padding:5px 8px;background:#1b4236;border-radius:7px}
+.ota-action-box{background:#102d27;border:1px solid #315046;border-radius:12px;padding:15px;margin-top:12px}
+.ota-action-box h3{font-size:.94rem;margin:0 0 8px}
+.ota-destination{display:block;margin:10px 0;color:#b2eacd;font-weight:700}
+.ota-result{margin:12px 0 0;padding:12px;background:#173b30;border-radius:8px;font-size:.87rem}
+.ota-log-details{margin-top:10px;border-top:1px solid #315046;padding-top:8px}
+@media(max-width:620px){.ota-slots{grid-template-columns:1fr}.ota-version{font-size:1.4rem}}
 </style></head><body>
 <main>
 <header><div><div class="logo">FERNANDO LAB</div><h1>BOTIZIN / Central da S3</h1></div>
@@ -54,9 +70,9 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 <p class="description">CORE 0.0.30 candidata: Wi-Fi 2.2 validado e OTA 3.0 com identificacao real dos firmwares e relatorio de instalacao.</p>
 <div class="state" id="state" role="status" aria-live="polite">Nenhum diagnóstico recebido.</div>
 <div class="g" id="metrics">
-<div class="metric"><div class="k">Firmware / slot</div><div class="v" id="firmware">—</div></div>
+<div class="metric"><div class="k">Versão em execução</div><div class="v" id="firmware">—</div></div>
 <div class="metric"><div class="k">Wi-Fi / HTTP</div><div class="v" id="network">—</div></div>
-<div class="metric"><div class="k">OTA / rollback</div><div class="v" id="ota">—</div></div>
+<div class="metric"><div class="k">Segurança de boot / OTA</div><div class="v" id="ota">—</div></div>
 <div class="metric"><div class="k">RAM disponível</div><div class="v" id="memory">—</div></div>
 </div>
 
@@ -86,30 +102,45 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 </section></div>
 <div id="page-ota3" role="tabpanel" aria-labelledby="tab-ota3" hidden>
 <section class="panel">
-<h2>OTA 3.0 · Duas partições livres</h2>
-<p class="muted small">As instalações são manuais. O GitHub guarda as versões. A S3 grava somente no slot inativo; a instalação não troca a próxima inicialização.</p>
-<div class="link-grid">
-<div class="link-card"><h3>APP 0</h3><p id="ota3-app0">Consultar status</p></div>
-<div class="link-card"><h3>APP 1</h3><p id="ota3-app1">Consultar status</p></div>
+<h2>OTA 3.0 · Gerenciar versões</h2>
+<p class="muted small">Duas APPs disponíveis. Você escolhe quando instalar e quando reiniciar. O GitHub só é consultado por solicitação.</p>
+<div class="ota-slots" aria-label="Firmware das duas partições">
+<div class="ota-card" id="ota3-card0">
+<div class="ota-card-head"><b>APP 0 <span class="ota-muted">· OTA 0</span></b><span class="ota-tag" id="ota3-tag0">CONSULTANDO</span></div>
+<div class="ota-version" id="ota3-app0">Versão não consultada</div>
+<div class="ota-detail" id="ota3-detail0">Aguardando consulta.</div>
 </div>
-<p class="tiny" id="ota3-feedback" role="status" aria-live="polite">Nenhuma consulta executada.</p>
+<div class="ota-card" id="ota3-card1">
+<div class="ota-card-head"><b>APP 1 <span class="ota-muted">· OTA 1</span></b><span class="ota-tag" id="ota3-tag1">CONSULTANDO</span></div>
+<div class="ota-version" id="ota3-app1">Versão não consultada</div>
+<div class="ota-detail" id="ota3-detail1">Aguardando consulta.</div>
+</div></div>
+<p class="tiny" id="ota3-feedback" role="status" aria-live="polite">O estado é atualizado quando esta aba é aberta ou você pede uma leitura.</p>
 <div class="buttons">
-<button type="button" id="ota3-status-btn">Ler partições</button>
-<button type="button" id="ota3-catalog-btn">Consultar catálogo GitHub</button>
+<button type="button" id="ota3-status-btn">Atualizar informações das APPs</button>
+<button type="button" id="ota3-catalog-btn">Consultar versões no GitHub</button>
 </div>
-<div class="control-form" style="margin-top:16px">
-<label for="ota3-version">Versão aprovada disponível</label>
+<div class="ota-action-box">
+<h3>Instalar uma versão</h3>
+<label for="ota3-version" class="muted small">Escolha um firmware do catálogo</label>
 <select class="control-input" id="ota3-version" disabled><option>Consulte o catálogo</option></select>
-<div class="buttons">
-<button type="button" id="ota3-install-btn" disabled>Instalar na APP inativa</button>
+<p class="ota-destination" id="ota3-destination">Destino: aguardando identificação da APP ativa</p>
+<p class="tiny">A versão da APP de destino será substituída. A instalação não altera o próximo boot.</p>
+<div class="buttons"><button type="button" id="ota3-install-btn" disabled>Consultar destino para instalar</button></div>
 </div>
-</div>
-<p class="note">Depois de gravar: você escolhe permanecer na APP atual ou reiniciar no slot instalado. Versões antigas que não têm OTA 3.0 podem exigir recuperação via USB caso o painel não abra.</p>
+<div class="ota-action-box">
+<h3>Iniciar uma versão já instalada</h3>
+<p class="muted small">Escolher uma APP reinicia a S3 nela, sem baixar ou gravar firmware.</p>
 <div class="buttons">
 <button type="button" id="ota3-boot0">Iniciar APP 0</button>
 <button type="button" id="ota3-boot1">Iniciar APP 1</button>
 </div>
+</div>
+<p class="ota-result" id="ota3-result" role="status" aria-live="polite">Sem operação recente nesta sessão.</p>
+<details class="ota-log-details"><summary>Detalhes técnicos e progresso da operação</summary>
 <pre id="ota3-output" aria-live="polite">Sem operações. Nenhuma consulta periódica.</pre>
+</details>
+<p class="note">Versões sem OTA 3.0 podem perder os botões de alternância. Se uma imagem não abrir o painel, a recuperação pode exigir USB.</p>
 </section></div>
 <div id="page-wifi" role="tabpanel" aria-labelledby="tab-wifi" hidden>
 <section class="panel">
