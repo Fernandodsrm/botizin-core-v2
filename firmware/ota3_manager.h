@@ -8,6 +8,7 @@
 #include <esp_partition.h>
 #include <mbedtls/sha256.h>
 #include <strings.h>
+#include "ota3_known_ids.h"
 
 static constexpr size_t OTA3_CATALOG_MAX = 4096;
 static constexpr size_t OTA3_BIN_MAX = 3145728;
@@ -19,7 +20,54 @@ static bool ota3Busy = false;
 static char ota3Stage[30] = "IDLE", ota3Message[90] = "PRONTO", ota3Catalog[OTA3_CATALOG_MAX + 1] = {0};
 static char ota3Selected[42] = {0};
 static uint32_t ota3Done = 0, ota3Total = 0;
-static uint8_t ota3CatalogCount = 0;
+static uint8_t ota3CatalogCount = 0, ota3CurrentKind = 0;
+static char ota3VerifiedSha[65] = {0};
+static String ota3HexFingerprint(const esp_app_desc_t &desc) {
+  char out[65];
+  for(int i=0;i<32;i++) snprintf(out+i*2,3,"%02x",desc.app_elf_sha256[i]);
+  return String(out);
+}
+static bool ota3SlotMetadata(int slot,const esp_app_desc_t &desc,String &version,bool &hasOta3) {
+  const char *versionKey=slot==0?"v0":"v1", *fingerprintKey=slot==0?"f0":"f1";
+  const char *compatKey=slot==0?"c0":"c1";
+  Preferences p;
+  if(!p.begin("ota3-slots",true))return false;
+  String stored=p.getString(versionKey,"");
+  String fingerprint=p.getString(fingerprintKey,"");
+  bool compatible=p.getBool(compatKey,false);
+  p.end();
+  if(stored.isEmpty() || stored.length()>31 ||
+      !fingerprint.equalsIgnoreCase(ota3HexFingerprint(desc))) return false;
+  version=stored;
+  hasOta3=compatible;
+  return true;
+}
+static bool ota3StoreSlotMetadata(int slot,const esp_app_desc_t &desc,
+                                  const char *version,bool compatible) {
+  const char *versionKey=slot==0?"v0":"v1", *fingerprintKey=slot==0?"f0":"f1";
+  const char *compatKey=slot==0?"c0":"c1";
+  Preferences p;
+  if(!p.begin("ota3-slots",false))return false;
+  String fingerprint=ota3HexFingerprint(desc);
+  bool ok=p.putString(versionKey,version)==strlen(version) &&
+          p.putString(fingerprintKey,fingerprint)==fingerprint.length() &&
+          p.putBool(compatKey,compatible)>0;
+  p.end();
+  return ok;
+}
+static String ota3ResolveVersion(int slot,const esp_partition_t *p,
+                                 const esp_app_desc_t &desc,bool &hasOta3) {
+  const esp_partition_t *running=esp_ota_get_running_partition();
+  if(running && p && p->address==running->address) {
+    hasOta3=true; return String(BOTIZIN_VERSION);
+  }
+  const Ota3KnownImage *known=ota3KnownImage(desc);
+  if(known) {hasOta3=known->ota3;return String(known->version);}
+  String version;
+  if(ota3SlotMetadata(slot,desc,version,hasOta3))return version;
+  hasOta3=false;
+  return "NAO_IDENTIFICADA";
+}
 
 static void ota3Progress(const char *stage, const char *message, size_t done = 0, size_t total = 0) {
   portENTER_CRITICAL(&ota3Mux);
@@ -30,16 +78,28 @@ static void ota3Progress(const char *stage, const char *message, size_t done = 0
   portEXIT_CRITICAL(&ota3Mux);
 }
 static void ota3Finish(bool success, const char *message) {
-  ota3Progress(success ? "PRONTO" : "ERRO", message);
-  // Persist only the latest outcome, not periodic telemetry or full logs.
-  Preferences p;
-  if (p.begin("ota3-last", false)) {
-    p.putString("outcome", String(success ? "OK: " : "ERROR: ") + message);
-    p.end();
+  uint32_t done=0,total=0;uint8_t kind=0;char sha[65];
+  portENTER_CRITICAL(&ota3Mux);
+  done=ota3Done;total=ota3Total;kind=ota3CurrentKind;
+  memcpy(sha,ota3VerifiedSha,sizeof(sha));
+  portEXIT_CRITICAL(&ota3Mux);
+  // Keep final progress; do not turn a successful 1292560/1292560 into 0/0.
+  ota3Progress(success ? "PRONTO" : "ERRO", message,done,total);
+  // Catalog refresh is not a firmware installation: do not overwrite history.
+  if(kind==2) {
+    Preferences p;
+    if(p.begin("ota3-last",false)) {
+      p.putString("outcome",String(success?"OK: ":"ERROR: ")+message);
+      p.putUInt("bytes",done);
+      p.putUInt("total",total);
+      p.putString("sha256",success?sha:"");
+      p.end();
+    }
   }
   portENTER_CRITICAL(&ota3Mux);
-  ota3Busy = false;
-  peerOtaBusy = false;
+  ota3Busy=false;
+  peerOtaBusy=false;
+  ota3CurrentKind=0;
   portEXIT_CRITICAL(&ota3Mux);
 }
 static String ota3Status() {
@@ -65,24 +125,47 @@ static int ota3RunningSlot() {
   return -1;
 }
 static String ota3SlotSnapshot(int slot) {
-  const esp_partition_t *p=ota3Slot(slot), *run=esp_ota_get_running_partition(),
+  const esp_partition_t *p=ota3Slot(slot),*run=esp_ota_get_running_partition(),
       *boot=esp_ota_get_boot_partition();
-  if(!p) return String("APP")+slot+": MISSING\n";
-  esp_app_desc_t desc={}; 
-  esp_err_t d=esp_ota_get_partition_description(p,&desc);
+  if(!p)return String("APP")+slot+": MISSING\n";
+  esp_app_desc_t desc={};
+  esp_err_t imageResult=esp_ota_get_partition_description(p,&desc);
   esp_ota_img_states_t st=ESP_OTA_IMG_UNDEFINED;
-  esp_err_t sr=esp_ota_get_state_partition(p,&st);
-  String version=d==ESP_OK?String(desc.version):"INVALID_IMAGE";
-  // app description is not proof of full bootability; selection verifies image.
-  String state=sr==ESP_OK?String((int)st):"UNDEFINED";
-  return String("APP")+slot+"_VERSION: "+version+"\nAPP"+slot+"_STATE_CODE: "+state+
+  esp_err_t stateResult=esp_ota_get_state_partition(p,&st);
+  bool compatible=false;
+  String version=imageResult==ESP_OK?
+    ota3ResolveVersion(slot,p,desc,compatible):"SEM_IMAGEM_RECONHECIVEL";
+  String code=stateResult==ESP_OK?String((int)st):String(esp_err_to_name(stateResult));
+  String detail=stateResult==ESP_ERR_NOT_FOUND?"SEM_REGISTRO_OTADATA":
+    (stateResult==ESP_OK?
+      (st==ESP_OTA_IMG_VALID?"VALID":
+       st==ESP_OTA_IMG_NEW?"NEW":
+       st==ESP_OTA_IMG_PENDING_VERIFY?"PENDING_VERIFY":
+       st==ESP_OTA_IMG_INVALID?"INVALID":
+       st==ESP_OTA_IMG_ABORTED?"ABORTED":"UNDEFINED_NATIVO")
+     :String("OTA_STATE_ERROR_")+esp_err_to_name(stateResult));
+  // An OTA image can be staged and SHA-verified without yet having a boot record.
+  return String("APP")+slot+"_VERSION: "+version+
+    "\nAPP"+slot+"_IMAGE_DESC: "+esp_err_to_name(imageResult)+
+    "\nAPP"+slot+"_STATE_CODE: "+code+
+    "\nAPP"+slot+"_STATE_DETAIL: "+detail+
+    "\nAPP"+slot+"_OTA3: "+(compatible?"YES":"NO")+
     "\nAPP"+slot+"_RUNNING: "+(run && p->address==run->address?"YES":"NO")+
     "\nAPP"+slot+"_NEXT_BOOT: "+(boot && p->address==boot->address?"YES":"NO")+"\n";
 }
 static String ota3LastResult() {
-  Preferences p; String result="NONE";
+  Preferences p;String result="NONE";
   if(p.begin("ota3-last",true)){result=p.getString("outcome","NONE");p.end();}
   return result;
+}
+static String ota3LastInstallProof() {
+  Preferences p;
+  if(!p.begin("ota3-last",true))return "OTA3_LAST_BYTES: NONE\nOTA3_LAST_SHA256: NONE\n";
+  uint32_t done=p.getUInt("bytes",0),total=p.getUInt("total",0);
+  String sha=p.getString("sha256","");
+  p.end();
+  return "OTA3_LAST_BYTES: "+String(done)+"/"+String(total)+
+         "\nOTA3_LAST_SHA256: "+(sha.isEmpty()?"NONE":sha)+"\n";
 }
 static bool ota3ShaValid(const char *sha) {
   if(!sha || strlen(sha)!=64)return false;
