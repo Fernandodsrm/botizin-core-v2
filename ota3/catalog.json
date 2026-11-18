@@ -5,7 +5,7 @@
     {
       "id": "0.0.31-ota3-ui-beta",
       "version": "0.0.31",
-      "label": "OTA 3.0 visual - boot, Wi-Fi e painel testados",
+      "label": "OTA 3.0 — TESTADA E CONFIRMADA NA S3",
       "board": "esp32s3-n16r8",
       "size": 1300480,
       "sha256": "6e526a8299dd24c112c5324878954c1dea81d0f15e99ae49d6484d4ee57dda82",
@@ -13,8 +13,9 @@
       "ota3": true,
       "approved": true,
       "physical_test": true,
-      "experimental": true,
-      "test_scope": "Instalacao APP0, SHA flash, boot VALID, HTTP, Wi-Fi e UI. MQTT e ida/volta 0.31↔0.30 pendentes."
+      "experimental": false,
+      "test_scope": "CI, flash e SHA256, APP0/APP1, boot VALID, Wi-Fi, HTTP, interface, ida/volta sem reinstalar. MQTT 4/4 confirmado na CORE 0.0.30; teste MQTT prolongado da 0.0.31 ainda nao registrado.",
+      "validation_status": "TESTADA_E_CONFIRMADA"
     },
     {
       "id": "0.0.30-ota3-beta",
