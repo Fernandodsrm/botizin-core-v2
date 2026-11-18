@@ -35,7 +35,7 @@ for frag in ["Atualizar informações das APPs","Instalar na APP ","ota3Present(
              "ota3UpdateDestination()","APP0_RUNNING","APP1_RUNNING",
              "if(data.APP0_RUNNING||data.APP1_RUNNING)ota3Present(data)",
              "await ota3GetStatus()","ota3Installing=false",
-             "Iniciar APP 0","Iniciar APP 1""]:
+             "Iniciar APP 0","Iniciar APP 1"]:
     assert frag in panel,frag
 assert "Ler partições" not in panel
 assert "APP "+ "inativa" not in controls.buttons.get("ota3-install-btn",{}).get("id","")
