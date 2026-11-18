@@ -13,6 +13,8 @@ REFERENCES = (
      "2e6269f79f559a63f36d7c3f225832dbb62bcf255eb57da764958eeb5edeb624"),
     ("packages/ota3-0.0.29/firmware.bin", "0.0.29", True,
      "1e35e161df445aca08efa92d3adf42eedda57a6ebda0aadad263ae33fce0c8cf"),
+    ("packages/ota3-0.0.30/firmware.bin", "0.0.30", True,
+     "afa9a3d0af61d8deb9dcda509b57b875fedcddb830e58c364a04691fc3c84d15"),
 )
 
 def generate():
