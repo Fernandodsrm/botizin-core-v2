@@ -376,9 +376,11 @@ function renderStatus(txt){
  const d=parseStatus(txt),first=txt.split(/\r?\n/)[0].replace('BOTIZIN CORE ','');
  const wifi=get(d,'WIFI'),server=get(d,'HTTP_SERVER_STARTED'),confirmed=get(d,'HTTP_CONFIRMED_BY_REQUEST');
  const state=get(d,'RUNNING_OTA_STATE');
- $('firmware').textContent=first+' / '+get(d,'RUNNING_PARTITION').split(' / ')[1];
+ const currentSlot=get(d,'RUNNING_PARTITION').includes('app0')?'APP 0':
+    get(d,'RUNNING_PARTITION').includes('app1')?'APP 1':'APP desconhecida';
+ $('firmware').textContent=first+' · '+currentSlot;
  $('network').textContent=wifi+' · HTTP '+(server==='YES'?'iniciado':'não confirmado');
- $('ota').textContent=state+' · '+get(d,'INTERNET_OTA');
+ $('ota').textContent=state+' · '+(d.OTA_AUTOMATIC_ENABLED==='NO'?'OTA manual':'OTA automática');
  const free=Number(d.DIAG_FREE);
  $('memory').textContent=Number.isFinite(free)?Math.round(free/1024)+' KB livres':'—';
  const fields=[
@@ -495,79 +497,169 @@ $('controlConnections').addEventListener('click',()=>runControl('/control/connec
 
 $('settingsGotoOta').addEventListener('click',()=>$('tab-ota3').click());
 const ota3Output=(message)=>{showText('ota3-output',message);};
+let ota3LastSnapshot=null,ota3CatalogLoaded=false,ota3Installing=false;
+function ota3VersionLabel(value) {
+ if(!value||value==='NAO_IDENTIFICADA'||value==='INVALID_IMAGE'||value==='SEM_IMAGEM_RECONHECIVEL')
+   return 'Versão não identificada';
+ return 'CORE '+value;
+}
+function ota3Detail(n,data){
+ const root=$('ota3-detail'+n);
+ root.replaceChildren();
+ const add=(value)=>{
+  const span=document.createElement('span');
+  span.textContent=value;
+  root.append(span);
+ };
+ const imageValid=data['APP'+n+'_IMAGE_DESC']==='ESP_OK';
+ const valid=data['APP'+n+'_STATE_DETAIL']||'ESTADO_NAO_LIDO';
+ const active=data['APP'+n+'_RUNNING']==='YES';
+ add(active?'Executando agora':'Instalada / inativa');
+ add(data['APP'+n+'_NEXT_BOOT']==='YES'?'Próximo boot: esta APP':'Próximo boot: outra APP');
+ add(valid==='VALID'?'Imagem VALID':
+     valid==='SEM_REGISTRO_OTADATA'?'Ainda sem registro de boot':
+     valid==='ESTADO_NAO_LIDO'?'Estado não disponível':valid.replaceAll('_',' '));
+ if(!imageValid)add('Cabeçalho não validado');
+ add(data['APP'+n+'_OTA3']==='YES'?'OTA 3.0':'Sem OTA 3.0');
+}
+function ota3UpdateDestination() {
+ const d=ota3LastSnapshot;
+ let running=d?.APP0_RUNNING==='YES'?0:d?.APP1_RUNNING==='YES'?1:-1;
+ const target=running<0?-1:1-running;
+ const busy=d?.BUSY==='YES'||ota3Installing;
+ if(target<0){
+  showText('ota3-destination','Destino desconhecido. Atualize as informações das APPs.');
+ }else{
+  const oldVersion=d['APP'+target+'_VERSION']||'desconhecida';
+  showText('ota3-destination','Destino: APP '+target+' (inativa) · substitui '+
+    (oldVersion==='NAO_IDENTIFICADA'?'versão não identificada':'CORE '+oldVersion));
+ }
+ const button=$('ota3-install-btn');
+ button.textContent=target<0?'Consultar destino para instalar':'Instalar na APP '+target+' (inativa)';
+ button.disabled=target<0||!ota3CatalogLoaded||busy;
+}
+function ota3Present(data){
+ ota3LastSnapshot=data;
+ for(const n of [0,1]){
+  const active=data['APP'+n+'_RUNNING']==='YES';
+  const el=$('ota3-card'+n);
+  el.classList.toggle('is-running',active);
+  const tag=$('ota3-tag'+n);
+  tag.classList.toggle('is-on',active);
+  tag.textContent=active?'EM EXECUÇÃO':'INSTALADA';
+  showText('ota3-app'+n,ota3VersionLabel(data['APP'+n+'_VERSION']));
+  ota3Detail(n,data);
+ }
+ ota3UpdateDestination();
+ const state=data.STATE||'—',msg=data.MESSAGE||'—';
+ showText('ota3-feedback','Estado da operação: '+state+' · '+msg+
+   ' · lido às '+new Date().toLocaleTimeString('pt-BR'));
+}
 async function ota3GetStatus(){
  const reply=await runControl('/control/ota3/status');
  if(!reply)return null;
- const d=parseStatus(reply);
- function part(n){
-   const id='ota3-app'+n;
-   const version=d['APP'+n+'_VERSION']||'—';
-   const ota=d['APP'+n+'_OTA3']==='YES'?' · OTA3':' · legado/sem OTA3';
-  const phase=d['APP'+n+'_STATE_DETAIL']||'ESTADO_INDEFINIDO';
-  showText(id,version+' | '+(d['APP'+n+'_RUNNING']==='YES'?'EXECUTANDO':'Inativa')+
-    ' | proximo boot: '+(d['APP'+n+'_NEXT_BOOT']==='YES'?'SIM':'NAO')+ota+' | '+phase);
- }
- part(0);part(1);
- showText('ota3-feedback',(d.STATE||'—')+' · '+(d.MESSAGE||'—')+
-    (d.TOTAL?'': ''));
- return d;
+ const data=parseStatus(reply);
+ if(data.APP0_RUNNING || data.APP1_RUNNING)ota3Present(data);
+ return data;
 }
 async function ota3WatchOperation(seconds){
  const deadline=Date.now()+seconds*1000;
  while(Date.now()<deadline){
   await new Promise(resolve=>setTimeout(resolve,1200));
   const reply=await controlPost('/control/ota3/status');
-  const d=parseStatus(reply);
+  const data=parseStatus(reply);
   ota3Output(reply);
-  if(d.BUSY==='NO')return d;
+  if(data.APP0_RUNNING||data.APP1_RUNNING)ota3Present(data);
+  showText('ota3-result',data.BUSY==='YES'?
+      'Operação em andamento: '+(data.MESSAGE||'aguardando')+
+      ' · '+(data.BYTES||'progresso indisponível')+' bytes':
+      (data.STATE==='PRONTO'?'Concluído: ':'Resultado: ')+(data.MESSAGE||'—'));
+  if(data.BUSY==='NO')return data;
  }
- ota3Output('Limite do acompanhamento no navegador. Consulte o estado manualmente.');
+ showText('ota3-result','A consulta de progresso terminou sem confirmação final. Consulte as APPs antes de repetir.');
+ ota3Output('Limite de acompanhamento no navegador. Consulte o estado manualmente.');
  return null;
 }
 async function ota3LoadCatalog(){
- const text=await runControl('/control/ota3/catalog');
- if(!text||!text.startsWith('{'))return;
+ const raw=await runControl('/control/ota3/catalog');
+ if(!raw||!raw.startsWith('{'))return;
  let data;
- try{data=JSON.parse(text)}catch(e){ota3Output('Catalogo invalido: '+e.message);return}
- const select=$('ota3-version');
+ try{data=JSON.parse(raw)}
+ catch(e){ota3Output('Catálogo inválido: '+e.message);return}
+ const select=$('ota3-version'),previous=select.value;
  select.replaceChildren();
  const entries=Array.isArray(data.entries)?data.entries:[];
  for(const item of entries){
   if(!item.approved)continue;
   const option=document.createElement('option');
   option.value=item.id;
-  option.textContent=item.version+' — '+item.label+(item.ota3?'':' [sem OTA3]');
+  option.textContent=item.version+' — '+item.label+
+      (item.experimental?' [EXPERIMENTAL]':'')+
+      (item.ota3?'':' [sem OTA3]');
   select.append(option);
  }
- select.disabled=select.options.length===0;
- $('ota3-install-btn').disabled=select.disabled;
- ota3Output(select.options.length+' versões autorizadas no catálogo. Selecione uma e escolha instalar.');
+ if(previous && [...select.options].some(o=>o.value===previous))select.value=previous;
+ ota3CatalogLoaded=select.options.length>0;
+ select.disabled=!ota3CatalogLoaded;
+ ota3UpdateDestination();
+ showText('ota3-result',select.options.length+
+   ' versões encontradas. Escolha uma para instalar na APP inativa.');
+ ota3Output(select.options.length+' versões no catálogo; nenhuma instalação foi iniciada.');
 }
 $('tab-ota3').addEventListener('click',()=>ota3GetStatus());
-$('ota3-status-btn').addEventListener('click',()=>ota3GetStatus());
-$('ota3-catalog-btn').addEventListener('click',async()=>{
- const r=await runControl('/control/ota3/catalog-refresh');
- if(!r)return;
- const d=await ota3WatchOperation(55);
- if(d&&d.STATE==='PRONTO'&&d.MESSAGE==='CATALOGO_VALIDADO')await ota3LoadCatalog();
+$('ota3-status-btn').addEventListener('click',async()=>{
+ const data=await ota3GetStatus();
+ if(data)showText('ota3-result','Informações das APPs atualizadas às '+
+    new Date().toLocaleTimeString('pt-BR')+'. Nenhuma instalação iniciada.');
 });
+$('ota3-catalog-btn').addEventListener('click',async()=>{
+ const started=await runControl('/control/ota3/catalog-refresh');
+ if(!started)return;
+ try {
+  const data=await ota3WatchOperation(55);
+  if(data&&data.STATE==='PRONTO'&&data.MESSAGE==='CATALOGO_VALIDADO')
+    await ota3LoadCatalog();
+ }catch(e){showText('ota3-result','Consulta indisponível: '+e.message)}
+});
+$('ota3-version').addEventListener('change',ota3UpdateDestination);
 $('ota3-install-btn').addEventListener('click',async()=>{
  const id=$('ota3-version').value;
- const d=await ota3GetStatus();if(!d||!id)return;
- const to=d.APP0_RUNNING==='YES'?'APP 1':'APP 0';
- if(!window.confirm('Instalar '+id+' em '+to+'? A versão existente nesse slot será substituída. A S3 NÃO reinicia automaticamente.'))return;
- const r=await runControl('/control/ota3/install',{id});if(!r)return;
- $('ota3-install-btn').disabled=true;
- try{await ota3WatchOperation(240)}catch(e){ota3Output('Falha ao ler estado: '+e.message)}
- $('ota3-install-btn').disabled=false;
- await ota3GetStatus();
+ const data=await ota3GetStatus();
+ if(!data || !id)return;
+ const target=data.APP0_RUNNING==='YES'?1:data.APP1_RUNNING==='YES'?0:-1;
+ if(target<0){showText('ota3-result','Destino não identificado. Instalação bloqueada.');return}
+ if(!window.confirm('Instalar '+id+' na APP '+target+' (inativa)? '+
+   'A versão instalada nesse slot será SUBSTITUÍDA. '+
+   'A S3 continuará executando a APP '+(1-target)+' sem reiniciar.'))return;
+ ota3Installing=true;ota3UpdateDestination();
+ try{
+  const reply=await runControl('/control/ota3/install',{id});
+  if(!reply)return;
+  const result=await ota3WatchOperation(240);
+  if(result && result.STATE==='PRONTO' &&
+       result.MESSAGE.includes('_GRAVADA_SEM_TROCAR_BOOT')){
+    showText('ota3-result','Firmware gravado na APP '+target+
+      '. A S3 continua na APP '+(1-target)+'. Para iniciar a nova versão, use o botão correspondente.');
+  }
+ }catch(e){showText('ota3-result','Falha ao acompanhar instalação: '+e.message)}
+ finally{
+  ota3Installing=false;
+  // Refresh versions and boot state after flash, without reboot or GitHub lookup.
+  await ota3GetStatus();
+  ota3UpdateDestination();
+ }
 });
 async function ota3Boot(slot){
- const d=await ota3GetStatus();if(!d)return;
- const version=d['APP'+slot+'_VERSION']||'desconhecida';
- if(!window.confirm('REINICIAR na APP '+slot+' ('+version+')? Se o firmware não abrir o painel, pode precisar de USB.'))return;
- const r=await runControl('/control/ota3/boot',{slot:String(slot)});
- if(r)ota3Output(r+'\nA conexão com o painel será interrompida.');
+ const data=await ota3GetStatus();if(!data)return;
+ const version=data['APP'+slot+'_VERSION']||'desconhecida';
+ if(!window.confirm('REINICIAR na APP '+slot+' ('+version+')? '+
+    'Não haverá gravação. Se o firmware não abrir o painel, pode ser necessário USB.'))return;
+ const reply=await runControl('/control/ota3/boot',{slot:String(slot)});
+ if(reply){
+  ota3Output(reply+'\nA conexão com o painel será interrompida.');
+  showText('ota3-result','Reinício solicitado na APP '+slot+
+    '. Quando a S3 voltar, a nova página mostrará a versão em execução.');
+ }
 }
 $('ota3-boot0').addEventListener('click',()=>ota3Boot(0));
 $('ota3-boot1').addEventListener('click',()=>ota3Boot(1));
