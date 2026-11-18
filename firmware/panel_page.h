@@ -66,8 +66,8 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 </style></head><body>
 <main>
 <header><div><div class="logo">FERNANDO LAB</div><h1>BOTIZIN / Central da S3</h1></div>
-<div class="flag">OTA 3.0 · CORE 0.0.30 CANDIDATA</div></header>
-<p class="description">CORE 0.0.30 candidata: Wi-Fi 2.2 validado e OTA 3.0 com identificacao real dos firmwares e relatorio de instalacao.</p>
+<div class="flag">OTA 3.0 · CORE 0.0.31 CANDIDATA</div></header>
+<p class="description">CORE 0.0.31 candidata: Wi-Fi 2.2 validado e OTA 3.0 com gerenciador visual de versoes, instalacao manual e selecao segura de APP.</p>
 <div class="state" id="state" role="status" aria-live="polite">Nenhum diagnóstico recebido.</div>
 <div class="g" id="metrics">
 <div class="metric"><div class="k">Versão em execução</div><div class="v" id="firmware">—</div></div>
