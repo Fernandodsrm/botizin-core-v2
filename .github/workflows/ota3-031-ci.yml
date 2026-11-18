@@ -1,0 +1,103 @@
+name: BOTIZIN OTA3 0.0.31 (corrigir versoes sem alterar main)
+on:
+  push:
+    branches: ['candidate/ota3-0.0.31-panel-final']
+    paths:
+      - 'firmware/**'
+      - 'ci/build.py'
+      - 'ci/ota3_image_ids.py'
+      - 'ota3/**'
+      - 'tests/ota3_invariants_test.py'
+      - 'tests/ota3_panel_ux_test.py'
+      - '.github/workflows/ota3-031-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.repository == 'Fernandodsrm/botizin-core-v2' && github.ref == 'refs/heads/candidate/ota3-0.0.31-panel-final'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Testes de contrato, identidade e JS
+        run: |
+          set -euo pipefail
+          python3 tests/ota3_invariants_test.py
+          python3 tests/ota3_panel_ux_test.py
+          python3 ci/ota3_image_ids.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          s=Path('firmware/panel_page.h').read_text()
+          html=re.search(r'R"BTZN\((.*?)\)BTZN"',s,re.S).group(1)
+          Path('/tmp/ota3-panel-030.js').write_text(re.search(r'<script>(.*?)</script>',html,re.S).group(1))
+          known=Path('firmware/ota3_known_ids.h').read_text()
+          assert '"0.0.30"' in known and '"0.0.29"' in known and '"0.0.28"' in known
+          assert 'ota3KnownImage(' in known
+          PY
+          node --check /tmp/ota3-panel-030.js
+      - uses: arduino/setup-arduino-cli@v2
+        with:
+          version: '1.5.1'
+      - name: ESP32 3.3.12 e MQTT
+        run: |
+          set -euo pipefail
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install 'PubSubClient@2.8'
+      - name: Compilar S3 experimental sem release
+        run: |
+          set -euo pipefail
+          unset BOTIZIN_TB_DEVICE_TOKEN
+          python3 ci/build.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          d=json.loads(Path('dist/build-record.json').read_text())
+          b=Path('dist/firmware.bin').read_bytes()
+          assert d['version']=='0.0.31'
+          assert d['published'] is False and d['publishable'] is False
+          assert d['device_token_compiled'] is False and d['thingsboard_enabled'] is False
+          assert b'OTA3_CANDIDATE_030' in b
+          assert b'OTA_AUTOMATIC_ENABLED: NO' in b
+          assert b'OTA3_LAST_SHA256:' in b
+          assert len(b)<=3145728 and b[:1]==b'\xe9'
+          print('OTA3_031_COMPILED_CANDIDATE_OK',len(b),d['sha256'])
+          PY
+      - name: Gravar BIN apenas nesta branch candidata, sem tocar main
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/candidate/ota3-0.0.31-panel-final'
+          mkdir -p packages/ota3-0.0.31
+          cp dist/firmware.bin packages/ota3-0.0.31/firmware.bin
+          cp dist/firmware.bin.sha256 packages/ota3-0.0.31/firmware.bin.sha256
+          cp dist/build-record.json packages/ota3-0.0.31/build-record.json
+          git add -f packages/ota3-0.0.31/firmware.bin packages/ota3-0.0.31/firmware.bin.sha256 packages/ota3-0.0.31/build-record.json
+          # ci/build.py generates a temporary image fingerprint header for this build.
+          # Rebase requires a clean worktree; restore the tracked fallback only AFTER compilation.
+          git restore -- firmware/ota3_known_ids.h
+          if ! git diff --cached --quiet; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'build(ota3): 0.0.31 candidata CI, sem release'
+            git fetch origin refs/heads/candidate/ota3-0.0.31-panel-final:refs/remotes/origin/candidate/ota3-0.0.31-panel-final
+            changed=$(git diff --name-only "$GITHUB_SHA" refs/remotes/origin/candidate/ota3-0.0.31-panel-final -- firmware ci tests .github ota3)
+            test -z "$changed" || { echo "SOURCE_CHANGED_DURING_BUILD"; exit 1; }
+            git rebase refs/remotes/origin/candidate/ota3-0.0.31-panel-final
+            git push origin HEAD:refs/heads/candidate/ota3-0.0.31-panel-final
+          fi
+      - name: Artefato experimental (nao instalar automaticamente)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OTA3-031-EXPERIMENTAL-NOT-RELEASE
+          path: |
+            dist/firmware.bin
+            dist/firmware.bin.sha256
+            dist/build-record.json
+            dist/compile.log
+          retention-days: 14
+          if-no-files-found: error
