@@ -3,6 +3,19 @@
   "board": "esp32s3-n16r8",
   "entries": [
     {
+      "id": "0.0.31-ota3-ui-beta",
+      "version": "0.0.31",
+      "label": "OTA 3.0 visual - CANDIDATA, sem teste fisico",
+      "board": "esp32s3-n16r8",
+      "size": 1300480,
+      "sha256": "6e526a8299dd24c112c5324878954c1dea81d0f15e99ae49d6484d4ee57dda82",
+      "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/232cc5040b00afb72c7e44eb91628c980e3d6cab/packages/ota3-0.0.31/firmware.bin",
+      "ota3": true,
+      "approved": true,
+      "physical_test": false,
+      "experimental": true
+    },
+    {
       "id": "0.0.30-ota3-beta",
       "version": "0.0.30",
       "label": "OTA3 revisado - CANDIDATA SEM TESTE FISICO",
