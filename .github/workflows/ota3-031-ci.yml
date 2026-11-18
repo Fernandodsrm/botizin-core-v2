@@ -64,7 +64,7 @@ jobs:
           assert d['version']=='0.0.31'
           assert d['published'] is False and d['publishable'] is False
           assert d['device_token_compiled'] is False and d['thingsboard_enabled'] is False
-          assert b'OTA3_CANDIDATE_030' in b
+          assert b'OTA3_CANDIDATE_031' in b
           assert b'OTA_AUTOMATIC_ENABLED: NO' in b
           assert b'OTA3_LAST_SHA256:' in b
           assert len(b)<=3145728 and b[:1]==b'\xe9'
