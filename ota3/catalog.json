@@ -3,6 +3,32 @@
   "board": "esp32s3-n16r8",
   "entries": [
     {
+      "id": "0.0.30-ota3-beta",
+      "version": "0.0.30",
+      "label": "OTA3 revisado - CANDIDATA SEM TESTE FISICO",
+      "board": "esp32s3-n16r8",
+      "size": 1293728,
+      "sha256": "afa9a3d0af61d8deb9dcda509b57b875fedcddb830e58c364a04691fc3c84d15",
+      "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/b416b5f1658c563f0c7ef599a1f6d8cffcc22311/packages/ota3-0.0.30/firmware.bin",
+      "ota3": true,
+      "approved": true,
+      "physical_test": false,
+      "experimental": true
+    },
+    {
+      "id": "0.0.29-ota3",
+      "version": "0.0.29",
+      "label": "OTA3 - boot, catalogo e gravacao testados",
+      "board": "esp32s3-n16r8",
+      "size": 1290208,
+      "sha256": "1e35e161df445aca08efa92d3adf42eedda57a6ebda0aadad263ae33fce0c8cf",
+      "url": "https://raw.githubusercontent.com/Fernandodsrm/botizin-core-v2/f79d42b0565d32fb935d6508125741d132cf1119/packages/ota3-0.0.29/firmware.bin",
+      "ota3": true,
+      "approved": true,
+      "physical_test": true,
+      "experimental": true
+    },
+    {
       "id": "0.0.28-wifi2",
       "version": "0.0.28",
       "label": "Wi-Fi 2.2 validado",
