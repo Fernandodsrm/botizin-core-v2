@@ -50,8 +50,8 @@ a{color:#b3f2d3;text-decoration:underline}.tiny{font-size:.75rem;color:#9db5ab}
 </style></head><body>
 <main>
 <header><div><div class="logo">FERNANDO LAB</div><h1>BOTIZIN / Central da S3</h1></div>
-<div class="flag">WIFI 2.2 · CORE 0.0.28 CANDIDATA</div></header>
-<p class="description">CORE 0.0.29 candidata: Wi-Fi 2.2 validado e OTA 3.0 manual com catálogo de versões GitHub e dois slots livres.</p>
+<div class="flag">OTA 3.0 · CORE 0.0.30 CANDIDATA</div></header>
+<p class="description">CORE 0.0.30 candidata: Wi-Fi 2.2 validado e OTA 3.0 com identificacao real dos firmwares e relatorio de instalacao.</p>
 <div class="state" id="state" role="status" aria-live="polite">Nenhum diagnóstico recebido.</div>
 <div class="g" id="metrics">
 <div class="metric"><div class="k">Firmware / slot</div><div class="v" id="firmware">—</div></div>
@@ -471,8 +471,10 @@ async function ota3GetStatus(){
  function part(n){
    const id='ota3-app'+n;
    const version=d['APP'+n+'_VERSION']||'—';
-   showText(id,version+' | '+(d['APP'+n+'_RUNNING']==='YES'?'EXECUTANDO':'Inativa')+
-    ' | proximo boot: '+(d['APP'+n+'_NEXT_BOOT']==='YES'?'SIM':'NAO'));
+   const ota=d['APP'+n+'_OTA3']==='YES'?' · OTA3':' · legado/sem OTA3';
+  const phase=d['APP'+n+'_STATE_DETAIL']||'ESTADO_INDEFINIDO';
+  showText(id,version+' | '+(d['APP'+n+'_RUNNING']==='YES'?'EXECUTANDO':'Inativa')+
+    ' | proximo boot: '+(d['APP'+n+'_NEXT_BOOT']==='YES'?'SIM':'NAO')+ota+' | '+phase);
  }
  part(0);part(1);
  showText('ota3-feedback',(d.STATE||'—')+' · '+(d.MESSAGE||'—')+
